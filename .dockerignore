@@ -1,3 +1,9 @@
 # flyctl launch added from .gitignore
 **/data
 fly.toml
+**/.env
+**/bin
+.git
+**/.git
+.DS_Store
+pocker

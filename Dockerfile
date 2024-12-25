@@ -2,18 +2,15 @@
 FROM golang:latest AS builder
 
 WORKDIR /app
-
-# Copy go mod and sum files
-COPY go.mod go.sum ./
-
-# Download dependencies
-RUN go mod download
-
-# Copy the source code
 COPY . .
 
+# WORKDIR /app/pocker
+
+# # Download dependencies
+# RUN go mod download
+
 # Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -o pocker ./examples/pocker/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -o pocker ./examples/fly/main.go
 
 # Final stage
 FROM alpine:latest

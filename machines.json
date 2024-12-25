@@ -1,0 +1,212 @@
+[
+  {
+    "machineId": "784e694b290248",
+    "name": "wispy-bird-1237",
+    "region": "sjc",
+    "privateIp": "fdaa:9:e182:a7b:16d:30ee:1b7d:2"
+  },
+  {
+    "machineId": "784e1d1cee7268",
+    "name": "icy-thunder-5466",
+    "region": "sea",
+    "privateIp": "fdaa:9:e182:a7b:1ac:a0db:93fe:2"
+  },
+  {
+    "machineId": "0806de9c532048",
+    "name": "fragrant-resonance-2749",
+    "region": "den",
+    "privateIp": "fdaa:9:e182:a7b:a:295d:17c1:2"
+  },
+  {
+    "machineId": "0801e44c56e538",
+    "name": "floral-voice-5099",
+    "region": "ord",
+    "privateIp": "fdaa:9:e182:a7b:2a9:a12d:6df2:2"
+  },
+  {
+    "machineId": "148e2d03c22068",
+    "name": "bitter-moon-9061",
+    "region": "lax",
+    "privateIp": "fdaa:9:e182:a7b:2b9:4538:db29:2"
+  },
+  {
+    "machineId": "683dd71a729448",
+    "name": "quiet-wildflower-3660",
+    "region": "atl",
+    "privateIp": "fdaa:9:e182:a7b:e4:668:d4d0:2"
+  },
+  {
+    "machineId": "48eddeef772198",
+    "name": "weathered-glitter-8055",
+    "region": "yyz",
+    "privateIp": "fdaa:9:e182:a7b:f2:dd7a:47ad:2"
+  },
+  {
+    "machineId": "d8913e4c614278",
+    "name": "late-feather-6405",
+    "region": "qro",
+    "privateIp": "fdaa:9:e182:a7b:1b5:e501:8166:2"
+  },
+  {
+    "machineId": "5683045dfde228",
+    "name": "sparkling-sky-5044",
+    "region": "gdl",
+    "privateIp": "fdaa:9:e182:a7b:352:d42a:63b:2"
+  },
+  {
+    "machineId": "9185e234a06338",
+    "name": "empty-moon-8571",
+    "region": "mia",
+    "privateIp": "fdaa:9:e182:a7b:2eb:6f2b:22dd:2"
+  },
+  {
+    "machineId": "e825d04b7010d8",
+    "name": "frosty-sunset-668",
+    "region": "phx",
+    "privateIp": "fdaa:9:e182:a7b:2c7:c84e:76ec:2"
+  },
+  {
+    "machineId": "28715e9a07d228",
+    "name": "silent-violet-7870",
+    "region": "iad",
+    "privateIp": "fdaa:9:e182:a7b:304:c288:15b7:2"
+  },
+  {
+    "machineId": "e824004f0e5328",
+    "name": "empty-sun-948",
+    "region": "bos",
+    "privateIp": "fdaa:9:e182:a7b:13:cfcb:57e1:2"
+  },
+  {
+    "machineId": "d8dd954a13ed78",
+    "name": "weathered-grass-9116",
+    "region": "dfw",
+    "privateIp": "fdaa:9:e182:a7b:66:bfd0:fd76:2"
+  },
+  {
+    "machineId": "1852d36f191448",
+    "name": "billowing-smoke-7384",
+    "region": "ewr",
+    "privateIp": "fdaa:9:e182:a7b:b:2700:c6d0:2"
+  },
+  {
+    "machineId": "080e54db557928",
+    "name": "still-glade-2685",
+    "region": "eze",
+    "privateIp": "fdaa:9:e182:a7b:146:819:2f13:2"
+  },
+  {
+    "machineId": "2867642a943de8",
+    "name": "spring-bush-6608",
+    "region": "syd",
+    "privateIp": "fdaa:9:e182:a7b:2db:a3e3:6dca:2"
+  },
+  {
+    "machineId": "9080142b0d6d38",
+    "name": "delicate-thunder-1531",
+    "region": "lhr",
+    "privateIp": "fdaa:9:e182:a7b:2808:e0c8:1b:2"
+  },
+  {
+    "machineId": "e82d92efe557d8",
+    "name": "hidden-sea-8605",
+    "region": "yul",
+    "privateIp": "fdaa:9:e182:a7b:144:b098:1aff:2"
+  },
+  {
+    "machineId": "28663d9c670778",
+    "name": "rough-silence-5057",
+    "region": "bog",
+    "privateIp": "fdaa:9:e182:a7b:273:1466:4d2c:2"
+  },
+  {
+    "machineId": "48ed67ea142578",
+    "name": "winter-voice-815",
+    "region": "bom",
+    "privateIp": "fdaa:9:e182:a7b:177:35e6:e3ec:2"
+  },
+  {
+    "machineId": "918597df094383",
+    "name": "late-voice-9971",
+    "region": "hkg",
+    "privateIp": "fdaa:9:e182:a7b:7f07:54e0:eea3:2"
+  },
+  {
+    "machineId": "e8254d5c741918",
+    "name": "floral-bush-529",
+    "region": "nrt",
+    "privateIp": "fdaa:9:e182:a7b:2df:48d3:e2dd:2"
+  },
+  {
+    "machineId": "48e2911be90998",
+    "name": "patient-brook-8772",
+    "region": "ams",
+    "privateIp": "fdaa:9:e182:a7b:38:bd9c:c96c:2"
+  },
+  {
+    "machineId": "2867540c790628",
+    "name": "icy-dawn-471",
+    "region": "cdg",
+    "privateIp": "fdaa:9:e182:a7b:108:86e0:a97c:2"
+  },
+  {
+    "machineId": "185e13eb4004e8",
+    "name": "muddy-shadow-5603",
+    "region": "fra",
+    "privateIp": "fdaa:9:e182:a7b:73:72eb:b1db:2"
+  },
+  {
+    "machineId": "d8d9776f160368",
+    "name": "winter-mountain-3406",
+    "region": "scl",
+    "privateIp": "fdaa:9:e182:a7b:fb:9d4b:1fd5:2"
+  },
+  {
+    "machineId": "2871573a146528",
+    "name": "broken-water-8937",
+    "region": "waw",
+    "privateIp": "fdaa:9:e182:a7b:2d4:74a8:fe1:2"
+  },
+  {
+    "machineId": "185e172c454118",
+    "name": "red-wave-2703",
+    "region": "arn",
+    "privateIp": "fdaa:9:e182:a7b:35a:d8b6:8f99:2"
+  },
+  {
+    "machineId": "d891d12b6e2398",
+    "name": "snowy-glitter-6162",
+    "region": "sin",
+    "privateIp": "fdaa:9:e182:a7b:fe:49cc:218a:2"
+  },
+  {
+    "machineId": "2874435c399358",
+    "name": "icy-mountain-9346",
+    "region": "gig",
+    "privateIp": "fdaa:9:e182:a7b:d5:347c:a03a:2"
+  },
+  {
+    "machineId": "e82d627a499d28",
+    "name": "polished-firefly-4919",
+    "region": "mad",
+    "privateIp": "fdaa:9:e182:a7b:1be:87b1:fcfd:2"
+  },
+  {
+    "machineId": "080e205a635638",
+    "name": "dry-forest-9361",
+    "region": "gru",
+    "privateIp": "fdaa:9:e182:a7b:135:8dde:1f02:2"
+  },
+  {
+    "machineId": "e82d6d4ce77518",
+    "name": "cool-cherry-9349",
+    "region": "otp",
+    "privateIp": "fdaa:9:e182:a7b:1ad:c147:c30b:2"
+  },
+  {
+    "machineId": "9185e270a05598",
+    "name": "misty-fog-9201",
+    "region": "jnb",
+    "privateIp": "fdaa:9:e182:a7b:2e4:f3c3:8e45:2"
+  }
+]

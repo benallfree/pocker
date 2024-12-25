@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Error Occurred</title>
+    <style>
+      body {
+        font-family: system-ui, -apple-system, sans-serif;
+        padding: 2rem;
+        max-width: 800px;
+        margin: 0 auto;
+        text-align: center;
+        background-color: #000000;
+        color: #ffffff;
+      }
+      .error-box {
+        background: #fff1f0;
+        border: 1px solid #ffa39e;
+        padding: 1rem;
+        border-radius: 4px;
+        margin-top: 2rem;
+        text-align: left;
+        color: #000000;
+      }
+      .robot-image {
+        width: 200px;
+        height: 200px;
+        margin: 1rem auto;
+        border-radius: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <img
+      class="robot-image"
+      src="https://robohash.org/{{ .timestamp }}?set=set3"
+      alt="Robot friend"
+    />
+    <h1>Willow is unhappy.</h1>
+    <div class="error-box">
+      <p>An error occurred while processing your request:</p>
+      <pre>{{ .error }}</pre>
+      <p>If you don't know what to do, please contact support.</p>
+    </div>
+  </body>
+</html>

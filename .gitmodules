@@ -1,0 +1,6 @@
+[submodule "forks/pluja-pocketbase"]
+	path = forks/pluja-pocketbase
+	url = https://github.com/benallfree/pluja-pocketbase
+[submodule "forks/pocketbase"]
+	path = forks/pocketbase
+	url = https://github.com/benallfree/pocketbase
