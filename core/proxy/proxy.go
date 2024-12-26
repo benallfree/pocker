@@ -74,7 +74,7 @@ func (p *Proxy) bindEdgeApi(r *gin.Engine) {
 
 func (p *Proxy) bindPockerDefaultHandler(r *gin.Engine) {
 	pockerMiddlewares := []gin.HandlerFunc{
-		middleware.RequestLoggerMiddleware(),
+		// middleware.RequestLoggerMiddleware(),
 	}
 	pockerMiddlewares = append(pockerMiddlewares, p.config.PockerMiddlewares...)
 	pockerMiddlewares = append(pockerMiddlewares, middleware.PockerMiddleware(p.config.PockerMiddlewareConfig))
