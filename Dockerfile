@@ -27,4 +27,4 @@ RUN mkdir /data
 EXPOSE 8080
 
 # Run the binary
-CMD ["/pocker"] 
+CMD ["sh", "-c", "ulimit -n 1000000 && /pocker"]
