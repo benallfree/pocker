@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"runtime/debug"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -19,7 +18,7 @@ var recoveryTemplate string
 
 type errorResponse struct {
 	Error     interface{} `json:"error"`
-	Timestamp int64       `json:"timestamp"`
+	Signature string      `json:"signature"`
 }
 
 func RecoveryMiddleware() gin.HandlerFunc {
@@ -28,13 +27,18 @@ func RecoveryMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		defer func() {
 			if err := recover(); err != nil {
+				if err == http.ErrAbortHandler {
+					slog.Debug("Request aborted", "request", c.Request.URL.Path)
+					return
+				}
 				// Get stack trace
 				stack := debug.Stack()
 
 				// Log both the error and stack trace
-				slog.Error(fmt.Sprintf("Panic in request handler: %s\n%s", err, string(stack)))
+				slog.Error("Caught panic on request", "request", c.Request.URL.Path, "error", err)
+				slog.Error(fmt.Sprintf("Stack trace: %s\n", string(stack)))
 
-				timestamp := time.Now().UnixMicro()
+				signature := fmt.Sprintf("%s-%s", c.Request.URL.Path, err)
 
 				// Get Accept header and default to HTML if not specified
 				accept := c.GetHeader("Accept")
@@ -44,7 +48,7 @@ func RecoveryMiddleware() gin.HandlerFunc {
 				// Prepare common response data
 				data := errorResponse{
 					Error:     err,
-					Timestamp: timestamp,
+					Signature: signature,
 				}
 
 				// Return format based on Accept header
@@ -53,12 +57,12 @@ func RecoveryMiddleware() gin.HandlerFunc {
 					c.JSON(http.StatusInternalServerError, data)
 
 				case strings.Contains(accept, "text/plain"):
-					c.String(http.StatusInternalServerError, "Internal Server Error\nError: %v\nTimestamp: %d", err, timestamp)
+					c.String(http.StatusInternalServerError, "Internal Server Error: %S", signature)
 
 				default: // HTML response
 					tmpl.Execute(c.Writer, gin.H{
 						"error":     err,
-						"timestamp": timestamp,
+						"signature": signature,
 					})
 				}
 			}
