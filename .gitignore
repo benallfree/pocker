@@ -20,6 +20,6 @@ CHANGELOG_8_15.html
 LICENSE.html
 data
 
-.env
+.env*
 pocker
 tmp
