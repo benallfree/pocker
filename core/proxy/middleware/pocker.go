@@ -8,6 +8,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -102,14 +103,18 @@ func PockerMiddleware(config PockerMiddlewareConfig) gin.HandlerFunc {
 		proxy := httputil.NewSingleHostReverseProxy(proxyUrl)
 
 		// Configure proxy with custom transport that skips TLS verification
-		proxy.Transport = &http.Transport{
+		transport := &http.Transport{
 			TLSClientConfig: &tls.Config{
 				InsecureSkipVerify: true,
 			},
+			MaxIdleConns:        100000,
+			MaxConnsPerHost:     1000,
+			MaxIdleConnsPerHost: 1000,
+			IdleConnTimeout:     5 * time.Minute,
 		}
-
+		proxy.Transport = transport
 		proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
-			panic(err)
+			slog.Warn("Inside proxy error handler", "error", err)
 		}
 		proxy.ServeHTTP(c.Writer, c.Request)
 		c.Next()
