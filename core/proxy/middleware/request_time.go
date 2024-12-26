@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"fmt"
-	"log/slog"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -29,15 +28,15 @@ func (w *customResponseWriter) WriteHeader(code int) {
 	w.Header().Set("X-PocketHost-Request-End-Time", fmt.Sprintf("%d", end.UnixMilli()))
 	w.Header().Set("X-PocketHost-Request-Duration", fmt.Sprintf("%d", elapsed.Milliseconds()))
 	w.ResponseWriter.WriteHeader(code)
-	slog.Debug("Request timing",
-		"url", w.context.Request.URL.String(),
-		"scheme", w.context.Request.URL.Scheme,
-		"host", w.context.Request.Host,
-		"path", w.context.Request.URL.Path,
-		"method", w.context.Request.Method,
-		"start", w.start.UnixMilli(),
-		"end", end.UnixMilli(),
-		"duration", elapsed.Milliseconds())
+	// slog.Debug("Request timing",
+	// 	"url", w.context.Request.URL.String(),
+	// 	"scheme", w.context.Request.URL.Scheme,
+	// 	"host", w.context.Request.Host,
+	// 	"path", w.context.Request.URL.Path,
+	// 	"method", w.context.Request.Method,
+	// 	"start", w.start.UnixMilli(),
+	// 	"end", end.UnixMilli(),
+	// 	"duration", elapsed.Milliseconds())
 }
 
 func RequestTimerMiddleware() gin.HandlerFunc {
