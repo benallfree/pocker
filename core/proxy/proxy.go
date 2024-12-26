@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"log/slog"
+	"net"
 	"net/http"
 	"pocker/core/proxy/middleware"
 
@@ -38,12 +39,18 @@ func (p *Proxy) Start() {
 	p.applyGlobalMiddlewares(r)
 	p.bindEdgeApi(r)
 	p.bindPockerDefaultHandler(r)
-	r.Run(p.config.ListenAddr)
+	server := &http.Server{
+		Addr:    p.config.ListenAddr,
+		Handler: r,
+		ConnState: func(conn net.Conn, state http.ConnState) {
+			// slog.Debug("Connection state", "state", state, "ip", conn.RemoteAddr(), "url", conn.RemoteAddr().String())
+		},
+	}
 
 	slog.Info("Starting main server",
 		"addr", p.config.ListenAddr)
 
-	if err := http.ListenAndServe(p.config.ListenAddr, nil); err != nil {
+	if err := server.ListenAndServe(); err != nil {
 		slog.Error("Server failed to start",
 			"error", err)
 		panic(err)
