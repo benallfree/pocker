@@ -1,0 +1,4 @@
+#! /bin/bash
+
+./sfly secrets import < .env.staging
+./sfly deploy
