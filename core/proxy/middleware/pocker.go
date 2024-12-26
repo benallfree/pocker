@@ -60,7 +60,7 @@ func PockerMiddleware(config PockerMiddlewareConfig) gin.HandlerFunc {
 	}
 
 	isLegacyOriginHelper := thisMachineId == legacyOriginHelperMachineId
-	slog.Debug("Is legacy origin helper", "is_legacy_origin_helper", isLegacyOriginHelper)
+	// slog.Debug("Is legacy origin helper", "is_legacy_origin_helper", isLegacyOriginHelper)
 	return func(c *gin.Context) {
 		// deployment, err := ioc.DeploymentService().GetDeploymentByHost(c.Request.Host)
 		// if err != nil {
@@ -77,7 +77,7 @@ func PockerMiddleware(config PockerMiddlewareConfig) gin.HandlerFunc {
 		// }
 
 		host := strings.Split(c.Request.Host, ":")[0]
-		slog.Debug("Received request from host", "host", host)
+		// slog.Debug("Received request from host", "host", host)
 
 		subdomain := strings.Split(host, ".")[0]
 		finalHost := fmt.Sprintf("%s.%s", subdomain, legacyApexDomain)
@@ -86,12 +86,12 @@ func PockerMiddleware(config PockerMiddlewareConfig) gin.HandlerFunc {
 
 		proxyUrl := legacyOriginUrl
 		if !isLegacyOriginHelper {
-			slog.Debug("Machine id is not the legacy origin helper machine id, using legacy origin helper machine", "machine_id", thisMachineId)
+			// slog.Debug("Machine id is not the legacy origin helper machine id, using legacy origin helper machine", "machine_id", thisMachineId)
 			proxyUrl = legacyOriginHelperProxyUrl
 		}
 
-		logRequest("Modified request", c)
-		slog.Debug("Proxy URL", "url", proxyUrl)
+		// logRequest("Modified request", c)
+		// slog.Debug("Proxy URL", "url", proxyUrl)
 
 		c.Request.Header.Set("X-Pockethost-Secret", secret)
 
