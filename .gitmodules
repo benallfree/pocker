@@ -4,3 +4,6 @@
 [submodule "forks/pocketbase"]
 	path = forks/pocketbase
 	url = https://github.com/benallfree/pocketbase
+[submodule "forks/geesefs"]
+	path = forks/geesefs
+	url = https://github.com/benallfree/geesefs

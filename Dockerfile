@@ -1,5 +1,13 @@
 # Build stage
-FROM golang:latest AS builder
+FROM golang:alpine AS builder
+
+RUN apk add --no-cache wget
+
+ENV GEESEFS_VERSION=v0.42.0-tigris1
+ENV GEESEFS_BIN=geesefs-linux-amd64
+RUN wget -O /usr/local/bin/geesefs https://github.com/tigrisdata/geesefs/releases/download/${GEESEFS_VERSION}/${GEESEFS_BIN}
+RUN chmod +x /usr/local/bin/geesefs
+
 
 WORKDIR /app
 COPY . .
@@ -15,16 +23,25 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o pocker ./examples/fly/main.go
 # Final stage
 FROM alpine:latest
 
-WORKDIR /
+# Install supervisord and other dependencies
+RUN apk add --no-cache supervisor fuse3
+
+# Create data directory for persistence
+RUN mkdir -p /data
+RUN mkdir -p /data/geesefs-cache
+RUN mkdir -p /mnt/data
+
+# Install geesefs
+COPY --from=builder /usr/local/bin/geesefs /usr/local/bin/geesefs
+
+# Set up supervisord configuration
+COPY docker/supervisord.conf /etc/supervisord.conf
 
 # Copy the binary from builder
 COPY --from=builder /app/pocker .
 
-# Create data directory for persistence
-RUN mkdir /data
-
 # Expose the port specified in fly.toml
 EXPOSE 8080
 
-# Run the binary
-CMD ["sh", "-c", "ulimit -n 1000000 && /pocker"]
+# Run supervisord
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
