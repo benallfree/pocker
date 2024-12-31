@@ -7,3 +7,6 @@
 [submodule "forks/geesefs"]
 	path = forks/geesefs
 	url = https://github.com/benallfree/geesefs
+[submodule "forks/sturdyc"]
+	path = forks/sturdyc
+	url = https://github.com/benallfree/sturdyc.git

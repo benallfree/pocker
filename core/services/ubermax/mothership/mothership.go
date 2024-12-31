@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"pocker/core/ioc"
-	"pocker/core/providers/deployment/ubermax/mothership/mirror"
+	"pocker/core/services/ubermax/mothership/mirror"
 	"sync"
 
 	"github.com/pluja/pocketbase"

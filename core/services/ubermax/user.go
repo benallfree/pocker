@@ -1,15 +1,11 @@
-package models
-
-import (
-	"pocker/core/syncx"
-)
+package ubermax
 
 type S3Config struct {
 	Key    string `json:"key"`
 	Secret string `json:"secret"`
 }
 
-type UserRec struct {
+type User struct {
 	RecordBase
 	Email                string   `json:"email"`
 	PasswordHash         string   `json:"passwordHash"`
@@ -23,36 +19,4 @@ type UserRec struct {
 	Verified             bool     `json:"verified"`
 	Suspension           string   `json:"suspension"`
 	DoubleVerified       bool     `json:"double_verified"`
-}
-
-type User struct {
-	rec *UserRec
-}
-
-func (p *User) IsVerified() bool {
-	return p.rec.Verified
-}
-
-func (p *User) SuspendedReason() string {
-	return p.rec.Suspension
-}
-
-func (p *User) IsSuspended() bool {
-	return p.rec.Suspension != ""
-}
-
-func (p *User) GetFieldMap() map[string]string {
-	return map[string]string{
-		"id":       p.rec.Id,
-		"email":    p.rec.Email,
-		"username": p.rec.Username,
-	}
-}
-
-type UserReference struct {
-	syncx.Reference[*User]
-}
-
-func NewUser() *User {
-	return &User{}
 }

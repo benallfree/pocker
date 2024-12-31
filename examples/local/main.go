@@ -8,8 +8,11 @@ import (
 	"os"
 	"os/signal"
 	"pocker"
+	"pocker/core/ioc"
 	"pocker/core/proxy"
 	"pocker/core/proxy/middleware"
+	"pocker/core/services/machine/local"
+	"pocker/core/services/ubermax"
 	"syscall"
 
 	"github.com/caarlos0/env/v11"
@@ -31,7 +34,7 @@ type EnvConfig struct {
 func main() {
 	// Load .env file if present
 	if err := godotenv.Load(); err != nil {
-		slog.Warn("No .env file found: %v", err)
+		slog.Warn("No .env file found", "error", err)
 	}
 
 	cfg, err := env.ParseAs[EnvConfig]()
@@ -52,6 +55,15 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	machineInfoService := local.New(*machine, "local")
+	ioc.RegisterMachineInfoService(machineInfoService)
+
+	mothershipService := ubermax.New()
+	ioc.RegisterMothershipService(mothershipService)
+
+	machineInfoService.Start()
+	mothershipService.Start()
 
 	// deploymentProvider := ubermax.New()
 	// ioc.RegisterDeploymentService(deploymentProvider)
@@ -77,7 +89,6 @@ func main() {
 				LegacyOriginUrl:             cfg.LegacyOriginUrl,
 				LegacyApexDomain:            cfg.LegacyApexDomain,
 				LegacyOriginHelperMachineId: cfg.LegacyOriginHelperMachineId,
-				MachineId:                   *machine,
 				LegacyOriginHelperProxyUrl:  cfg.LegacyOriginHelperProxyUrl,
 				PHSecret:                    cfg.PHSecret,
 			},

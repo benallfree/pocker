@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
@@ -34,7 +35,21 @@ func (p *Proxy) Start() {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
-	r := gin.Default()
+	r := gin.New()
+	r.Use(gin.LoggerWithConfig(gin.LoggerConfig{
+		Formatter: func(param gin.LogFormatterParams) string {
+			return fmt.Sprintf("[GIN] %v | %3d | %13v | %7s | %s | %s | %s\n",
+				param.TimeStamp.Format("2006/01/02 - 15:04:05"),
+				param.StatusCode,
+				param.Latency,
+				param.Method,
+				param.Request.Host,
+				param.Path,
+				param.ClientIP,
+			)
+		},
+	}))
+	r.Use(gin.Recovery())
 
 	p.applyGlobalMiddlewares(r)
 	p.bindEdgeApi(r)

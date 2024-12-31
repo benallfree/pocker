@@ -1,4 +1,4 @@
-package models
+package ubermax
 
 type RecordBase struct {
 	CollectionId   string `json:"collectionId"`

@@ -5,6 +5,7 @@ go 1.23.3
 replace (
 	github.com/pluja/pocketbase => ./forks/pluja-pocketbase
 	github.com/pocketbase/pocketbase => ./forks/pocketbase
+	github.com/viccon/sturdyc => ./forks/sturdyc
 )
 
 require (
@@ -40,6 +41,7 @@ require (
 	github.com/aws/smithy-go v1.22.1 // indirect
 	github.com/bytedance/sonic v1.12.5 // indirect
 	github.com/bytedance/sonic/loader v0.2.1 // indirect
+	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cloudwego/base64x v0.1.4 // indirect
 	github.com/cloudwego/iasm v0.2.0 // indirect
 	github.com/disintegration/imaging v1.6.2 // indirect
@@ -88,6 +90,7 @@ require (
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.2.12 // indirect
+	github.com/viccon/sturdyc v1.0.8 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	gocloud.dev v0.40.0 // indirect
 	golang.org/x/arch v0.12.0 // indirect

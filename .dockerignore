@@ -7,3 +7,4 @@ fly.toml
 **/.git
 .DS_Store
 pocker
+s3proxy.jar

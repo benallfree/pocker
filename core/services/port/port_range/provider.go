@@ -7,6 +7,8 @@ import (
 	"pocker/core/syncx"
 )
 
+var _ ioc.IPortService = (*FixedPortRangeProvider)(nil)
+
 type FixedPortRangeProvider struct {
 	ports syncx.Pool[int]
 }
@@ -16,7 +18,7 @@ type FixedPortRangeProviderConfig struct {
 	PortRangeEnd   int
 }
 
-func NewFixedPortRangeProvider(config FixedPortRangeProviderConfig) ioc.IPortProvider {
+func New(config FixedPortRangeProviderConfig) ioc.IPortService {
 	portStart := config.PortRangeStart
 	if portStart == 0 {
 		portStart = 10000

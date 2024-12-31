@@ -1,16 +1,15 @@
 package middleware
 
 import (
-	"pocker/examples/fly/helpers"
+	"pocker/core/ioc"
 
 	"github.com/gin-gonic/gin"
 )
 
 func FlyHeadersMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		machineInfo := helpers.MustGetFlyMachineInfo()
-		c.Header("X-PocketHost-Machine-Id", machineInfo.MachineId)
-		c.Header("X-PocketHost-Region", machineInfo.Region)
+		c.Header("X-PocketHost-Machine-Id", ioc.MachineInfoService().MachineId())
+		c.Header("X-PocketHost-Region", ioc.MachineInfoService().Region())
 		c.Next()
 	}
 }

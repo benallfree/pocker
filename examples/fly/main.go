@@ -9,10 +9,12 @@ import (
 	"os"
 	"os/signal"
 	"pocker"
+	"pocker/core/ioc"
 	"pocker/core/proxy"
+	"pocker/core/services/machine/fly"
+	"pocker/core/services/ubermax"
 	"syscall"
 
-	flyHelpers "pocker/examples/fly/helpers"
 	"pocker/examples/fly/middleware"
 
 	pockerMiddleware "pocker/core/proxy/middleware"
@@ -49,9 +51,18 @@ func main() {
 	httpAddr := flag.String("http", ":8080", "the HTTP server address")
 	flag.Parse()
 
-	displayFlyInfo()
+	// Bootstrap providers
+	machineInfoService := fly.New()
+	ioc.RegisterMachineInfoService(machineInfoService)
 
-	machineInfo := flyHelpers.MustGetFlyMachineInfo()
+	mothershipService := ubermax.New()
+	ioc.RegisterMothershipService(mothershipService)
+
+	machineInfoService.Start()
+	mothershipService.Start()
+
+	// And begin proxy
+	displayFlyInfo()
 
 	pocker := pocker.NewPocker(pocker.PockerConfig{
 		ProxyConfig: proxy.ProxyConfig{
@@ -61,7 +72,6 @@ func main() {
 			},
 			DevMode: cfg.DevMode,
 			PockerMiddlewareConfig: pockerMiddleware.PockerMiddlewareConfig{
-				MachineId:                   machineInfo.MachineId,
 				LegacyOriginHelperMachineId: cfg.LegacyOriginHelperMachineId,
 				LegacyOriginHelperProxyUrl:  cfg.LegacyOriginHelperProxyUrl,
 				LegacyOriginUrl:             cfg.LegacyOriginUrl,
@@ -77,11 +87,10 @@ func main() {
 }
 
 func displayFlyInfo() {
-	if machineInfo := flyHelpers.MustGetFlyMachineInfo(); machineInfo.Region != "" {
-		log.Printf("Running on Fly.io - Region: %s, Machine ID: %s, App: %s, Private IP: %s",
-			machineInfo.Region,
-			machineInfo.MachineId,
-			machineInfo.AppName,
-			machineInfo.PrivateIp)
-	}
+	info := ioc.MachineInfoService()
+	log.Printf("Running on Fly.io - Region: %s, Machine ID: %s, App: %s, Private IP: %s",
+		info.Region(),
+		info.MachineId(),
+		info.AppName(),
+		info.PrivateIp())
 }
