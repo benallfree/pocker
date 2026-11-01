@@ -1,6 +1,6 @@
 <p align="center">
     <a href="https://pocketbase.io" target="_blank" rel="noopener">
-        <img src="https://i.imgur.com/aCBbjKx.png" alt="PocketBase - open source backend in 1 file" />
+        <img src="https://ganigeorgiev.com/api/git/pocketbase/pocketbase/content/.bugstage/readme.png" alt="PocketBase - open source backend in 1 file" />
     </a>
 </p>
 
