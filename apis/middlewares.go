@@ -34,7 +34,6 @@ const (
 	DefaultActivityLoggerMiddlewarePriority   = DefaultRateLimitMiddlewarePriority - 40
 	DefaultActivityLoggerMiddlewareId         = "pbActivityLogger"
 	DefaultSkipSuccessActivityLogMiddlewareId = "pbSkipSuccessActivityLog"
-	DefaultEnableAuthIdActivityLog            = "pbEnableAuthIdActivityLog"
 
 	DefaultPanicRecoverMiddlewarePriority = DefaultRateLimitMiddlewarePriority - 30
 	DefaultPanicRecoverMiddlewareId       = "pbPanicRecover"
