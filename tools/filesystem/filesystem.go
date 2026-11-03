@@ -520,7 +520,7 @@ func (s *System) IsEmptyDir(dir string) bool {
 
 var inlineServeContentTypes = []string{
 	// image
-	"image/png", "image/jpg", "image/jpeg", "image/gif", "image/webp", "image/x-icon", "image/bmp",
+	"image/png", "image/jpg", "image/jpeg", "image/jxl", "image/gif", "image/webp", "image/x-icon", "image/bmp",
 	// video
 	"video/webm", "video/mp4", "video/3gpp", "video/quicktime", "video/x-ms-wmv",
 	// audio

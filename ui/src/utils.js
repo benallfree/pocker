@@ -1293,7 +1293,8 @@ const utils = {
     },
 
     // ---------------------------------------------------------------
-    imageExtensions: [".jpg", ".jpeg", ".png", ".svg", ".gif", ".jfif", ".webp", ".avif"],
+
+    imageExtensions: [".png", ".svg", ".jpg", ".jpeg", ".jfif", ".jxl", ".gif", ".webp", ".avif"],
     videoExtensions: [".mp4", ".avi", ".mov", ".3gp", ".wmv"],
     audioExtensions: [".aa", ".aac", ".m4v", ".mp3", ".ogg", ".oga", ".mogg", ".amr"],
     documentExtensions: [".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".odp", ".odt", ".ods", ".txt"],
