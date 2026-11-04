@@ -178,6 +178,8 @@ function initChart(el, dataPoints, logsSettings) {
     const strokeColor = computedStyle.getPropertyValue("--surfaceAlt4Color");
     const fillColor = computedStyle.getPropertyValue("--surfaceAlt2Color");
 
+    const largestTotal = Math.max(0, ...(dataPoints[1] || []));
+
     const opts = {
         width: el.clientWidth,
         height: getChartHeight(),
@@ -272,7 +274,7 @@ function initChart(el, dataPoints, logsSettings) {
             },
             {
                 show: true,
-                size: logsSettings.totalFound >= 100000 ? 70 : 50,
+                size: largestTotal >= 100000 ? 70 : 50,
                 stroke: gridTxtColor,
                 grid: {
                     show: true,
