@@ -8,6 +8,8 @@
 - Auto run `VACUUM` for the `auxiliary.db` after deleting more than 20k logs [#7854](https://ganigeorgiev.com/pocketbase/discussions/7854#comment-8lea6s7xy8x4abs).
     _It runs as part of the `__pbLogsCleanup__` cron job and it is an extra optimization to more eagerly free up unused disk space after large logs rotation._
 
+- Fixed logs chart y-axis overlap when numbers with more than 5 digits are shown.
+
 
 ## v0.41.1
 

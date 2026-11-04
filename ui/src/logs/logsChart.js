@@ -272,6 +272,7 @@ function initChart(el, dataPoints, logsSettings) {
             },
             {
                 show: true,
+                size: logsSettings.totalFound >= 100000 ? 70 : 50,
                 stroke: gridTxtColor,
                 grid: {
                     show: true,
