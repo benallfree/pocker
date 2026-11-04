@@ -1632,14 +1632,14 @@ func (app *BaseApp) initLogger() error {
 			})
 			_, err = e.App.AuxNonconcurrentDB().Delete((&Log{}).TableName(), expr).Execute()
 			if err != nil {
-				e.App.Logger().Debug("Failed to cleanup old logs", "error", err)
+				e.App.Logger().Warn("Failed to cleanup old logs", "error", err)
 			}
 
-			// no logs are allowed -> try to reclaim preserved disk space after the previous delete operation
+			// no logs are allowed -> try to free up unused disk space after the previous delete operation
 			if e.App.Settings().Logs.MaxDays == 0 {
 				err = e.App.AuxVacuum()
 				if err != nil {
-					e.App.Logger().Debug("Failed to VACUUM aux database", "error", err)
+					e.App.Logger().Warn("Failed to VACUUM aux database", "error", err)
 				}
 			}
 
@@ -1649,10 +1649,44 @@ func (app *BaseApp) initLogger() error {
 	})
 
 	// cleanup old logs
+	//
+	// note: need to count before/after delete manually because drivers
+	// are not required to support returning affected rows
+	// ---
+	var totalDeletedSinceVacuum atomic.Int64
 	app.Cron().Add("__pbLogsCleanup__", "0 */6 * * *", func() {
-		deleteErr := app.DeleteOldLogs(time.Now().AddDate(0, 0, -1*app.Settings().Logs.MaxDays))
-		if deleteErr != nil {
-			app.Logger().Warn("Failed to delete old logs", "error", deleteErr)
+		oldCount, err := app.CountLogs()
+		if err != nil {
+			app.Logger().Warn("Failed to count logs before delete", "error", err)
+		}
+
+		err = app.DeleteOldLogs(time.Now().AddDate(0, 0, -1*app.Settings().Logs.MaxDays))
+		if err != nil {
+			app.Logger().Warn("Failed to delete old logs", "error", err)
+		}
+
+		newCount, err := app.CountLogs()
+		if err != nil {
+			app.Logger().Warn("Failed to count logs after delete", "error", err)
+		}
+
+		// try to free up unused disk space if a lot of logs have been deleted
+		// (its racy but its ok in our use case as it is not expected to run frequently)
+		total := totalDeletedSinceVacuum.Add(max(oldCount-newCount, 0))
+		if total >= 20000 {
+			totalDeletedSinceVacuum.Store(0)
+
+			err = app.AuxVacuum()
+			if err != nil {
+				app.Logger().Warn("Failed to VACUUM aux database after cleanup", "error", err)
+			}
+		}
+
+		// force a checkpoint to minimize the risk of excessive wal file
+		// growth due to slower delete or vacuum
+		_, err = app.AuxNonconcurrentDB().NewQuery("PRAGMA wal_checkpoint(TRUNCATE)").Execute()
+		if err != nil {
+			app.Logger().Warn("Failed to run PRAGMA wal_checkpoint after logs cleanup", "error", err)
 		}
 	})
 

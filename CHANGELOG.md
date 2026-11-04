@@ -1,3 +1,14 @@
+## v0.42.0 (WIP)
+
+- Allow previewing JPEG XL images (`.jxl`) in the superuser UI.
+    _Note that there is no thumbs support for JPEG XL yet._
+
+- Added helper `app.CountLogs()` query method.
+
+- Auto run `VACUUM` for the `auxiliary.db` after deleting more than 20k logs [#7854](https://ganigeorgiev.com/pocketbase/discussions/7854#comment-8lea6s7xy8x4abs).
+    _It runs as part of the `__pbLogsCleanup__` cron job and it is an extra optimization to more eagerly free up unused disk space after large logs rotation._
+
+
 ## v0.41.1
 
 - Added missing license info to the vendored fonts ([#8352](https://ganigeorgiev.com/pocketbase/discussions/8352)).

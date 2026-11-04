@@ -383,6 +383,9 @@ type App interface {
 	// LogsStatsItem returns hourly grouped logs statistics.
 	LogsStats(expr dbx.Expression) ([]*LogsStatsItem, error)
 
+	// CountLogs returns the total number of log entries.
+	CountLogs(exprs ...dbx.Expression) (int64, error)
+
 	// DeleteOldLogs delete all logs that are created before createdBefore.
 	DeleteOldLogs(createdBefore time.Time) error
 

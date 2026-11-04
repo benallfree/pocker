@@ -46,6 +46,58 @@ func TestFindLogById(t *testing.T) {
 	}
 }
 
+func TestCountLogs(t *testing.T) {
+	t.Parallel()
+
+	app, _ := tests.NewTestApp()
+	defer app.Cleanup()
+
+	tests.StubLogsData(app)
+
+	scenarios := []struct {
+		name        string
+		expressions []dbx.Expression
+		expectTotal int64
+	}{
+		{
+			"nil expression",
+			[]dbx.Expression{nil},
+			2,
+		},
+		{
+			"no matches",
+			[]dbx.Expression{
+				nil,
+				dbx.Like("message", "test"),
+				dbx.HashExp{"level": 1},
+			},
+			0,
+		},
+		{
+			"with matches",
+			[]dbx.Expression{
+				nil,
+				dbx.Like("message", "test"),
+				dbx.HashExp{"level": 0},
+			},
+			1,
+		},
+	}
+
+	for _, s := range scenarios {
+		t.Run(s.name, func(t *testing.T) {
+			total, err := app.CountLogs(s.expressions...)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if total != s.expectTotal {
+				t.Fatalf("Expected total %d, got %d", s.expectTotal, total)
+			}
+		})
+	}
+}
+
 func TestLogsStats(t *testing.T) {
 	t.Parallel()
 

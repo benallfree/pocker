@@ -458,12 +458,12 @@ func (app *BaseApp) FindFirstRecordByFilter(
 }
 
 // CountRecords returns the total number of records in a collection.
-func (app *BaseApp) CountRecords(collectionModelOrIdentifier any, exprs ...dbx.Expression) (int64, error) {
+func (app *BaseApp) CountRecords(collectionModelOrIdentifier any, optExprs ...dbx.Expression) (int64, error) {
 	var total int64
 
 	q := app.RecordQuery(collectionModelOrIdentifier).Select("count(*)")
 
-	for _, expr := range exprs {
+	for _, expr := range optExprs {
 		if expr != nil { // add only the non-nil expressions
 			q.AndWhere(expr)
 		}
