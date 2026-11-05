@@ -659,7 +659,7 @@ func (s *System) createThumb(originalKey, thumbKey, thumbSize string) error {
 
 	currentDimensions := int64(config.Width) * int64(config.Height)
 	if currentDimensions > maxPixels {
-		return fmt.Errorf("the original image is too large (%dx%d) and exceeds the total max allowed %d pixels", config.Width, config.Height, maxPixels)
+		return fmt.Errorf("the original image is too large (%dx%d) and exceeds the total max allowed %d pixels (you can set the env 'PB_THUMBS_MAX_SOURCE_PIXELS=max' to change the limit)", config.Width, config.Height, maxPixels)
 	}
 
 	// rewind
