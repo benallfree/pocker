@@ -3,6 +3,8 @@
 - Allow previewing JPEG XL images (`.jxl`) in the superuser UI.
     _Note that there is no thumbs support for JPEG XL yet._
 
+- Allow reordering the configured OAuth2 providers in the UI _(mostly for the `listAuthMethods()` response)_.
+
 - Added helper `app.CountLogs()` query method.
 
 - Auto run `VACUUM` for the `auxiliary.db` after deleting more than 20k logs [#7854](https://ganigeorgiev.com/pocketbase/discussions/7854#comment-8lea6s7xy8x4abs).

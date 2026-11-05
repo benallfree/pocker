@@ -8,7 +8,7 @@ window.app.components = window.app.components || {};
  * ```js
  * app.components.sortable({
  *     data: () => data.list,
- *     dataItem: (item) => t.strong(null, "ID:", () => item.id),
+ *     dataItem: (item, i) => t.strong(null, "ID:", () => item.id),
  *     onchange: function(sortedList, fromIndex, toIndex) {
  *         data.list = sortedList;
  *     },
