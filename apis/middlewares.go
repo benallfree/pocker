@@ -368,14 +368,30 @@ func logRequest(event *core.RequestEvent, err error) {
 		return
 	}
 
-	// the non-error route has explicitly disabled the activity logger
-	if err == nil && event.Get(requestEventKeySkipSuccessActivityLog) != nil {
+	status := event.Status()
+
+	// check if it is "benign" to decide whether to log it as error or just info
+	isOKState := status < 399 && canBeIgnored(err)
+
+	// the OK route has explicitly disabled the activity logger
+	if isOKState && event.Get(requestEventKeySkipSuccessActivityLog) != nil {
 		return
 	}
 
+	method := cutStr(strings.ToUpper(event.Request.Method), 50)
+	requestUri := cutStr(event.Request.URL.RequestURI(), 3000)
+
 	attrs := make([]any, 0, 15)
 
-	attrs = append(attrs, slog.String("type", "request"))
+	attrs = append(
+		attrs,
+		slog.Int("status", status),
+		slog.String("type", "request"),
+		slog.String("url", requestUri),
+		slog.String("method", method),
+		slog.String("referer", cutStr(event.Request.Referer(), 2000)),
+		slog.String("userAgent", cutStr(event.Request.UserAgent(), 2000)),
+	)
 
 	started := cast.ToTime(event.Get(requestEventKeyExecStart))
 	if !started.IsZero() {
@@ -386,15 +402,16 @@ func logRequest(event *core.RequestEvent, err error) {
 		attrs = append(attrs, slog.Any("meta", meta))
 	}
 
-	status := event.Status()
-	method := cutStr(strings.ToUpper(event.Request.Method), 50)
-	requestUri := cutStr(event.Request.URL.RequestURI(), 3000)
-
-	// parse the request error
+	// parse the request error state no matter of the log type
 	if err != nil {
+		var errMsgSuffix string
+		if isOKState {
+			errMsgSuffix = " (often benign see #8361)"
+		}
+
 		apiErr, isPlainApiError := err.(*router.ApiError)
 		if isPlainApiError || errors.As(err, &apiErr) {
-			// the status header wasn't written yet
+			// in case the status header wasn't written yet
 			if status == 0 {
 				status = apiErr.Status
 			}
@@ -410,22 +427,13 @@ func logRequest(event *core.RequestEvent, err error) {
 
 			attrs = append(
 				attrs,
-				slog.String("error", errMsg),
+				slog.String("error", errMsg+errMsgSuffix),
 				slog.Any("details", apiErr.RawData()),
 			)
 		} else {
-			attrs = append(attrs, slog.String("error", err.Error()))
+			attrs = append(attrs, slog.String("error", err.Error()+errMsgSuffix))
 		}
 	}
-
-	attrs = append(
-		attrs,
-		slog.String("url", requestUri),
-		slog.String("method", method),
-		slog.Int("status", status),
-		slog.String("referer", cutStr(event.Request.Referer(), 2000)),
-		slog.String("userAgent", cutStr(event.Request.UserAgent(), 2000)),
-	)
 
 	if event.Auth != nil {
 		attrs = append(attrs, slog.String("auth", event.Auth.Collection().Name))
@@ -455,10 +463,10 @@ func logRequest(event *core.RequestEvent, err error) {
 			message += requestUri
 		}
 
-		if err != nil {
-			event.App.Logger().Error(message, attrs...)
-		} else {
+		if isOKState {
 			event.App.Logger().Info(message, attrs...)
+		} else {
+			event.App.Logger().Error(message, attrs...)
 		}
 	})
 }
@@ -468,4 +476,33 @@ func cutStr(str string, max int) string {
 		return str[:max] + "..."
 	}
 	return str
+}
+
+// benignErrors are usually returned after OK status has been already
+// written and are mostly informative (aka. can be safely ignored).
+//
+// See https://ganigeorgiev.com/pocketbase/discussions/8361.
+//
+// @todo consider using the eventual exported error vars once
+// https://github.com/golang/go/issues/66812 get sorted out
+var benignErrors = []string{
+	"http2: request body closed due to handler exiting",
+	"http2: stream closed",
+	"write: broken pipe",
+}
+
+func canBeIgnored(err error) bool {
+	if err == nil {
+		return true
+	}
+
+	rawErr := err.Error()
+
+	for _, benign := range benignErrors {
+		if strings.Contains(rawErr, benign) {
+			return true
+		}
+	}
+
+	return false
 }

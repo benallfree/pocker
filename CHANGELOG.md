@@ -16,6 +16,8 @@
 
 - Added guard for a `cron.Stop()` race in case it happens to be called right before the ticker initialization _(unlikely to trigger in real usage)_.
 
+- Log harmless mid-response network errors with level `INFO (0)` ([#8361](https://ganigeorgiev.com/pocketbase/discussions/8361)).
+
 
 ## v0.41.1
 
