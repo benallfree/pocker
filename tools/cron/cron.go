@@ -23,7 +23,7 @@ type Cron struct {
 	timezone   *time.Location
 	ticker     *time.Ticker
 	startTimer *time.Timer
-	tickerDone chan bool
+	tickerDone chan struct{}
 	jobs       []*Job
 	interval   time.Duration
 	mux        sync.RWMutex
@@ -39,7 +39,7 @@ func New() *Cron {
 		interval:   1 * time.Minute,
 		timezone:   time.UTC,
 		jobs:       []*Job{},
-		tickerDone: make(chan bool),
+		tickerDone: make(chan struct{}, 1), // buffered to prevent deadlock in case c.Stop() and c.runDue(t) happen to run at the same time
 	}
 }
 
@@ -167,7 +167,7 @@ func (c *Cron) Stop() {
 		return // already stopped
 	}
 
-	c.tickerDone <- true
+	c.tickerDone <- struct{}{}
 	c.ticker.Stop()
 	c.ticker = nil
 }
@@ -185,7 +185,14 @@ func (c *Cron) Start() {
 
 	c.mux.Lock()
 	c.startTimer = time.AfterFunc(delay, func() {
+		// init a ticker
 		c.mux.Lock()
+		if c.startTimer == nil {
+			// rare race edge-case when Close is called AFTER the timer
+			// initialization but BEFORE the AfterFunc callback execution
+			c.mux.Unlock()
+			return
+		}
 		c.ticker = time.NewTicker(c.interval)
 		c.mux.Unlock()
 

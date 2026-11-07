@@ -14,6 +14,8 @@
 
 - Replaced `fmt.Sprintf("%x")` with the slightly more performant `encoding/hex.EncodeToString()`.
 
+- Added guard for a `cron.Stop()` race in case it happens to be called right before the ticker initialization _(unlikely to trigger in real usage)_.
+
 
 ## v0.41.1
 
