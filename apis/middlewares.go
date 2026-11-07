@@ -385,7 +385,6 @@ func logRequest(event *core.RequestEvent, err error) {
 
 	attrs = append(
 		attrs,
-		slog.Int("status", status),
 		slog.String("type", "request"),
 		slog.String("url", requestUri),
 		slog.String("method", method),
@@ -393,20 +392,11 @@ func logRequest(event *core.RequestEvent, err error) {
 		slog.String("userAgent", cutStr(event.Request.UserAgent(), 2000)),
 	)
 
-	started := cast.ToTime(event.Get(requestEventKeyExecStart))
-	if !started.IsZero() {
-		attrs = append(attrs, slog.Float64("execTime", float64(time.Since(started))/float64(time.Millisecond)))
-	}
-
-	if meta := event.Get(RequestEventKeyLogMeta); meta != nil {
-		attrs = append(attrs, slog.Any("meta", meta))
-	}
-
 	// parse the request error state no matter of the log type
 	if err != nil {
 		var errMsgSuffix string
 		if isOKState {
-			errMsgSuffix = " (often benign see #8361)"
+			errMsgSuffix = " (often benign, see #8361)"
 		}
 
 		apiErr, isPlainApiError := err.(*router.ApiError)
@@ -433,6 +423,17 @@ func logRequest(event *core.RequestEvent, err error) {
 		} else {
 			attrs = append(attrs, slog.String("error", err.Error()+errMsgSuffix))
 		}
+	}
+
+	attrs = append(attrs, slog.Int("status", status))
+
+	started := cast.ToTime(event.Get(requestEventKeyExecStart))
+	if !started.IsZero() {
+		attrs = append(attrs, slog.Float64("execTime", float64(time.Since(started))/float64(time.Millisecond)))
+	}
+
+	if meta := event.Get(RequestEventKeyLogMeta); meta != nil {
+		attrs = append(attrs, slog.Any("meta", meta))
 	}
 
 	if event.Auth != nil {
