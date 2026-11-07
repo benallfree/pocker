@@ -12,6 +12,8 @@
 
 - Fixed logs chart y-axis overlap when numbers with more than 5 digits are shown.
 
+- Replaced `fmt.Sprintf("%x")` with the slightly more performant `encoding/hex.EncodeToString()`.
+
 
 ## v0.41.1
 
