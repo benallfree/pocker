@@ -371,7 +371,7 @@ func logRequest(event *core.RequestEvent, err error) {
 	status := event.Status()
 
 	// check if it is "benign" to decide whether to log it as error or just info
-	isOKState := status < 399 && canBeIgnored(err)
+	isOKState := status < 400 && status > 199 && canBeIgnored(err)
 
 	// the OK route has explicitly disabled the activity logger
 	if isOKState && event.Get(requestEventKeySkipSuccessActivityLog) != nil {
