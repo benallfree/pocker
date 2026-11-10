@@ -43,19 +43,30 @@ type Config struct {
 
 	// MaxQueryDuration interrupts any SQL statement without its own deadline (raw SQL from JS) (default 30s).
 	MaxQueryDuration time.Duration `yaml:"max_query_duration"`
+
+	// EgressAllow lists private networks apps may still connect to (default none: public addresses only).
+	EgressAllow []string `yaml:"egress_allow"`
+
+	// HTTPSendMaxTimeout caps the timeout a JS $http.send can request (default 60s).
+	HTTPSendMaxTimeout time.Duration `yaml:"http_send_max_timeout"`
+
+	// HTTPSendMaxBody caps $http.send response bodies in bytes (default 10 MiB).
+	HTTPSendMaxBody int64 `yaml:"http_send_max_body"`
 }
 
 // DefaultConfig returns the defaults used when no config file (or field) is given.
 func DefaultConfig() Config {
 	pool := 2
 	return Config{
-		Listen:           ":8090",
-		PBRoot:           "./pb_root",
-		InstancesFile:    "./instances.yaml",
-		HooksPoolSize:    &pool,
-		ShutdownTimeout:  10 * time.Second,
-		MaxJSExecution:   30 * time.Second,
-		MaxQueryDuration: 30 * time.Second,
+		Listen:             ":8090",
+		PBRoot:             "./pb_root",
+		InstancesFile:      "./instances.yaml",
+		HooksPoolSize:      &pool,
+		ShutdownTimeout:    10 * time.Second,
+		MaxJSExecution:     30 * time.Second,
+		MaxQueryDuration:   30 * time.Second,
+		HTTPSendMaxTimeout: 60 * time.Second,
+		HTTPSendMaxBody:    10 << 20,
 	}
 }
 
@@ -97,6 +108,15 @@ func LoadConfig(path string) (Config, error) {
 	}
 	if fromFile.MaxQueryDuration > 0 {
 		cfg.MaxQueryDuration = fromFile.MaxQueryDuration
+	}
+	if fromFile.EgressAllow != nil {
+		cfg.EgressAllow = fromFile.EgressAllow
+	}
+	if fromFile.HTTPSendMaxTimeout > 0 {
+		cfg.HTTPSendMaxTimeout = fromFile.HTTPSendMaxTimeout
+	}
+	if fromFile.HTTPSendMaxBody > 0 {
+		cfg.HTTPSendMaxBody = fromFile.HTTPSendMaxBody
 	}
 	return cfg, nil
 }

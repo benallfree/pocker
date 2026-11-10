@@ -59,6 +59,9 @@ hooks_pool_size: 2
 shutdown_timeout: 10s
 max_js_execution: 30s     # any single JS call (hook, route, cron, migration)
 max_query_duration: 30s   # any SQL statement without its own deadline
+egress_allow: []          # private networks apps may still reach (default none)
+http_send_max_timeout: 60s
+http_send_max_body: 10485760
 ```
 
 `GET /_pocker/health` on any host reports `{status, instances, running}`.
@@ -77,11 +80,12 @@ route from one instance against another instance and the host; all of these are 
 | Go internals: `$app.restart/bootstrap/runAllMigrations/onServe/onTerminate/onBootstrap/cron/unsafeWithoutHooks`, `hook.bindFunc/bind/trigger/unbind*`, `*sql.DB/Conn/Tx/Stmt` (e.g. `dbx.DB.DB()`), `database/sql/driver`, `os/exec`, `net`, `syscall`, `http.Server` controls | Hidden from JS (the field-name mapper maps them to nothing). Top-level `onRecord*`, `routerAdd`, `cronAdd` and the rest of `$app` work as usual. |
 | Raw SQL (`$app.db().newQuery`) | Allowed. SQLite's authorizer refuses `ATTACH` (and `VACUUM INTO`) outside the instance's `pb_data`, `PRAGMA temp_store_directory/data_store_directory` and `load_extension`; the CLI-only `readfile`/`writefile`/`fsdir` don't exist in the library. Statements without a deadline get `max_query_duration`. |
 | CPU | Every JS call is interrupted after `max_js_execution`; `sleep()` is capped at 10 s. |
+| Outbound network: `$http.send`, `$filesystem.fileFromURL`, S3 storage and backups, OAuth2/JWK fetches, SMTP | Public addresses only, checked on the address actually connected to (after DNS, so rebinding doesn't help): loopback, private ranges, link-local and cloud metadata, CGNAT, multicast, reserved and documentation ranges, and IPv6 equivalents/IPv4-in-IPv6 are refused unless listed in `egress_allow`. Installed process-wide on Go's default HTTP transport and PocketBase's SMTP client (`pocker/egress.go`). `$http.send` timeouts and response bodies are capped. |
 
 **Not covered yet:** per-instance memory (goja has no heap limit; a hook can still allocate the process into GC
-pressure or OOM), outbound network (`$http.send`, `$filesystem.fileFromURL`, SMTP/S3 can reach private addresses such
-as cloud metadata or internal services), per-instance concurrency limits, and OS-level defence in depth (non-root
-user, seccomp, Landlock). Until those land, don't run untrusted instances next to sensitive networks.
+pressure or OOM), per-instance concurrency limits, and OS-level defence in depth: run Pocker as a non-root user with an
+OS firewall that only lets that user reach public addresses (a second, independent egress layer), plus seccomp and
+Landlock.
 
 ## Changes to PocketBase
 
@@ -92,7 +96,9 @@ Kept small and marked `// POCKER:` so upstream merges stay easy:
 - `core.BaseAppConfig.EncryptionKey`: the settings encryption key passed in directly instead of read from the process
   environment.
 - `plugins/jsvm`: `Config.Sandbox` (all sandbox code is in `sandbox.go`); `pool.go` and `jsvm.go` call it at a few
-  marked points (bindings, `require` loader, per-call time limit).
+  marked points (bindings, `require` loader, per-call time limit); `binds.go` has `HTTPSendMaxTimeout` /
+  `HTTPSendMaxBodySize` caps for `$http.send`.
+- `tools/mailer`: `DialContext`, when set, sends SMTP through the host's dialer (same exchange as mailyak).
 
 ## Upstream tracking
 

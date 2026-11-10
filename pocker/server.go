@@ -3,9 +3,11 @@ package pocker
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
+	"net/netip"
 	"time"
 )
 
@@ -37,6 +39,19 @@ func (s *Server) Run(ctx context.Context) error {
 	if s.Config.MaxQueryDuration > 0 {
 		maxQueryDuration = s.Config.MaxQueryDuration
 	}
+	var allow []netip.Prefix
+	for _, c := range s.Config.EgressAllow {
+		pfx, err := netip.ParsePrefix(c)
+		if err != nil {
+			a, aerr := netip.ParseAddr(c)
+			if aerr != nil {
+				return fmt.Errorf("egress_allow: %q is not an IP or CIDR", c)
+			}
+			pfx = netip.PrefixFrom(a, a.BitLen())
+		}
+		allow = append(allow, pfx)
+	}
+	InstallEgressPolicy(EgressPolicy{Allow: allow}, int(s.Config.HTTPSendMaxTimeout/time.Second), s.Config.HTTPSendMaxBody)
 	pool := 2
 	if s.Config.HooksPoolSize != nil {
 		pool = *s.Config.HooksPoolSize
