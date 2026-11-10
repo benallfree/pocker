@@ -105,6 +105,7 @@ func main() {
 		BaseURL:    "https://ganigeorgiev.com",
 		Project:    "pocketbase",
 		Repository: "pocketbase",
+		Channel:    "default",
 	})
 
 	// static route to serves files from the provided public dir

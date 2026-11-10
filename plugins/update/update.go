@@ -69,7 +69,7 @@ type Config struct {
 
 	// Channel specifies the name of the release channel to check.
 	//
-	// If not set uses the system "default" channel.
+	// If not set will look for the latest semver release from any channel.
 	Channel string
 
 	// ArchiveExecutable specifies the name of the executable file in the release archive
@@ -116,10 +116,6 @@ func Register(app core.App, rootCmd *cobra.Command, config Config) error {
 
 	if p.config.ArchiveExecutable == "" {
 		p.config.ArchiveExecutable = p.config.Repository
-	}
-
-	if p.config.Channel == "" {
-		p.config.Channel = "default"
 	}
 
 	if p.config.HttpClient == nil {
@@ -295,16 +291,21 @@ func (p *plugin) update(withBackup bool) error {
 }
 
 func (p *plugin) fetchLatestRelease() (*release, error) {
+	rawFilter := fmt.Sprintf(
+		"channel.repository.name=%q && channel.repository.project.name=%q",
+		p.config.Repository,
+		p.config.Project,
+	)
+
+	if p.config.Channel != "" {
+		rawFilter += fmt.Sprintf(" && channel.name=%q", p.config.Channel)
+	}
+
 	queryParams := url.Values{}
 	queryParams.Set("perPage", "1")
 	queryParams.Set("skipTotal", "1")
 	queryParams.Set("sort", "-semver")
-	queryParams.Set("filter", fmt.Sprintf(
-		"channel.name=%q && channel.repository.name=%q && channel.repository.project.name=%q",
-		p.config.Channel,
-		p.config.Repository,
-		p.config.Project,
-	))
+	queryParams.Set("filter", rawFilter)
 
 	releaseURL := fmt.Sprintf("%s/api/collections/releases/records?%s", p.config.BaseURL, queryParams.Encode())
 
