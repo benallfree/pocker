@@ -58,6 +58,10 @@ type Sandbox struct {
 	// Owner identifies the app in InterruptActive results (e.g. the instance id).
 	Owner string
 
+	// Console, when set, receives console.log/info/debug ("stdout") and console.warn/error ("stderr") output
+	// instead of the process's stdout/stderr, so each app's output stays its own.
+	Console func(stream, message string)
+
 	// HTTPSendMaxTimeout (seconds) and HTTPSendMaxBody (bytes) cap $http.send for this app; 0 = the process-wide
 	// HTTPSendMaxTimeout / HTTPSendMaxBodySize.
 	HTTPSendMaxTimeout int
@@ -409,6 +413,42 @@ func (s *Sandbox) apply(vm *goja.Runtime, templates *template.Registry) {
 	}
 	vm.SetMaxCallStackSize(callStack)
 	s.capAllocations(vm)
+
+	// console: the app's own sink instead of the shared process output
+	if s.Console != nil {
+		sink := s.Console
+		isError := func(goja.Value) bool { return false }
+		if v, err := vm.RunString("(function (e) { return e instanceof Error })"); err == nil {
+			if fn, ok := goja.AssertFunction(v); ok {
+				isError = func(o goja.Value) bool {
+					res, err := fn(goja.Undefined(), o)
+					return err == nil && res.ToBoolean()
+				}
+			}
+		}
+		format := func(call goja.FunctionCall) string {
+			parts := make([]string, len(call.Arguments))
+			for i, a := range call.Arguments {
+				if o, ok := a.(*goja.Object); ok && !isError(o) {
+					if b, err := o.MarshalJSON(); err == nil {
+						parts[i] = string(b)
+						continue
+					}
+				}
+				parts[i] = a.String()
+			}
+			return strings.Join(parts, " ")
+		}
+		con := vm.NewObject()
+		for name, stream := range map[string]string{"log": "stdout", "info": "stdout", "debug": "stdout", "warn": "stderr", "error": "stderr"} {
+			stream := stream
+			con.Set(name, func(call goja.FunctionCall) goja.Value {
+				sink(stream, format(call))
+				return goja.Undefined()
+			})
+		}
+		vm.Set("console", con)
+	}
 
 	// $http.send caps for this app, pinned read-only on the VM (binds.go reads them at call time)
 	_ = vm.GlobalObject().DefineDataProperty(httpLimitsKey,
