@@ -57,15 +57,31 @@ dev: false
 instances_file: "./instances.yaml"
 hooks_pool_size: 2
 shutdown_timeout: 10s
+max_js_execution: 30s     # any single JS call (hook, route, cron, migration)
+max_query_duration: 30s   # any SQL statement without its own deadline
 ```
 
 `GET /_pocker/health` on any host reports `{status, instances, running}`.
 
-## Security status
+## Sandbox
 
-**Not a sandbox yet.** Every instance runs in the same process with the stock JS hooks layer, so an instance's hooks can
-read other instances' files, the host environment through other bindings, or run commands. Only run instances you trust
-until the locked-down `plugins/jsvm` lands.
+Every instance's JS hooks and migrations run in a sandbox (`plugins/jsvm/sandbox.go`), and its SQL runs behind
+SQLite's authorizer (`pocker/sqlguard.go`). [`pocker/sandbox_test.go`](pocker/sandbox_test.go) runs one attack per
+route from one instance against another instance and the host; all of these are refused:
+
+| Area | What the sandbox does |
+|---|---|
+| Files: `$os.*`, `$filepath.glob/walk*`, `$filesystem.fileFromPath`, `$template.loadFiles`, `$apis.static`, `require()` | Confined to the instance folder with an `os.Root`: the kernel resolves every path beneath it, refusing `..` and symlinks that leave it. Relative paths and absolute paths inside the folder (`__hooks + "/x"`) work as before. |
+| Host primitives: `$os.cmd`, `$os.exec`, `$os.exit`, `$os.args`, `$filesystem.local` | Disabled (`$os.args` is empty). |
+| Environment: `$os.getenv`, `process.env` | Only the instance's own `env`. |
+| Go internals: `$app.restart/bootstrap/runAllMigrations/onServe/onTerminate/onBootstrap/cron/unsafeWithoutHooks`, `hook.bindFunc/bind/trigger/unbind*`, `*sql.DB/Conn/Tx/Stmt` (e.g. `dbx.DB.DB()`), `database/sql/driver`, `os/exec`, `net`, `syscall`, `http.Server` controls | Hidden from JS (the field-name mapper maps them to nothing). Top-level `onRecord*`, `routerAdd`, `cronAdd` and the rest of `$app` work as usual. |
+| Raw SQL (`$app.db().newQuery`) | Allowed. SQLite's authorizer refuses `ATTACH` (and `VACUUM INTO`) outside the instance's `pb_data`, `PRAGMA temp_store_directory/data_store_directory` and `load_extension`; the CLI-only `readfile`/`writefile`/`fsdir` don't exist in the library. Statements without a deadline get `max_query_duration`. |
+| CPU | Every JS call is interrupted after `max_js_execution`; `sleep()` is capped at 10 s. |
+
+**Not covered yet:** per-instance memory (goja has no heap limit; a hook can still allocate the process into GC
+pressure or OOM), outbound network (`$http.send`, `$filesystem.fileFromURL`, SMTP/S3 can reach private addresses such
+as cloud metadata or internal services), per-instance concurrency limits, and OS-level defence in depth (non-root
+user, seccomp, Landlock). Until those land, don't run untrusted instances next to sensitive networks.
 
 ## Changes to PocketBase
 
@@ -75,6 +91,8 @@ Kept small and marked `// POCKER:` so upstream merges stay easy:
   instead of the global `core.AppMigrations`).
 - `core.BaseAppConfig.EncryptionKey`: the settings encryption key passed in directly instead of read from the process
   environment.
+- `plugins/jsvm`: `Config.Sandbox` (all sandbox code is in `sandbox.go`); `pool.go` and `jsvm.go` call it at a few
+  marked points (bindings, `require` loader, per-call time limit).
 
 ## Upstream tracking
 

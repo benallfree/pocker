@@ -14,7 +14,6 @@ import (
 	_ "ganigeorgiev.com/pocketbase/pocketbase/migrations" // registers PocketBase's system migrations, as pocketbase.go does
 	"ganigeorgiev.com/pocketbase/pocketbase/plugins/jsvm"
 	"ganigeorgiev.com/pocketbase/pocketbase/ui"
-	"github.com/dop251/goja"
 )
 
 // runningApp is a bootstrapped PocketBase app and the HTTP handler that serves it.
@@ -29,6 +28,8 @@ type appOptions struct {
 	PBRoot        string
 	HooksPoolSize int
 	ForceDev      bool // Pocker dev mode: every app runs in PocketBase dev mode
+	// MaxJSExecution interrupts a JS call that runs longer (0 = jsvm default, 30s).
+	MaxJSExecution time.Duration
 }
 
 func instanceDir(opts appOptions, inst Instance) string {
@@ -52,6 +53,7 @@ func startApp(opts appOptions, inst Instance) (*runningApp, error) {
 	}
 
 	app := core.NewBaseApp(core.BaseAppConfig{
+		DBConnect:     guardedDBConnect(), // SQL stays inside this app's files
 		DataDir:       filepath.Join(dir, "pb_data"),
 		IsDev:         inst.Dev || opts.ForceDev,
 		EncryptionKey: inst.Env["PB_ENCRYPTION_KEY"],
@@ -68,8 +70,10 @@ func startApp(opts appOptions, inst Instance) (*runningApp, error) {
 		MigrationsDir: filepath.Join(dir, "pb_migrations"),
 		HooksWatch:    false, // one process serves every app: a hooks change must not restart it
 		HooksPoolSize: opts.HooksPoolSize,
-		OnInit: func(vm *goja.Runtime) {
-			bindInstanceEnv(vm, env)
+		Sandbox: &jsvm.Sandbox{
+			Dir:          dir,
+			Env:          env,
+			MaxExecution: opts.MaxJSExecution,
 		},
 	})
 	if err != nil {
@@ -88,20 +92,6 @@ func startApp(opts appOptions, inst Instance) (*runningApp, error) {
 		return nil, err
 	}
 	return &runningApp{app: app, handler: handler, started: time.Now()}, nil
-}
-
-// bindInstanceEnv makes $os.getenv and process.env see only the instance's own environment, not the host's.
-func bindInstanceEnv(vm *goja.Runtime, env map[string]string) {
-	if osObj, ok := vm.Get("$os").(*goja.Object); ok {
-		_ = osObj.Set("getenv", func(key string) string { return env[key] })
-	}
-	if proc, ok := vm.Get("process").(*goja.Object); ok {
-		envObj := vm.NewObject()
-		for k, v := range env {
-			_ = envObj.Set(k, v)
-		}
-		_ = proc.Set("env", envObj)
-	}
 }
 
 // buildHandler mirrors apis.Serve: router, CORS, dashboard, OnServe hooks (customer routes, pb_public) and the

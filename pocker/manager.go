@@ -56,6 +56,8 @@ type ManagerOptions struct {
 	Dev bool
 	// HooksPoolSize is the number of prewarmed JS runtimes per app (0 = create one per hook run).
 	HooksPoolSize int
+	// MaxJSExecution interrupts a JS call that runs longer (0 = 30s).
+	MaxJSExecution time.Duration
 	// Logger defaults to slog.Default().
 	Logger *slog.Logger
 }
@@ -67,7 +69,7 @@ func NewManager(source InstanceSource, opts ManagerOptions) *Manager {
 	}
 	return &Manager{
 		source:    source,
-		opts:      appOptions{PBRoot: opts.PBRoot, HooksPoolSize: opts.HooksPoolSize, ForceDev: opts.Dev},
+		opts:      appOptions{PBRoot: opts.PBRoot, HooksPoolSize: opts.HooksPoolSize, ForceDev: opts.Dev, MaxJSExecution: opts.MaxJSExecution},
 		log:       opts.Logger,
 		dev:       opts.Dev,
 		instances: map[string]Instance{},

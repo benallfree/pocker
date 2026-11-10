@@ -37,17 +37,25 @@ type Config struct {
 
 	// ShutdownTimeout bounds graceful shutdown of in-flight requests (default 10s).
 	ShutdownTimeout time.Duration `yaml:"shutdown_timeout"`
+
+	// MaxJSExecution interrupts any single JS call (hook, route, cron job, migration) that runs longer (default 30s).
+	MaxJSExecution time.Duration `yaml:"max_js_execution"`
+
+	// MaxQueryDuration interrupts any SQL statement without its own deadline (raw SQL from JS) (default 30s).
+	MaxQueryDuration time.Duration `yaml:"max_query_duration"`
 }
 
 // DefaultConfig returns the defaults used when no config file (or field) is given.
 func DefaultConfig() Config {
 	pool := 2
 	return Config{
-		Listen:          ":8090",
-		PBRoot:          "./pb_root",
-		InstancesFile:   "./instances.yaml",
-		HooksPoolSize:   &pool,
-		ShutdownTimeout: 10 * time.Second,
+		Listen:           ":8090",
+		PBRoot:           "./pb_root",
+		InstancesFile:    "./instances.yaml",
+		HooksPoolSize:    &pool,
+		ShutdownTimeout:  10 * time.Second,
+		MaxJSExecution:   30 * time.Second,
+		MaxQueryDuration: 30 * time.Second,
 	}
 }
 
@@ -83,6 +91,12 @@ func LoadConfig(path string) (Config, error) {
 	}
 	if fromFile.ShutdownTimeout > 0 {
 		cfg.ShutdownTimeout = fromFile.ShutdownTimeout
+	}
+	if fromFile.MaxJSExecution > 0 {
+		cfg.MaxJSExecution = fromFile.MaxJSExecution
+	}
+	if fromFile.MaxQueryDuration > 0 {
+		cfg.MaxQueryDuration = fromFile.MaxQueryDuration
 	}
 	return cfg, nil
 }

@@ -34,6 +34,9 @@ func (s *Server) Run(ctx context.Context) error {
 	if _, err := source.Snapshot(ctx); err != nil {
 		return err // fail fast, e.g. missing instances file in production
 	}
+	if s.Config.MaxQueryDuration > 0 {
+		maxQueryDuration = s.Config.MaxQueryDuration
+	}
 	pool := 2
 	if s.Config.HooksPoolSize != nil {
 		pool = *s.Config.HooksPoolSize
