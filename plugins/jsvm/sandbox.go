@@ -461,6 +461,11 @@ var hiddenMethods = map[string]map[string]bool{
 		// binding JS functions at runtime runs them on other goroutines (goja isn't goroutine-safe)
 		"Bind": true, "BindFunc": true, "Unbind": true, "UnbindAll": true, "Trigger": true,
 	},
+	"os": {
+		// *os.Root / *os.File handed out by the sandbox: links and ownership could plant a way out for code that
+		// doesn't use the root (PocketBase's storage follows symlinks); Chdir changes the whole process's cwd.
+		"Symlink": true, "Link": true, "Chown": true, "Lchown": true, "Chdir": true, "Fd": true,
+	},
 	"ganigeorgiev.com/pocketbase/dbx": {
 		"DB": true, // *sql.DB: a raw connection pool that can open any file
 	},

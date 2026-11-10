@@ -61,6 +61,12 @@ var attacks = [][2]string{
 	{"sqlLoadExtension", `$app.db().newQuery("SELECT load_extension('/tmp/x.so') AS x").execute()`},
 	{"sqlAttachURI", `$app.db().newQuery("ATTACH 'file:" + OTHER + "/pb_data/data.db?mode=ro' AS z").execute()`},
 	{"sqlRunaway", `$app.db().newQuery("WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x+1 FROM c) SELECT max(x) AS m FROM c").execute()`},
+	{"rootSymlink", `typeof $os.openRoot(".").symlink`},
+	{"rootLink", `typeof $os.openRoot(".").link`},
+	{"fileChdir", `typeof $os.openInRoot(".", "pb_hooks/main.pb.js").chdir`},
+	{"fileFd", `typeof $os.openInRoot(".", "pb_hooks/main.pb.js").fd`},
+	{"blobEscape", `(() => { const f = $app.newFilesystem(); try { f.upload([104, 105], "../../../../../../tmp/pocker-blob-escape") } finally { f.close() } })()`},
+	{"blobOwn", `(() => { const f = $app.newFilesystem(); try { f.upload([104, 105], "own/test.txt"); return "done" } finally { f.close() } })()`},
 	{"plainVacuum", `($app.db().newQuery("VACUUM").execute(), "done")`},
 	{"literalAttachText", `($app.db().newQuery("SELECT 'attach' AS w").execute(), "done")`},
 	{"sleepCapped", `{ const s = Date.now(); sleep(60000); return Date.now() - s }`},
@@ -155,7 +161,7 @@ func TestSandboxBlocksEscapes(t *testing.T) {
 		}
 	}
 
-	hidden := []string{"restart", "bootstrap", "rawDB", "onServe", "bindHook", "cron", "unsafeWithoutHooks"}
+	hidden := []string{"rootSymlink", "rootLink", "fileChdir", "fileFd", "restart", "bootstrap", "rawDB", "onServe", "bindHook", "cron", "unsafeWithoutHooks"}
 	for _, name := range hidden {
 		res, _, _ := call(name)
 		if !res.OK || res.V != "undefined" {
@@ -177,7 +183,10 @@ func TestSandboxBlocksEscapes(t *testing.T) {
 		}
 	}
 
-	for _, name := range []string{"readOwn", "globOwn", "vacuumIntoOwn", "plainVacuum", "literalAttachText"} {
+	for _, name := range []string{"readOwn", "globOwn", "vacuumIntoOwn", "plainVacuum", "literalAttachText", "blobOwn",
+		// PocketBase's storage encodes "../" into the key's file name, so this stays in pb_data/storage
+		// (the outside-file check below confirms nothing reached /tmp)
+		"blobEscape"} {
 		res, code, _ := call(name)
 		if code != 200 || !res.OK {
 			t.Errorf("%s: expected allowed, got status=%d %+v", name, code, res)
@@ -192,6 +201,12 @@ func TestSandboxBlocksEscapes(t *testing.T) {
 	if err := running.app.CreateBackup(context.Background(), "sandbox-test.zip"); err != nil {
 		t.Errorf("backup through the SQL guard: %v", err)
 	}
+	// a backup name can't place the archive outside pb_data/backups
+	_ = running.app.CreateBackup(context.Background(), "../../../../../../tmp/pocker-backup-escape.zip")
+	if _, err := os.Stat("/tmp/pocker-backup-escape.zip"); err == nil {
+		t.Error("backup name escaped pb_data/backups")
+		_ = os.Remove("/tmp/pocker-backup-escape.zip")
+	}
 
 	if res, _, took := call("sqlRunaway"); res.OK || took > 5*time.Second {
 		t.Errorf("sqlRunaway: expected the query to be interrupted, got %+v after %s", res, took)
@@ -205,7 +220,7 @@ func TestSandboxBlocksEscapes(t *testing.T) {
 		t.Errorf("app unhealthy after interrupt: status=%d %+v", code, res)
 	}
 
-	for _, p := range []string{"/tmp/pocker-sql-pwn", "/tmp/pocker-sandbox-pwn", "/tmp/pocker-moved", "/tmp/pocker-sandbox-copy.db", filepath.Join(bDir, "pb_data/pwned")} {
+	for _, p := range []string{"/tmp/pocker-blob-escape", "/tmp/pocker-sql-pwn", "/tmp/pocker-sandbox-pwn", "/tmp/pocker-moved", "/tmp/pocker-sandbox-copy.db", filepath.Join(bDir, "pb_data/pwned")} {
 		if _, err := os.Stat(p); err == nil {
 			t.Errorf("%s exists: an escape wrote outside the app", p)
 			_ = os.Remove(p)
