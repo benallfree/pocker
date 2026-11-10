@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
+	"path/filepath"
 	"runtime/debug"
 	"time"
 
@@ -123,7 +124,30 @@ func (s *Server) Run(ctx context.Context) error {
 	}
 	serveErr := make(chan error, 1)
 	var redirect *http.Server
-	if s.Config.TLS.Cert != "" || s.Config.TLS.Key != "" {
+	startRedirect := func(h http.Handler) {
+		if s.Config.TLS.HTTPListen == "" {
+			return
+		}
+		redirect = &http.Server{Addr: s.Config.TLS.HTTPListen, Handler: h, ReadHeaderTimeout: time.Minute}
+		go func() {
+			if err := redirect.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				log.Error("pocker: http listener", "error", err)
+			}
+		}()
+	}
+	if s.Config.TLS.Auto {
+		auto, err := newAutoTLS(runCtx, s.Config.TLS, filepath.Join(s.Config.PBRoot, ".pocker-certs"), func(host string) bool {
+			_, ok := s.Manager.Lookup(host)
+			return ok
+		})
+		if err != nil {
+			_ = ln.Close()
+			return err
+		}
+		srv.TLSConfig = auto.tlsConfig()
+		go func() { serveErr <- srv.ServeTLS(ln, "", "") }()
+		startRedirect(auto.httpHandler(httpsRedirect(handler)))
+	} else if s.Config.TLS.Cert != "" || s.Config.TLS.Key != "" {
 		certs, err := newCertReloader(s.Config.TLS.Cert, s.Config.TLS.Key)
 		if err != nil {
 			_ = ln.Close()
@@ -131,14 +155,7 @@ func (s *Server) Run(ctx context.Context) error {
 		}
 		srv.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12, GetCertificate: certs.GetCertificate}
 		go func() { serveErr <- srv.ServeTLS(ln, "", "") }()
-		if s.Config.TLS.HTTPListen != "" {
-			redirect = &http.Server{Addr: s.Config.TLS.HTTPListen, Handler: httpsRedirect(handler), ReadHeaderTimeout: time.Minute}
-			go func() {
-				if err := redirect.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-					log.Error("pocker: http redirect listener", "error", err)
-				}
-			}()
-		}
+		startRedirect(httpsRedirect(handler))
 	} else {
 		go func() { serveErr <- srv.Serve(ln) }()
 	}
