@@ -220,7 +220,7 @@ func (p *plugin) registerMigrations() error {
 		vm.Set("migrate", func(up, down func(txApp core.App) error) {
 			// note: safe wrap to capture any eventual panic and to allow
 			// the error message to print the migration filename
-			core.AppMigrations.Register(
+			appMigrations(p.app).Register(
 				func(txApp core.App) error {
 					return routine.SafeWrap(func() error {
 						if up == nil {
@@ -588,4 +588,13 @@ func filesContent(dirPath string, pattern string) (map[string][]byte, error) {
 	}
 
 	return result, nil
+}
+
+// POCKER: appMigrations returns the app's own migrations list when it has one (several apps in one process),
+// otherwise the global [core.AppMigrations].
+func appMigrations(app core.App) *core.MigrationsList {
+	if l, ok := app.UnsafeWithoutHooks().(interface{ AppMigrationsList() *core.MigrationsList }); ok {
+		return l.AppMigrationsList()
+	}
+	return &core.AppMigrations
 }

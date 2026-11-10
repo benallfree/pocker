@@ -5,7 +5,6 @@ import (
 	"encoding/json/v2"
 	"errors"
 	"fmt"
-	"os"
 
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/security"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/types"
@@ -62,7 +61,7 @@ func (s *Settings) loadParam(app App, param *Param) error {
 
 	// failed, try to decrypt
 	if plainDecodeErr != nil {
-		encryptionKey := os.Getenv(app.EncryptionEnv())
+		encryptionKey := appEncryptionKey(app)
 
 		// load without decryption has failed and there is no encryption key to use for decrypt
 		if encryptionKey == "" {

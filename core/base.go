@@ -70,6 +70,15 @@ type BaseAppConfig struct {
 	AuxMaxOpenConns  int
 	AuxMaxIdleConns  int
 	IsDev            bool
+
+	// POCKER: per-app settings so several apps can share one process.
+
+	// EncryptionKey, when set, is used instead of reading the EncryptionEnv variable from the process environment.
+	EncryptionKey string
+
+	// AppMigrations, when set, is used instead of the global [AppMigrations] list
+	// (JS migrations registered by the jsvm plugin go here too).
+	AppMigrations *MigrationsList
 }
 
 // ensures that the BaseApp implements the App interface.
@@ -617,6 +626,22 @@ func (app *BaseApp) DataDir() string {
 	return app.config.DataDir
 }
 
+// POCKER: AppMigrationsList returns the app's own migrations list when configured, otherwise the global [AppMigrations].
+func (app *BaseApp) AppMigrationsList() *MigrationsList {
+	if app.config.AppMigrations != nil {
+		return app.config.AppMigrations
+	}
+	return &AppMigrations
+}
+
+// POCKER: EncryptionKey returns the configured app encryption key, falling back to the EncryptionEnv variable.
+func (app *BaseApp) EncryptionKey() string {
+	if app.config.EncryptionKey != "" {
+		return app.config.EncryptionKey
+	}
+	return os.Getenv(app.config.EncryptionEnv)
+}
+
 // EncryptionEnv returns the name of the app secret env key
 // (currently used primarily for optional settings encryption but this may change in the future).
 func (app *BaseApp) EncryptionEnv() string {
@@ -855,7 +880,7 @@ func (app *BaseApp) RunSystemMigrations() error {
 
 // RunAppMigrations applies all new migrations registered in the [core.AppMigrations] list.
 func (app *BaseApp) RunAppMigrations() error {
-	_, err := NewMigrationsRunner(app, AppMigrations).Up()
+	_, err := NewMigrationsRunner(app, *app.AppMigrationsList()).Up() // POCKER: per-app list
 	return err
 }
 
@@ -864,7 +889,7 @@ func (app *BaseApp) RunAppMigrations() error {
 func (app *BaseApp) RunAllMigrations() error {
 	list := MigrationsList{}
 	list.Copy(SystemMigrations)
-	list.Copy(AppMigrations)
+	list.Copy(*app.AppMigrationsList()) // POCKER: per-app list
 	_, err := NewMigrationsRunner(app, list).Up()
 	return err
 }
