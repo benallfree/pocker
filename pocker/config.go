@@ -46,6 +46,12 @@ type Config struct {
 	// EgressAllow lists private networks apps may still connect to (default none: public addresses only).
 	EgressAllow []string `yaml:"egress_allow"`
 
+	// Firewall: allowed peers, client IP headers, trusted clients, rate-limit header names.
+	Firewall FirewallConfig `yaml:"firewall"`
+
+	// TLS: certificate files for HTTPS, and an optional HTTP redirect listener.
+	TLS TLSConfig `yaml:"tls"`
+
 	// MemoryLimit sets the Go runtime's soft memory limit (GOMEMLIMIT) in bytes (default 0 = leave as is).
 	MemoryLimit int64 `yaml:"memory_limit"`
 
@@ -101,6 +107,11 @@ func LoadConfig(path string) (Config, error) {
 		cfg.ShutdownTimeout = fromFile.ShutdownTimeout
 	}
 	cfg.Limits = fromFile.Limits.over(cfg.Limits)
+	if fromFile.Limits.RateLimits == nil {
+		cfg.Limits.RateLimits = nil // keep "not set" so --dev can default rate limiting to off
+	}
+	cfg.Firewall = fromFile.Firewall
+	cfg.TLS = fromFile.TLS
 	if fromFile.EgressAllow != nil {
 		cfg.EgressAllow = fromFile.EgressAllow
 	}
@@ -125,5 +136,6 @@ func DefaultLimits() Limits {
 		HTTPSendMaxTimeout: 60 * time.Second,
 		HTTPSendMaxBody:    10 << 20,
 		Quarantine:         &q,
+		MaxConcurrentJS:    16,
 	}
 }

@@ -28,6 +28,93 @@ type Limits struct {
 	HTTPSendMaxTimeout time.Duration     `yaml:"http_send_max_timeout,omitempty"`
 	HTTPSendMaxBody    ByteSize          `yaml:"http_send_max_body,omitempty"`
 	Quarantine         *QuarantinePolicy `yaml:"quarantine,omitempty"`
+
+	// MaxConcurrentJS caps how many JS calls (hooks, routes, cron jobs) the instance runs at once; further calls
+	// wait up to max_js_execution for a slot, then fail.
+	MaxConcurrentJS int `yaml:"max_concurrent_js,omitempty"`
+
+	// RateLimits are the firewall's request limits for the instance (see [RateLimits]).
+	RateLimits *RateLimits `yaml:"rate_limits,omitempty"`
+
+	// TrustedClients are client IPs/CIDRs that get the trusted rate limits for this instance (on top of the
+	// process-wide firewall.trusted_clients).
+	TrustedClients []string `yaml:"trusted_clients,omitempty"`
+
+	// CORSOrigins restricts which origins may call the instance cross-origin (PocketBase's matching: exact, "*", and
+	// "*"/"?" wildcards). Empty = any origin ("*").
+	CORSOrigins []string `yaml:"cors_origins,omitempty"`
+}
+
+// RateLimits are request limits per client IP and per instance: an hourly budget and a concurrency cap, each with a
+// higher value for trusted clients. Requests to /api/files cost FileWeight of a request.
+type RateLimits struct {
+	IPHourly           int     `yaml:"ip_hourly,omitempty"`
+	InstanceHourly     int     `yaml:"instance_hourly,omitempty"`
+	IPConcurrent       int     `yaml:"ip_concurrent,omitempty"`
+	InstanceConcurrent int     `yaml:"instance_concurrent,omitempty"`
+	FileWeight         float64 `yaml:"file_weight,omitempty"`
+	// Trusted are the limits for trusted clients; zero fields fall back to the defaults' trusted values.
+	Trusted *RateLimitSet `yaml:"trusted,omitempty"`
+	// Off disables rate limiting for the instance.
+	Off bool `yaml:"off,omitempty"`
+}
+
+// RateLimitSet is one set of the four limits.
+type RateLimitSet struct {
+	IPHourly           int `yaml:"ip_hourly,omitempty"`
+	InstanceHourly     int `yaml:"instance_hourly,omitempty"`
+	IPConcurrent       int `yaml:"ip_concurrent,omitempty"`
+	InstanceConcurrent int `yaml:"instance_concurrent,omitempty"`
+}
+
+// DefaultRateLimits match the PocketHost edge firewall.
+var DefaultRateLimits = RateLimits{
+	IPHourly: 1000, InstanceHourly: 10000, IPConcurrent: 15, InstanceConcurrent: 250, FileWeight: 0.1,
+	Trusted: &RateLimitSet{IPHourly: 5000, InstanceHourly: 20000, IPConcurrent: 50, InstanceConcurrent: 250},
+}
+
+func pick(v, def int) int {
+	if v > 0 {
+		return v
+	}
+	return def
+}
+
+// merged returns r with zero fields taken from def.
+func (r RateLimits) merged(def RateLimits) RateLimits {
+	if r.Off || def.Off && r == (RateLimits{}) {
+		return RateLimits{Off: true}
+	}
+	out := RateLimits{
+		IPHourly:           pick(r.IPHourly, def.IPHourly),
+		InstanceHourly:     pick(r.InstanceHourly, def.InstanceHourly),
+		IPConcurrent:       pick(r.IPConcurrent, def.IPConcurrent),
+		InstanceConcurrent: pick(r.InstanceConcurrent, def.InstanceConcurrent),
+		FileWeight:         r.FileWeight,
+	}
+	if out.FileWeight <= 0 {
+		out.FileWeight = def.FileWeight
+	}
+	dt := RateLimitSet{}
+	if def.Trusted != nil {
+		dt = *def.Trusted
+	}
+	rt := RateLimitSet{}
+	if r.Trusted != nil {
+		rt = *r.Trusted
+	}
+	out.Trusted = &RateLimitSet{
+		IPHourly:           pick(rt.IPHourly, dt.IPHourly),
+		InstanceHourly:     pick(rt.InstanceHourly, dt.InstanceHourly),
+		IPConcurrent:       pick(rt.IPConcurrent, dt.IPConcurrent),
+		InstanceConcurrent: pick(rt.InstanceConcurrent, dt.InstanceConcurrent),
+	}
+	// a raised normal limit also lifts the trusted one (trusted is never lower)
+	out.Trusted.IPHourly = max(out.Trusted.IPHourly, out.IPHourly)
+	out.Trusted.InstanceHourly = max(out.Trusted.InstanceHourly, out.InstanceHourly)
+	out.Trusted.IPConcurrent = max(out.Trusted.IPConcurrent, out.IPConcurrent)
+	out.Trusted.InstanceConcurrent = max(out.Trusted.InstanceConcurrent, out.InstanceConcurrent)
+	return out
 }
 
 // QuarantinePolicy decides when repeated memory strikes pause an instance. Pauses back off: FirstPause, doubling on
@@ -125,6 +212,26 @@ func (l Limits) over(def Limits) Limits {
 	if l.HTTPSendMaxBody == 0 {
 		l.HTTPSendMaxBody = def.HTTPSendMaxBody
 	}
+	if l.MaxConcurrentJS == 0 {
+		l.MaxConcurrentJS = def.MaxConcurrentJS
+	}
+	if l.CORSOrigins == nil {
+		l.CORSOrigins = def.CORSOrigins
+	}
+	if l.TrustedClients == nil {
+		l.TrustedClients = def.TrustedClients
+	}
+	defR := DefaultRateLimits
+	if def.RateLimits != nil {
+		defR = def.RateLimits.merged(DefaultRateLimits)
+	}
+	rl := RateLimits{}
+	if l.RateLimits != nil {
+		rl = *l.RateLimits
+	}
+	rl = rl.merged(defR)
+	l.RateLimits = &rl
+
 	defQ := DefaultQuarantine
 	if def.Quarantine != nil {
 		defQ = def.Quarantine.merged(DefaultQuarantine)

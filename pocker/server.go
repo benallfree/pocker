@@ -2,6 +2,7 @@ package pocker
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -64,11 +65,23 @@ func (s *Server) Run(ctx context.Context) error {
 	if s.Config.HooksPoolSize != nil {
 		pool = *s.Config.HooksPoolSize
 	}
+	defaults := s.Config.Limits
+	if s.Config.Dev && defaults.RateLimits == nil {
+		defaults.RateLimits = &RateLimits{Off: true} // local development: no request budgets unless configured
+	}
+	fw, err := NewFirewall(s.Config.Firewall)
+	if err != nil {
+		return err
+	}
 	s.Manager = NewManager(source, ManagerOptions{
 		PBRoot:        s.Config.PBRoot,
 		Dev:           s.Config.Dev,
 		HooksPoolSize: pool,
 		Logger:        log,
+		Defaults:      defaults,
+		Firewall:      fw,
+		OnEvent:       s.onEvent(source, log),
+		Setup:         s.SetupApp,
 	})
 
 	var handler http.Handler = s.Manager
@@ -109,7 +122,26 @@ func (s *Server) Run(ctx context.Context) error {
 		BaseContext:  func(net.Listener) context.Context { return runCtx },
 	}
 	serveErr := make(chan error, 1)
-	go func() { serveErr <- srv.Serve(ln) }()
+	var redirect *http.Server
+	if s.Config.TLS.Cert != "" || s.Config.TLS.Key != "" {
+		certs, err := newCertReloader(s.Config.TLS.Cert, s.Config.TLS.Key)
+		if err != nil {
+			_ = ln.Close()
+			return err
+		}
+		srv.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12, GetCertificate: certs.GetCertificate}
+		go func() { serveErr <- srv.ServeTLS(ln, "", "") }()
+		if s.Config.TLS.HTTPListen != "" {
+			redirect = &http.Server{Addr: s.Config.TLS.HTTPListen, Handler: httpsRedirect(handler), ReadHeaderTimeout: time.Minute}
+			go func() {
+				if err := redirect.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+					log.Error("pocker: http redirect listener", "error", err)
+				}
+			}()
+		}
+	} else {
+		go func() { serveErr <- srv.Serve(ln) }()
+	}
 	log.Info("pocker: listening", "addr", ln.Addr().String(), "pb_root", s.Config.PBRoot, "dev", s.Config.Dev)
 
 	select {
@@ -133,6 +165,9 @@ func (s *Server) Run(ctx context.Context) error {
 	shutdownCtx, done := context.WithTimeout(context.Background(), timeout)
 	defer done()
 	_ = srv.Shutdown(shutdownCtx)
+	if redirect != nil {
+		_ = redirect.Shutdown(shutdownCtx)
+	}
 	cancel() // ends long-lived requests such as realtime SSE
 	s.Manager.Shutdown()
 	return nil

@@ -38,6 +38,7 @@ type Manager struct {
 
 	defaults Limits
 	onEvent  func(Event)
+	fw       *Firewall
 
 	mu        sync.RWMutex
 	qstate    map[string]*quarantineState // by ID
@@ -68,6 +69,8 @@ type ManagerOptions struct {
 	Defaults Limits
 	// OnEvent receives instance events (memory strikes, pauses, restarts), e.g. to log them or notify the owner.
 	OnEvent func(Event)
+	// Firewall, if set, checks peers and applies per-instance rate limits.
+	Firewall *Firewall
 	// Setup runs host Go code for each app after migrations and before it serves (see [Server.SetupApp]).
 	Setup func(inst Instance, app core.App) error
 	// Logger defaults to slog.Default().
@@ -85,6 +88,7 @@ func NewManager(source InstanceSource, opts ManagerOptions) *Manager {
 		opts:      appOptions{PBRoot: opts.PBRoot, HooksPoolSize: opts.HooksPoolSize, ForceDev: opts.Dev, Defaults: defaults, Setup: opts.Setup},
 		defaults:  defaults,
 		onEvent:   opts.OnEvent,
+		fw:        opts.Firewall,
 		qstate:    map[string]*quarantineState{},
 		paused:    map[string]time.Time{},
 		log:       opts.Logger,
@@ -296,6 +300,10 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		m.serveHealth(w)
 		return
 	}
+	if m.fw != nil && !m.fw.AllowPeer(r) {
+		http.Error(w, "forbidden: "+peerAddr(r).String(), http.StatusForbidden)
+		return
+	}
 
 	m.mu.RLock()
 	ready := m.ready
@@ -325,6 +333,14 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Retry-After", fmt.Sprint(int(time.Until(until).Seconds())+1))
 		http.Error(w, "this instance is paused for using too much memory; retry later", http.StatusServiceUnavailable)
 		return
+	}
+
+	if m.fw != nil {
+		release, ok := m.fw.rateCheck(w, r, inst, inst.Limits.over(m.defaults))
+		if !ok {
+			return
+		}
+		defer release() // long-lived responses (realtime) hold their concurrency slot until they end
 	}
 
 	app, err := m.app(inst)

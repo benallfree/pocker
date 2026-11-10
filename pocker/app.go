@@ -92,6 +92,7 @@ func startApp(opts appOptions, inst Instance) (r *runningApp, err error) {
 			MaxSleep:           lim.MaxSleep,
 			HTTPSendMaxTimeout: int(lim.HTTPSendMaxTimeout / time.Second),
 			HTTPSendMaxBody:    int64(lim.HTTPSendMaxBody),
+			MaxConcurrent:      lim.MaxConcurrentJS,
 			Owner:              inst.ID,
 			Console:            openInstanceLog(dir).Write,
 		},
@@ -115,7 +116,7 @@ func startApp(opts appOptions, inst Instance) (r *runningApp, err error) {
 		}
 	}
 
-	handler, err := buildHandler(app, filepath.Join(dir, "pb_public"))
+	handler, err := buildHandler(app, filepath.Join(dir, "pb_public"), lim.CORSOrigins)
 	if err != nil {
 		return nil, err
 	}
@@ -124,14 +125,17 @@ func startApp(opts appOptions, inst Instance) (r *runningApp, err error) {
 
 // buildHandler mirrors apis.Serve: router, CORS, dashboard, OnServe hooks (customer routes, pb_public) and the
 // final mux. The OnServe event gets a listener that is never served, so no port is opened per app.
-func buildHandler(app *core.BaseApp, publicDir string) (http.Handler, error) {
+func buildHandler(app *core.BaseApp, publicDir string, corsOrigins []string) (http.Handler, error) {
 	router, err := apis.NewRouter(app)
 	if err != nil {
 		return nil, err
 	}
 
+	if len(corsOrigins) == 0 {
+		corsOrigins = []string{"*"}
+	}
 	router.Bind(apis.CORS(apis.CORSConfig{
-		AllowOrigins: []string{"*"},
+		AllowOrigins: corsOrigins,
 		AllowMethods: []string{http.MethodGet, http.MethodHead, http.MethodPut, http.MethodPatch, http.MethodPost, http.MethodDelete},
 	}))
 
