@@ -58,6 +58,12 @@ type Sandbox struct {
 	// Owner identifies the app in InterruptActive results (e.g. the instance id).
 	Owner string
 
+	// MaxConcurrent caps how many hook/route/cron calls the app runs at once (0 = no cap). A call waits up to
+	// MaxExecution for a slot, then fails.
+	MaxConcurrent int
+	slotsOnce     sync.Once
+	slots         chan struct{}
+
 	// Console, when set, receives console.log/info/debug ("stdout") and console.warn/error ("stderr") output
 	// instead of the process's stdout/stderr, so each app's output stays its own.
 	Console func(stream, message string)
@@ -745,4 +751,27 @@ func httpSendLimits(vm *goja.Runtime) (int, int64) {
 		}
 	}
 	return timeout, body
+}
+
+// ErrTooBusy is returned when an app already runs MaxConcurrent JS calls and no slot frees up in time.
+var ErrTooBusy = errors.New("too many concurrent JS calls for this app; retry shortly")
+
+// acquire takes a concurrency slot for one JS call; the returned function gives it back.
+func (s *Sandbox) acquire() (func(), error) {
+	if s.MaxConcurrent <= 0 {
+		return func() {}, nil
+	}
+	s.slotsOnce.Do(func() { s.slots = make(chan struct{}, s.MaxConcurrent) })
+	wait := s.maxExecution()
+	if wait <= 0 {
+		wait = 30 * time.Second
+	}
+	t := time.NewTimer(wait)
+	defer t.Stop()
+	select {
+	case s.slots <- struct{}{}:
+		return func() { <-s.slots }, nil
+	case <-t.C:
+		return nil, ErrTooBusy
+	}
 }

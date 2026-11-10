@@ -80,6 +80,11 @@ func (p *vmsPool) run(call func(vm *goja.Runtime) error) error {
 // POCKER: call runs fn on vm under the sandbox time limit, if any.
 func (p *vmsPool) call(fn func(vm *goja.Runtime) error, vm *goja.Runtime) error {
 	if p.sandbox != nil {
+		release, err := p.sandbox.acquire()
+		if err != nil {
+			return err
+		}
+		defer release()
 		defer p.sandbox.interruptAfter(vm)()
 	}
 	return fn(vm)
