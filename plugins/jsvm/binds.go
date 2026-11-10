@@ -892,6 +892,14 @@ func BindApis(vm *goja.Runtime) {
 // for sending HTTP requests.
 //
 // See https://pocketbase.io/jsvm/modules/_http.html.
+// POCKER: process-wide caps for $http.send (0 = upstream behaviour: 120s default timeout, unbounded body).
+var (
+	// HTTPSendMaxTimeout caps the timeout (in seconds) a JS caller can request.
+	HTTPSendMaxTimeout int
+	// HTTPSendMaxBodySize caps the response body size in bytes; larger responses fail.
+	HTTPSendMaxBodySize int64
+)
+
 func BindHTTP(vm *goja.Runtime) {
 	obj := vm.NewObject()
 	vm.Set("$http", obj)
@@ -960,6 +968,9 @@ func BindHTTP(vm *goja.Runtime) {
 		if config.Timeout <= 0 {
 			config.Timeout = 120
 		}
+		if HTTPSendMaxTimeout > 0 && config.Timeout > HTTPSendMaxTimeout { // POCKER
+			config.Timeout = HTTPSendMaxTimeout
+		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(config.Timeout)*time.Second)
 		defer cancel()
@@ -1012,7 +1023,15 @@ func BindHTTP(vm *goja.Runtime) {
 		}
 		defer res.Body.Close()
 
-		bodyRaw, _ := io.ReadAll(res.Body)
+		var bodyRaw []byte
+		if HTTPSendMaxBodySize > 0 { // POCKER: bounded response body
+			bodyRaw, _ = io.ReadAll(io.LimitReader(res.Body, HTTPSendMaxBodySize+1))
+			if int64(len(bodyRaw)) > HTTPSendMaxBodySize {
+				return nil, errors.New("$http.send: response body larger than the allowed size")
+			}
+		} else {
+			bodyRaw, _ = io.ReadAll(res.Body)
+		}
 
 		result := &sendResult{
 			StatusCode: res.StatusCode,
