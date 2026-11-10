@@ -163,7 +163,7 @@ not guaranteed), and a hook that allocates faster than the 50 ms sample through 
 could still push the process over its limit. Set `memory_limit` and run Pocker under a cgroup memory limit so the worst
 case is a restart, not a host OOM.
 
-**Not covered yet:** and OS-level defence in depth: run Pocker as a non-root user with an
+**Not covered yet:** OS-level defence in depth: run Pocker as a non-root user with an
 OS firewall that only lets that user reach public addresses (a second, independent egress layer), plus seccomp and
 Landlock.
 
