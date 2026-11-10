@@ -28,10 +28,8 @@ type appOptions struct {
 	PBRoot        string
 	HooksPoolSize int
 	ForceDev      bool // Pocker dev mode: every app runs in PocketBase dev mode
-	// MaxJSExecution interrupts a JS call that runs longer (0 = jsvm default, 30s).
-	MaxJSExecution time.Duration
-	// MaxJSAllocation caps one-shot JS allocations (0 = jsvm default, 64 MiB).
-	MaxJSAllocation int64
+	// Defaults are the process-wide limits; an instance's own Limits override them.
+	Defaults Limits
 }
 
 func instanceDir(opts appOptions, inst Instance) string {
@@ -54,8 +52,10 @@ func startApp(opts appOptions, inst Instance) (*runningApp, error) {
 		}
 	}
 
+	lim := inst.Limits.over(opts.Defaults)
+
 	app := core.NewBaseApp(core.BaseAppConfig{
-		DBConnect:     guardedDBConnect(), // SQL stays inside this app's files
+		DBConnect:     guardedDBConnect(lim.MaxQueryDuration), // SQL stays inside this app's files
 		DataDir:       filepath.Join(dir, "pb_data"),
 		IsDev:         inst.Dev || opts.ForceDev,
 		EncryptionKey: inst.Env["PB_ENCRYPTION_KEY"],
@@ -73,11 +73,15 @@ func startApp(opts appOptions, inst Instance) (*runningApp, error) {
 		HooksWatch:    false, // one process serves every app: a hooks change must not restart it
 		HooksPoolSize: opts.HooksPoolSize,
 		Sandbox: &jsvm.Sandbox{
-			Dir:           dir,
-			Env:           env,
-			MaxExecution:  opts.MaxJSExecution,
-			MaxAllocation: opts.MaxJSAllocation,
-			Owner:         inst.ID,
+			Dir:                dir,
+			Env:                env,
+			MaxExecution:       lim.MaxJSExecution,
+			MaxAllocation:      int64(lim.MaxJSAllocation),
+			MaxCallStackSize:   lim.MaxCallStackSize,
+			MaxSleep:           lim.MaxSleep,
+			HTTPSendMaxTimeout: int(lim.HTTPSendMaxTimeout / time.Second),
+			HTTPSendMaxBody:    int64(lim.HTTPSendMaxBody),
+			Owner:              inst.ID,
 		},
 	})
 	if err != nil {

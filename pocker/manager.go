@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"reflect"
 	"regexp"
 	"strings"
 	"sync"
@@ -33,14 +34,15 @@ type Manager struct {
 
 	dev bool
 
-	quarantine quarantineOptions
+	defaults Limits
+	onEvent  func(Event)
 
 	mu        sync.RWMutex
-	strikes   map[string][]time.Time // by ID: recent memory strikes
-	paused    map[string]time.Time   // by ID: quarantined until
-	instances map[string]Instance    // by ID
-	hosts     map[string]string      // host -> ID
-	apps      map[string]*appSlot    // by ID
+	qstate    map[string]*quarantineState // by ID
+	paused    map[string]time.Time        // by ID: quarantined until
+	instances map[string]Instance         // by ID
+	hosts     map[string]string           // host -> ID
+	apps      map[string]*appSlot         // by ID
 	ready     bool
 }
 
@@ -60,12 +62,10 @@ type ManagerOptions struct {
 	Dev bool
 	// HooksPoolSize is the number of prewarmed JS runtimes per app (0 = create one per hook run).
 	HooksPoolSize int
-	// MaxJSExecution interrupts a JS call that runs longer (0 = 30s).
-	MaxJSExecution time.Duration
-	// MaxJSAllocation caps one-shot JS allocations in bytes (0 = 64 MiB).
-	MaxJSAllocation int64
-	// Quarantine: an instance with Strikes memory strikes within Window is paused (app stopped, 503) for Pause.
-	Quarantine quarantineOptions
+	// Defaults are the per-instance limits used where an instance doesn't set its own (zero = DefaultLimits).
+	Defaults Limits
+	// OnEvent receives instance events (memory strikes, pauses, restarts), e.g. to log them or notify the owner.
+	OnEvent func(Event)
 	// Logger defaults to slog.Default().
 	Logger *slog.Logger
 }
@@ -75,18 +75,19 @@ func NewManager(source InstanceSource, opts ManagerOptions) *Manager {
 	if opts.Logger == nil {
 		opts.Logger = slog.Default()
 	}
+	defaults := opts.Defaults.over(DefaultLimits())
 	return &Manager{
-		source: source,
-		opts: appOptions{PBRoot: opts.PBRoot, HooksPoolSize: opts.HooksPoolSize, ForceDev: opts.Dev,
-			MaxJSExecution: opts.MaxJSExecution, MaxJSAllocation: opts.MaxJSAllocation},
-		quarantine: opts.Quarantine.withDefaults(),
-		strikes:    map[string][]time.Time{},
-		paused:     map[string]time.Time{},
-		log:        opts.Logger,
-		dev:        opts.Dev,
-		instances:  map[string]Instance{},
-		hosts:      map[string]string{},
-		apps:       map[string]*appSlot{},
+		source:    source,
+		opts:      appOptions{PBRoot: opts.PBRoot, HooksPoolSize: opts.HooksPoolSize, ForceDev: opts.Dev, Defaults: defaults},
+		defaults:  defaults,
+		onEvent:   opts.OnEvent,
+		qstate:    map[string]*quarantineState{},
+		paused:    map[string]time.Time{},
+		log:       opts.Logger,
+		dev:       opts.Dev,
+		instances: map[string]Instance{},
+		hosts:     map[string]string{},
+		apps:      map[string]*appSlot{},
 	}
 }
 
@@ -129,9 +130,20 @@ func (m *Manager) apply(c Change) {
 	switch c.Kind {
 	case Upsert:
 		m.mu.Lock()
+		old, existed := m.instances[c.Instance.ID]
 		m.upsertLocked(c.Instance)
+		var stale *appSlot
+		if existed && !sameRuntime(old, c.Instance) {
+			// env (secrets), limits, dev mode or folder changed: the next request starts a fresh app
+			stale = m.apps[c.Instance.ID]
+			delete(m.apps, c.Instance.ID)
+		}
 		m.mu.Unlock()
 		m.log.Info("pocker: instance updated", "id", c.Instance.ID)
+		if stale != nil {
+			m.emit(Event{Kind: EventRestarted, InstanceID: c.Instance.ID, Reason: "settings changed"})
+			go retire(stale)
+		}
 	case Delete:
 		m.mu.Lock()
 		slot := m.apps[c.Instance.ID]
@@ -365,56 +377,102 @@ func (m *Manager) Shutdown() {
 	wg.Wait()
 }
 
-type quarantineOptions struct {
-	Strikes int           // default 3
-	Window  time.Duration // default 10m
-	Pause   time.Duration // default 5m
+// Event is something that happened to an instance, for logs or owner notifications.
+type Event struct {
+	Kind       EventKind
+	InstanceID string
+	Reason     string
+	Until      time.Time // EventPaused: when requests are served again
+	Strikes    int       // EventStrike: strikes within the window so far
 }
 
-func (q quarantineOptions) withDefaults() quarantineOptions {
-	if q.Strikes <= 0 {
-		q.Strikes = 3
+// EventKind names an [Event].
+type EventKind string
+
+const (
+	EventStrike    EventKind = "memory_strike" // a JS call was interrupted by the memory watch
+	EventPaused    EventKind = "paused"        // too many strikes: app stopped, requests get 503 until Until
+	EventRestarted EventKind = "restarted"     // settings changed: the app restarts on its next request
+)
+
+func (m *Manager) emit(e Event) {
+	if m.onEvent != nil {
+		m.onEvent(e)
 	}
-	if q.Window <= 0 {
-		q.Window = 10 * time.Minute
-	}
-	if q.Pause <= 0 {
-		q.Pause = 5 * time.Minute
-	}
-	return q
 }
 
-// Strike records a memory strike against an instance (from the [MemoryWatch]). Enough strikes within the window
-// pause it: its app is stopped to free memory and requests get 503 until the pause ends.
+type quarantineState struct {
+	strikes    []time.Time
+	level      int // quarantines so far (pause backoff)
+	lastStrike time.Time
+}
+
+// sameRuntime reports whether two versions of an instance can share a running app.
+func sameRuntime(a, b Instance) bool {
+	return a.Dir == b.Dir && a.Dev == b.Dev && reflect.DeepEqual(a.Env, b.Env) && reflect.DeepEqual(a.Limits, b.Limits)
+}
+
+// retire stops an app that new requests no longer reach, after giving in-flight requests time to finish.
+func retire(slot *appSlot) {
+	<-slot.done
+	if slot.app == nil {
+		return
+	}
+	time.Sleep(10 * time.Second)
+	stopApp(slot.app)
+}
+
+// Strike records a memory strike against an instance (from the [MemoryWatch]). With the instance's quarantine
+// policy, enough strikes within the window pause it: its app is stopped to free memory and requests get 503 until
+// the pause ends. Pauses back off on repeat quarantines and the backoff resets after a quiet period.
 func (m *Manager) Strike(id string) {
 	now := time.Now()
 	m.mu.Lock()
-	recent := m.strikes[id][:0]
-	for _, t := range m.strikes[id] {
-		if now.Sub(t) < m.quarantine.Window {
+	inst := m.instances[id]
+	policy := *inst.Limits.over(m.defaults).Quarantine
+	st := m.qstate[id]
+	if st == nil {
+		st = &quarantineState{}
+		m.qstate[id] = st
+	}
+	if !st.lastStrike.IsZero() && now.Sub(st.lastStrike) > policy.ResetAfter {
+		st.level = 0
+	}
+	st.lastStrike = now
+	recent := st.strikes[:0]
+	for _, t := range st.strikes {
+		if now.Sub(t) < policy.Window {
 			recent = append(recent, t)
 		}
 	}
-	recent = append(recent, now)
-	m.strikes[id] = recent
+	st.strikes = append(recent, now)
+	count := len(st.strikes)
+
 	var slot *appSlot
-	if len(recent) >= m.quarantine.Strikes {
-		m.paused[id] = now.Add(m.quarantine.Pause)
-		delete(m.strikes, id)
+	var until time.Time
+	if !policy.Off && count >= policy.Strikes {
+		until = now.Add(policy.pauseFor(st.level))
+		st.level++
+		st.strikes = nil
+		m.paused[id] = until
 		slot = m.apps[id]
 		delete(m.apps, id)
 	}
 	m.mu.Unlock()
 
-	m.log.Warn("pocker: memory strike", "id", id, "strikes", len(recent))
-	if slot != nil {
-		m.log.Warn("pocker: instance paused for memory", "id", id, "for", m.quarantine.Pause)
-		go func() {
-			<-slot.done
-			if slot.app != nil {
-				stopApp(slot.app)
-			}
-		}()
+	m.log.Warn("pocker: memory strike", "id", id, "strikes", count)
+	m.emit(Event{Kind: EventStrike, InstanceID: id, Strikes: count, Reason: "memory"})
+	if !until.IsZero() {
+		m.log.Warn("pocker: instance paused for memory", "id", id, "until", until)
+		m.emit(Event{Kind: EventPaused, InstanceID: id, Until: until, Reason: "memory"})
+		if slot != nil {
+			go func() {
+				<-slot.done
+				if slot.app != nil {
+					stopApp(slot.app)
+				}
+			}()
+		}
 	}
 }
 

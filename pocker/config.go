@@ -38,23 +38,13 @@ type Config struct {
 	// ShutdownTimeout bounds graceful shutdown of in-flight requests (default 10s).
 	ShutdownTimeout time.Duration `yaml:"shutdown_timeout"`
 
-	// MaxJSExecution interrupts any single JS call (hook, route, cron job, migration) that runs longer (default 30s).
-	MaxJSExecution time.Duration `yaml:"max_js_execution"`
-
-	// MaxQueryDuration interrupts any SQL statement without its own deadline (raw SQL from JS) (default 30s).
-	MaxQueryDuration time.Duration `yaml:"max_query_duration"`
+	// Limits are the defaults for every instance; an instance's own limits (from the instance source) override
+	// them field by field. Keys: max_js_execution, max_js_allocation, max_call_stack_size, max_sleep,
+	// max_query_duration, http_send_max_timeout, http_send_max_body, quarantine.
+	Limits `yaml:",inline"`
 
 	// EgressAllow lists private networks apps may still connect to (default none: public addresses only).
 	EgressAllow []string `yaml:"egress_allow"`
-
-	// HTTPSendMaxTimeout caps the timeout a JS $http.send can request (default 60s).
-	HTTPSendMaxTimeout time.Duration `yaml:"http_send_max_timeout"`
-
-	// HTTPSendMaxBody caps $http.send response bodies in bytes (default 10 MiB).
-	HTTPSendMaxBody int64 `yaml:"http_send_max_body"`
-
-	// MaxJSAllocation caps one-shot JS allocations in bytes (default 64 MiB).
-	MaxJSAllocation int64 `yaml:"max_js_allocation"`
 
 	// MemoryLimit sets the Go runtime's soft memory limit (GOMEMLIMIT) in bytes (default 0 = leave as is).
 	MemoryLimit int64 `yaml:"memory_limit"`
@@ -68,15 +58,12 @@ type Config struct {
 func DefaultConfig() Config {
 	pool := 2
 	return Config{
-		Listen:             ":8090",
-		PBRoot:             "./pb_root",
-		InstancesFile:      "./instances.yaml",
-		HooksPoolSize:      &pool,
-		ShutdownTimeout:    10 * time.Second,
-		MaxJSExecution:     30 * time.Second,
-		MaxQueryDuration:   30 * time.Second,
-		HTTPSendMaxTimeout: 60 * time.Second,
-		HTTPSendMaxBody:    10 << 20,
+		Listen:          ":8090",
+		PBRoot:          "./pb_root",
+		InstancesFile:   "./instances.yaml",
+		HooksPoolSize:   &pool,
+		ShutdownTimeout: 10 * time.Second,
+		Limits:          DefaultLimits(),
 	}
 }
 
@@ -113,23 +100,9 @@ func LoadConfig(path string) (Config, error) {
 	if fromFile.ShutdownTimeout > 0 {
 		cfg.ShutdownTimeout = fromFile.ShutdownTimeout
 	}
-	if fromFile.MaxJSExecution > 0 {
-		cfg.MaxJSExecution = fromFile.MaxJSExecution
-	}
-	if fromFile.MaxQueryDuration > 0 {
-		cfg.MaxQueryDuration = fromFile.MaxQueryDuration
-	}
+	cfg.Limits = fromFile.Limits.over(cfg.Limits)
 	if fromFile.EgressAllow != nil {
 		cfg.EgressAllow = fromFile.EgressAllow
-	}
-	if fromFile.HTTPSendMaxTimeout > 0 {
-		cfg.HTTPSendMaxTimeout = fromFile.HTTPSendMaxTimeout
-	}
-	if fromFile.HTTPSendMaxBody > 0 {
-		cfg.HTTPSendMaxBody = fromFile.HTTPSendMaxBody
-	}
-	if fromFile.MaxJSAllocation > 0 {
-		cfg.MaxJSAllocation = fromFile.MaxJSAllocation
 	}
 	if fromFile.MemoryLimit > 0 {
 		cfg.MemoryLimit = fromFile.MemoryLimit
@@ -138,4 +111,19 @@ func LoadConfig(path string) (Config, error) {
 		cfg.MemorySoftLimit = fromFile.MemorySoftLimit
 	}
 	return cfg, nil
+}
+
+// DefaultLimits are the built-in per-instance limits.
+func DefaultLimits() Limits {
+	q := DefaultQuarantine
+	return Limits{
+		MaxJSExecution:     30 * time.Second,
+		MaxJSAllocation:    64 << 20,
+		MaxCallStackSize:   2000,
+		MaxSleep:           10 * time.Second,
+		MaxQueryDuration:   30 * time.Second,
+		HTTPSendMaxTimeout: 60 * time.Second,
+		HTTPSendMaxBody:    10 << 20,
+		Quarantine:         &q,
+	}
 }

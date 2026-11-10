@@ -38,12 +38,13 @@ const guardDriverName = "pocker-sqlite"
 
 var registerGuard sync.Once
 
-// maxQueryDuration bounds any statement that has no deadline of its own (raw SQL from JS has none), so a runaway
-// query (e.g. an endless recursive CTE) is interrupted inside SQLite. Set by the Manager; default 30s.
-var maxQueryDuration = 30 * time.Second
+// queryLimits maps an app's pb_data folder to the deadline for its statements that have none of their own (raw SQL
+// from JS has none), so a runaway query (e.g. an endless recursive CTE) is interrupted inside SQLite.
+var queryLimits sync.Map // string -> time.Duration
 
-// guardedDBConnect returns a core.DBConnectFunc like core.DefaultDBConnect, opening through the SQL guard.
-func guardedDBConnect() core.DBConnectFunc {
+// guardedDBConnect returns a core.DBConnectFunc like core.DefaultDBConnect, opening through the SQL guard, with
+// maxQuery as the deadline for statements that have none (0 = none).
+func guardedDBConnect(maxQuery time.Duration) core.DBConnectFunc {
 	registerGuard.Do(func() {
 		base, err := sql.Open("sqlite", ":memory:")
 		if err != nil {
@@ -54,6 +55,9 @@ func guardedDBConnect() core.DBConnectFunc {
 		sql.Register(guardDriverName, &guardDriver{inner: inner})
 	})
 	return func(dbPath string) (*dbx.DB, error) {
+		if dir, err := filepath.Abs(filepath.Dir(dbPath)); err == nil {
+			queryLimits.Store(dir, maxQuery)
+		}
 		// same pragmas as core.DefaultDBConnect
 		pragmas := "?_pragma=busy_timeout(10000)&_pragma=journal_mode(WAL)&_pragma=journal_size_limit(200000000)&_pragma=synchronous(NORMAL)&_pragma=foreign_keys(ON)&_pragma=temp_store(MEMORY)&_pragma=cache_size(-32000)&_defensive=1"
 		return dbx.Open(guardDriverName, dbPath+pragmas)
@@ -81,7 +85,11 @@ func (d *guardDriver) Open(dsn string) (driver.Conn, error) {
 		_ = c.Close()
 		return nil, fmt.Errorf("pocker: SQL guard: %w", err)
 	}
-	return &guardConn{inner: c, handle: handle}, nil
+	var maxQuery time.Duration
+	if v, ok := queryLimits.Load(allowed); ok {
+		maxQuery = v.(time.Duration)
+	}
+	return &guardConn{inner: c, handle: handle, maxQuery: maxQuery}, nil
 }
 
 // authorizers maps a connection's sqlite3* handle to the app folder its SQL may touch.
@@ -159,8 +167,9 @@ func cFuncPointer[T any](f T) uintptr {
 
 // guardConn passes everything through to the driver; it exists to drop the authorizer entry on Close.
 type guardConn struct {
-	inner  driver.Conn
-	handle uintptr
+	inner    driver.Conn
+	handle   uintptr
+	maxQuery time.Duration
 }
 
 func (c *guardConn) Prepare(query string) (driver.Stmt, error) {
@@ -168,7 +177,7 @@ func (c *guardConn) Prepare(query string) (driver.Stmt, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &guardStmt{inner: st}, nil
+	return &guardStmt{inner: st, maxQuery: c.maxQuery}, nil
 }
 
 func (c *guardConn) PrepareContext(ctx context.Context, query string) (driver.Stmt, error) {
@@ -182,7 +191,7 @@ func (c *guardConn) PrepareContext(ctx context.Context, query string) (driver.St
 	if err != nil {
 		return nil, err
 	}
-	return &guardStmt{inner: st}, nil
+	return &guardStmt{inner: st, maxQuery: c.maxQuery}, nil
 }
 
 func (c *guardConn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
@@ -190,7 +199,7 @@ func (c *guardConn) ExecContext(ctx context.Context, query string, args []driver
 	if !ok {
 		return nil, driver.ErrSkip
 	}
-	ctx, cancel := withQueryDeadline(ctx)
+	ctx, cancel := withQueryDeadline(ctx, c.maxQuery)
 	defer cancel()
 	return e.ExecContext(ctx, query, args)
 }
@@ -200,7 +209,7 @@ func (c *guardConn) QueryContext(ctx context.Context, query string, args []drive
 	if !ok {
 		return nil, driver.ErrSkip
 	}
-	ctx, cancel := withQueryDeadline(ctx)
+	ctx, cancel := withQueryDeadline(ctx, c.maxQuery)
 	rows, err := q.QueryContext(ctx, query, args)
 	if err != nil {
 		cancel()
@@ -209,12 +218,12 @@ func (c *guardConn) QueryContext(ctx context.Context, query string, args []drive
 	return &guardRows{Rows: rows, cancel: cancel}, nil
 }
 
-// withQueryDeadline adds maxQueryDuration to a context that has no deadline.
-func withQueryDeadline(ctx context.Context) (context.Context, context.CancelFunc) {
-	if _, ok := ctx.Deadline(); ok || maxQueryDuration <= 0 {
+// withQueryDeadline adds max to a context that has no deadline.
+func withQueryDeadline(ctx context.Context, max time.Duration) (context.Context, context.CancelFunc) {
+	if _, ok := ctx.Deadline(); ok || max <= 0 {
 		return ctx, func() {}
 	}
-	return context.WithTimeout(ctx, maxQueryDuration)
+	return context.WithTimeout(ctx, max)
 }
 
 // guardRows releases the query deadline when the rows are closed (they stream after QueryContext returns).
@@ -230,7 +239,10 @@ func (r *guardRows) Close() error {
 }
 
 // guardStmt applies the query deadline to prepared statements.
-type guardStmt struct{ inner driver.Stmt }
+type guardStmt struct {
+	inner    driver.Stmt
+	maxQuery time.Duration
+}
 
 func (s *guardStmt) Close() error  { return s.inner.Close() }
 func (s *guardStmt) NumInput() int { return s.inner.NumInput() }
@@ -244,7 +256,7 @@ func (s *guardStmt) Query(args []driver.Value) (driver.Rows, error) {
 }
 
 func (s *guardStmt) ExecContext(ctx context.Context, args []driver.NamedValue) (driver.Result, error) {
-	ctx, cancel := withQueryDeadline(ctx)
+	ctx, cancel := withQueryDeadline(ctx, s.maxQuery)
 	defer cancel()
 	if e, ok := s.inner.(driver.StmtExecContext); ok {
 		return e.ExecContext(ctx, args)
@@ -253,7 +265,7 @@ func (s *guardStmt) ExecContext(ctx context.Context, args []driver.NamedValue) (
 }
 
 func (s *guardStmt) QueryContext(ctx context.Context, args []driver.NamedValue) (driver.Rows, error) {
-	ctx, cancel := withQueryDeadline(ctx)
+	ctx, cancel := withQueryDeadline(ctx, s.maxQuery)
 	var rows driver.Rows
 	var err error
 	if q, ok := s.inner.(driver.StmtQueryContext); ok {

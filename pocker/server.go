@@ -19,6 +19,10 @@ type Server struct {
 	Logger  *slog.Logger
 	Manager *Manager // set by Run
 
+	// OnEvent, if set, receives instance events (memory strikes, pauses, restarts). An instance source that
+	// implements [EventSink] receives them too.
+	OnEvent func(Event)
+
 	// Wrap, if set, wraps the instance handler (e.g. firewall or rate-limit middleware from a host application).
 	Wrap func(http.Handler) http.Handler
 }
@@ -37,9 +41,6 @@ func (s *Server) Run(ctx context.Context) error {
 	if _, err := source.Snapshot(ctx); err != nil {
 		return err // fail fast, e.g. missing instances file in production
 	}
-	if s.Config.MaxQueryDuration > 0 {
-		maxQueryDuration = s.Config.MaxQueryDuration
-	}
 	var allow []netip.Prefix
 	for _, c := range s.Config.EgressAllow {
 		pfx, err := netip.ParsePrefix(c)
@@ -52,7 +53,7 @@ func (s *Server) Run(ctx context.Context) error {
 		}
 		allow = append(allow, pfx)
 	}
-	InstallEgressPolicy(EgressPolicy{Allow: allow}, int(s.Config.HTTPSendMaxTimeout/time.Second), s.Config.HTTPSendMaxBody)
+	InstallEgressPolicy(EgressPolicy{Allow: allow}, int(s.Config.HTTPSendMaxTimeout/time.Second), int64(s.Config.HTTPSendMaxBody))
 	pool := 2
 	if s.Config.HooksPoolSize != nil {
 		pool = *s.Config.HooksPoolSize
@@ -129,4 +130,22 @@ func (s *Server) Run(ctx context.Context) error {
 	cancel() // ends long-lived requests such as realtime SSE
 	s.Manager.Shutdown()
 	return nil
+}
+
+// EventSink is implemented by instance sources that want instance events (e.g. to notify the owner).
+type EventSink interface {
+	InstanceEvent(Event)
+}
+
+func (s *Server) onEvent(source InstanceSource, log *slog.Logger) func(Event) {
+	sink, _ := source.(EventSink)
+	return func(e Event) {
+		log.Info("pocker: event", "kind", e.Kind, "id", e.InstanceID, "reason", e.Reason, "until", e.Until, "strikes", e.Strikes)
+		if s.OnEvent != nil {
+			s.OnEvent(e)
+		}
+		if sink != nil {
+			sink.InstanceEvent(e)
+		}
+	}
 }

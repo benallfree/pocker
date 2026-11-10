@@ -26,6 +26,9 @@ type Instance struct {
 	// PB_ENCRYPTION_KEY, when set, encrypts the app settings (like `pocketbase serve --encryptionEnv`).
 	Env map[string]string `yaml:"env,omitempty"`
 
+	// Limits override the process defaults for this instance (zero fields keep the default).
+	Limits Limits `yaml:"limits,omitempty"`
+
 	// Blocked, when set, answers every request for this instance with the given status and message instead of
 	// serving it (e.g. suspended, unpaid). A running app is left running.
 	Blocked *Blocked `yaml:"blocked,omitempty"`

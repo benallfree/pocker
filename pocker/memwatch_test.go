@@ -82,30 +82,80 @@ routerAdd("GET", "/ok", (e) => e.json(200, { ok: true }))
 	t.Logf("interrupted after %s; heap base %d MiB", took, base>>20)
 }
 
-func TestQuarantineAfterStrikes(t *testing.T) {
-	m := newTestManager(t, false, Instance{ID: "hog", Hosts: []string{"hog.example.com"}})
-	m.quarantine = quarantineOptions{Strikes: 3, Window: time.Minute, Pause: time.Minute}
+func TestQuarantineBackoff(t *testing.T) {
+	m := newTestManager(t, false,
+		Instance{ID: "hog", Hosts: []string{"hog.example.com"}},
+		Instance{ID: "trusted", Limits: Limits{Quarantine: &QuarantinePolicy{Off: true}}},
+		Instance{ID: "lenient", Limits: Limits{Quarantine: &QuarantinePolicy{Strikes: 5}}},
+	)
+	var events []Event
+	m.onEvent = func(e Event) { events = append(events, e) }
 
-	m.Strike("hog")
-	m.Strike("hog")
-	if _, paused := m.pausedUntil("hog"); paused {
+	pauseAfter := func(id string, strikes int) time.Duration {
+		t.Helper()
+		for i := 0; i < strikes; i++ {
+			m.Strike(id)
+		}
+		until, paused := m.pausedUntil(id)
+		if !paused {
+			return 0
+		}
+		m.mu.Lock()
+		delete(m.paused, id) // end the pause for the next round
+		m.mu.Unlock()
+		return time.Until(until).Round(time.Second)
+	}
+
+	if d := pauseAfter("hog", 2); d != 0 {
 		t.Fatal("two strikes must not pause")
 	}
-	m.Strike("hog")
-	if _, paused := m.pausedUntil("hog"); !paused {
-		t.Fatal("three strikes within the window must pause")
+	if d := pauseAfter("hog", 1); d != 30*time.Second {
+		t.Fatalf("first pause: got %s, want 30s", d)
+	}
+	if d := pauseAfter("hog", 3); d != time.Minute {
+		t.Fatalf("second pause: got %s, want 1m (backoff)", d)
+	}
+	// a quiet hour resets the backoff
+	m.mu.Lock()
+	m.qstate["hog"].lastStrike = time.Now().Add(-2 * time.Hour)
+	m.mu.Unlock()
+	if d := pauseAfter("hog", 3); d != 30*time.Second {
+		t.Fatalf("after a quiet hour: got %s, want 30s", d)
 	}
 
+	if d := pauseAfter("trusted", 10); d != 0 {
+		t.Fatal("quarantine: off must never pause")
+	}
+	if d := pauseAfter("lenient", 4); d != 0 {
+		t.Fatal("per-instance strikes: 5 must not pause after 4")
+	}
+	if d := pauseAfter("lenient", 1); d == 0 {
+		t.Fatal("per-instance strikes: 5 must pause on the 5th")
+	}
+
+	// a paused instance answers 503 with Retry-After
+	m.Strike("hog")
+	m.Strike("hog")
+	m.Strike("hog")
 	w := httptest.NewRecorder()
 	m.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "http://hog.example.com/api/health", nil))
 	if w.Code != http.StatusServiceUnavailable || w.Header().Get("Retry-After") == "" {
 		t.Fatalf("paused instance: got %d (Retry-After %q)", w.Code, w.Header().Get("Retry-After"))
 	}
 
-	m.mu.Lock()
-	m.paused["hog"] = time.Now().Add(-time.Second)
-	m.mu.Unlock()
-	if _, paused := m.pausedUntil("hog"); paused {
-		t.Fatal("pause must end")
+	var strikes, pauses int
+	for _, e := range events {
+		switch e.Kind {
+		case EventStrike:
+			strikes++
+		case EventPaused:
+			pauses++
+			if e.Until.IsZero() {
+				t.Error("pause event without Until")
+			}
+		}
+	}
+	if strikes == 0 || pauses != 5 {
+		t.Errorf("events: %d strikes, %d pauses (want 5 pauses)", strikes, pauses)
 	}
 }
