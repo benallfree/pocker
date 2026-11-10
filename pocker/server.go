@@ -10,6 +10,8 @@ import (
 	"net/netip"
 	"runtime/debug"
 	"time"
+
+	"ganigeorgiev.com/pocketbase/pocketbase/core"
 )
 
 // Server wires a [Config], an [InstanceSource] and a [Manager] into one HTTP server.
@@ -22,6 +24,10 @@ type Server struct {
 	// OnEvent, if set, receives instance events (memory strikes, pauses, restarts). An instance source that
 	// implements [EventSink] receives them too.
 	OnEvent func(Event)
+
+	// SetupApp, if set, runs for each app after its migrations and before it serves: the place for a host
+	// application's Go code (routes, settings) that uses Instance.Private instead of env.
+	SetupApp func(inst Instance, app core.App) error
 
 	// Wrap, if set, wraps the instance handler (e.g. firewall or rate-limit middleware from a host application).
 	Wrap func(http.Handler) http.Handler

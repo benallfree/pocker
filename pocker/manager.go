@@ -12,6 +12,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"ganigeorgiev.com/pocketbase/pocketbase/core"
 )
 
 // HealthPath answers on any host with the engine's status.
@@ -66,6 +68,8 @@ type ManagerOptions struct {
 	Defaults Limits
 	// OnEvent receives instance events (memory strikes, pauses, restarts), e.g. to log them or notify the owner.
 	OnEvent func(Event)
+	// Setup runs host Go code for each app after migrations and before it serves (see [Server.SetupApp]).
+	Setup func(inst Instance, app core.App) error
 	// Logger defaults to slog.Default().
 	Logger *slog.Logger
 }
@@ -78,7 +82,7 @@ func NewManager(source InstanceSource, opts ManagerOptions) *Manager {
 	defaults := opts.Defaults.over(DefaultLimits())
 	return &Manager{
 		source:    source,
-		opts:      appOptions{PBRoot: opts.PBRoot, HooksPoolSize: opts.HooksPoolSize, ForceDev: opts.Dev, Defaults: defaults},
+		opts:      appOptions{PBRoot: opts.PBRoot, HooksPoolSize: opts.HooksPoolSize, ForceDev: opts.Dev, Defaults: defaults, Setup: opts.Setup},
 		defaults:  defaults,
 		onEvent:   opts.OnEvent,
 		qstate:    map[string]*quarantineState{},
@@ -275,6 +279,7 @@ func (m *Manager) app(inst Instance) (*runningApp, error) {
 			}
 			m.mu.Unlock()
 			m.log.Error("pocker: instance failed to start", "id", inst.ID, "error", slot.err)
+			openInstanceLog(instanceDir(m.opts, inst)).Write("stderr", "Instance failed to start: "+slot.err.Error())
 		} else {
 			m.log.Info("pocker: instance started", "id", inst.ID, "ms", time.Since(t).Milliseconds())
 		}
@@ -409,7 +414,8 @@ type quarantineState struct {
 
 // sameRuntime reports whether two versions of an instance can share a running app.
 func sameRuntime(a, b Instance) bool {
-	return a.Dir == b.Dir && a.Dev == b.Dev && reflect.DeepEqual(a.Env, b.Env) && reflect.DeepEqual(a.Limits, b.Limits)
+	return a.Dir == b.Dir && a.Dev == b.Dev && reflect.DeepEqual(a.Env, b.Env) && reflect.DeepEqual(a.Limits, b.Limits) &&
+		reflect.DeepEqual(a.Superusers, b.Superusers) && reflect.DeepEqual(a.Private, b.Private)
 }
 
 // retire stops an app that new requests no longer reach, after giving in-flight requests time to finish.

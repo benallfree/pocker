@@ -9,10 +9,12 @@ import (
 	"path/filepath"
 	"time"
 
+	"ganigeorgiev.com/pocketbase/dbx"
 	"ganigeorgiev.com/pocketbase/pocketbase/apis"
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	_ "ganigeorgiev.com/pocketbase/pocketbase/migrations" // registers PocketBase's system migrations, as pocketbase.go does
 	"ganigeorgiev.com/pocketbase/pocketbase/plugins/jsvm"
+	"ganigeorgiev.com/pocketbase/pocketbase/tools/security"
 	"ganigeorgiev.com/pocketbase/pocketbase/ui"
 )
 
@@ -30,6 +32,8 @@ type appOptions struct {
 	ForceDev      bool // Pocker dev mode: every app runs in PocketBase dev mode
 	// Defaults are the process-wide limits; an instance's own Limits override them.
 	Defaults Limits
+	// Setup, if set, runs for each app after migrations and before it serves (host application Go code).
+	Setup func(inst Instance, app core.App) error
 }
 
 func instanceDir(opts appOptions, inst Instance) string {
@@ -41,7 +45,14 @@ func instanceDir(opts appOptions, inst Instance) string {
 
 // startApp creates, bootstraps and migrates the instance's PocketBase app and builds its router, the same way
 // `pocketbase serve` does, but without opening a listener: Pocker's own server dispatches to the returned handler.
-func startApp(opts appOptions, inst Instance) (*runningApp, error) {
+func startApp(opts appOptions, inst Instance) (r *runningApp, err error) {
+	// PocketBase's JS plugin panics on a broken hooks file; one instance's bad code must be an error, not a crash
+	defer func() {
+		if p := recover(); p != nil {
+			r, err = nil, fmt.Errorf("%v", p)
+		}
+	}()
+
 	dir, err := filepath.Abs(instanceDir(opts, inst))
 	if err != nil {
 		return nil, err
@@ -82,6 +93,7 @@ func startApp(opts appOptions, inst Instance) (*runningApp, error) {
 			HTTPSendMaxTimeout: int(lim.HTTPSendMaxTimeout / time.Second),
 			HTTPSendMaxBody:    int64(lim.HTTPSendMaxBody),
 			Owner:              inst.ID,
+			Console:            openInstanceLog(dir).Write,
 		},
 	})
 	if err != nil {
@@ -93,6 +105,14 @@ func startApp(opts appOptions, inst Instance) (*runningApp, error) {
 	}
 	if err := app.RunAllMigrations(); err != nil {
 		return nil, fmt.Errorf("migrations: %w", err)
+	}
+	if err := syncSuperusers(app, inst.Superusers); err != nil {
+		return nil, fmt.Errorf("superusers: %w", err)
+	}
+	if opts.Setup != nil {
+		if err := opts.Setup(inst, app); err != nil {
+			return nil, fmt.Errorf("setup: %w", err)
+		}
 	}
 
 	handler, err := buildHandler(app, filepath.Join(dir, "pb_public"))
@@ -147,6 +167,33 @@ func buildHandler(app *core.BaseApp, publicDir string) (http.Handler, error) {
 		return nil, errors.New("OnServe did not complete; a hook may not have called e.next()")
 	}
 	return handler, nil
+}
+
+// syncSuperusers upserts the provider's superusers (id, email, token key, password hash) into _superusers.
+func syncSuperusers(app core.App, users []Superuser) error {
+	for _, u := range users {
+		if u.Email == "" || u.PasswordHash == "" {
+			continue
+		}
+		id := u.ID
+		if id == "" {
+			id = "pocker" + security.RandomStringWithAlphabet(10, "abcdefghijklmnopqrstuvwxyz0123456789")
+			if existing, err := app.FindAuthRecordByEmail(core.CollectionNameSuperusers, u.Email); err == nil {
+				id = existing.Id
+			}
+		}
+		tokenKey := u.TokenKey
+		if tokenKey == "" {
+			tokenKey = security.RandomString(50)
+		}
+		_, err := app.DB().NewQuery(
+			"INSERT OR REPLACE INTO {{_superusers}} ([[id]], [[email]], [[tokenKey]], [[password]]) VALUES ({:id}, {:email}, {:tokenKey}, {:password})",
+		).Bind(dbx.Params{"id": id, "email": u.Email, "tokenKey": tokenKey, "password": u.PasswordHash}).Execute()
+		if err != nil {
+			return fmt.Errorf("%s: %w", u.Email, err)
+		}
+	}
+	return nil
 }
 
 // stopApp runs the app's terminate hooks and closes its databases.

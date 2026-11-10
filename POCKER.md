@@ -87,7 +87,20 @@ instances:
     limits: { quarantine: off }   # only interrupt, never pause
 ```
 
-When an instance's `env`, `limits`, `dev` or `dir` changes, its app restarts on the next request (the old one finishes
+## Platform values and logs
+
+- **Superusers** (`superusers: [{email, password_hash, id?, token_key?}]`) are upserted into the app's `_superusers`
+  in Go when it starts, e.g. so a hosting platform's login works in the dashboard. Nothing goes through env.
+- **Private values** (`private: {...}`) are for the host application's Go code and never visible to JS. A host
+  registers that code with `Server.SetupApp(inst, app)`, which runs after migrations and before the app serves (for
+  example a backup route checked against `inst.Private["backup_token"]`).
+- **Env** (`env: {...}`) is what the instance's JS sees through `$os.getenv` / `process.env`, and nothing else.
+- **Logs:** PocketBase's own logs (the dashboard's Logs) are per instance in its `pb_data`. `console.*` from JS hooks
+  goes to `<instance>/logs/exec.log` as JSON lines `{message, stream, time}` (`stdout` for log/info/debug, `stderr`
+  for warn/error), rotated to `exec.log.1` at 10 MiB. A start failure (e.g. a broken hooks file) is written there too,
+  and only that instance fails.
+
+When an instance's `env`, `limits`, `dev`, `dir`, `superusers` or `private` changes, its app restarts on the next request (the old one finishes
 in-flight requests first), so a rotated secret takes effect immediately. Host changes apply without a restart.
 
 `GET /_pocker/health` on any host reports `{status, instances, running}`.

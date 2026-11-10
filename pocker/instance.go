@@ -26,12 +26,28 @@ type Instance struct {
 	// PB_ENCRYPTION_KEY, when set, encrypts the app settings (like `pocketbase serve --encryptionEnv`).
 	Env map[string]string `yaml:"env,omitempty"`
 
+	// Superusers are upserted into the app's _superusers when it starts (in Go, never through env), e.g. so a
+	// hosting platform's login works in the dashboard. PasswordHash is the bcrypt hash PocketBase stores.
+	Superusers []Superuser `yaml:"superusers,omitempty"`
+
+	// Private holds values for the host application's Go code (see [Server.SetupApp]), e.g. a backup token.
+	// It is never visible to the instance's JS.
+	Private map[string]string `yaml:"private,omitempty"`
+
 	// Limits override the process defaults for this instance (zero fields keep the default).
 	Limits Limits `yaml:"limits,omitempty"`
 
 	// Blocked, when set, answers every request for this instance with the given status and message instead of
 	// serving it (e.g. suspended, unpaid). A running app is left running.
 	Blocked *Blocked `yaml:"blocked,omitempty"`
+}
+
+// Superuser is a PocketBase superuser kept in sync by Pocker.
+type Superuser struct {
+	ID           string `yaml:"id"`
+	Email        string `yaml:"email"`
+	TokenKey     string `yaml:"token_key"`
+	PasswordHash string `yaml:"password_hash"`
 }
 
 // Blocked is the response for an instance that must not be served.
