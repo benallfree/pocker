@@ -1,0 +1,89 @@
+package pocker
+
+import (
+	"context"
+	"errors"
+	"log/slog"
+	"net"
+	"net/http"
+	"time"
+)
+
+// Server wires a [Config], an [InstanceSource] and a [Manager] into one HTTP server.
+type Server struct {
+	Config  Config
+	Source  InstanceSource // nil = YAMLSource{Path: Config.InstancesFile}
+	Logger  *slog.Logger
+	Manager *Manager // set by Run
+
+	// Wrap, if set, wraps the instance handler (e.g. firewall or rate-limit middleware from a host application).
+	Wrap func(http.Handler) http.Handler
+}
+
+// Run serves until ctx is done, then shuts down in-flight requests and running apps.
+func (s *Server) Run(ctx context.Context) error {
+	log := s.Logger
+	if log == nil {
+		log = slog.Default()
+	}
+	source := s.Source
+	if source == nil {
+		source = &YAMLSource{Path: s.Config.InstancesFile}
+	}
+	pool := 2
+	if s.Config.HooksPoolSize != nil {
+		pool = *s.Config.HooksPoolSize
+	}
+	s.Manager = NewManager(source, ManagerOptions{DataRoot: s.Config.DataRoot, HooksPoolSize: pool, Logger: log})
+
+	var handler http.Handler = s.Manager
+	if s.Wrap != nil {
+		handler = s.Wrap(handler)
+	}
+
+	runCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	managerErr := make(chan error, 1)
+	go func() { managerErr <- s.Manager.Run(runCtx) }()
+
+	ln, err := net.Listen("tcp", s.Config.Listen)
+	if err != nil {
+		return err
+	}
+	srv := &http.Server{
+		Handler:           handler,
+		ReadHeaderTimeout: time.Minute,
+		// large uploads/downloads, like `pocketbase serve`
+		ReadTimeout:  5 * time.Minute,
+		WriteTimeout: 5 * time.Minute,
+		BaseContext:  func(net.Listener) context.Context { return runCtx },
+	}
+	serveErr := make(chan error, 1)
+	go func() { serveErr <- srv.Serve(ln) }()
+	log.Info("pocker: listening", "addr", ln.Addr().String(), "data_root", s.Config.DataRoot)
+
+	select {
+	case <-ctx.Done():
+	case err := <-managerErr:
+		if err != nil {
+			log.Error("pocker: instance source stopped", "error", err)
+		}
+	case err := <-serveErr:
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			cancel()
+			s.Manager.Shutdown()
+			return err
+		}
+	}
+
+	timeout := s.Config.ShutdownTimeout
+	if timeout <= 0 {
+		timeout = 10 * time.Second
+	}
+	shutdownCtx, done := context.WithTimeout(context.Background(), timeout)
+	defer done()
+	_ = srv.Shutdown(shutdownCtx)
+	cancel() // ends long-lived requests such as realtime SSE
+	s.Manager.Shutdown()
+	return nil
+}
