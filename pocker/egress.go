@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/netip"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -63,6 +64,10 @@ func (p EgressPolicy) Permits(addr netip.Addr) bool {
 
 // Dialer returns a net.Dialer that refuses connections the policy doesn't permit.
 func (p EgressPolicy) Dialer() *net.Dialer {
+	return policyDialer(func() EgressPolicy { return p })
+}
+
+func policyDialer(current func() EgressPolicy) *net.Dialer {
 	return &net.Dialer{
 		Timeout:   30 * time.Second,
 		KeepAlive: 30 * time.Second,
@@ -72,7 +77,7 @@ func (p EgressPolicy) Dialer() *net.Dialer {
 				return err
 			}
 			addr, err := netip.ParseAddr(host)
-			if err != nil || !p.Permits(addr) {
+			if err != nil || !current().Permits(addr) {
 				return fmt.Errorf("egress to %s is not allowed on this host", address)
 			}
 			return nil
@@ -80,13 +85,19 @@ func (p EgressPolicy) Dialer() *net.Dialer {
 	}
 }
 
-var installEgress sync.Once
+var (
+	activeEgress atomic.Pointer[EgressPolicy]
+	wireEgress   sync.Once
+)
 
 // InstallEgressPolicy routes Go's default HTTP transport and PocketBase's SMTP client through the policy, and caps
-// $http.send. It applies to the whole process and can only be installed once.
+// $http.send. It applies to the whole process; calling it again replaces the policy (e.g. on a config reload).
 func InstallEgressPolicy(p EgressPolicy, httpMaxTimeoutSec int, httpMaxBody int64) {
-	installEgress.Do(func() {
-		d := p.Dialer()
+	activeEgress.Store(&p)
+	jsvm.HTTPSendMaxTimeout = httpMaxTimeoutSec
+	jsvm.HTTPSendMaxBodySize = httpMaxBody
+	wireEgress.Do(func() {
+		d := policyDialer(func() EgressPolicy { return *activeEgress.Load() })
 		if t, ok := http.DefaultTransport.(*http.Transport); ok {
 			t.DialContext = d.DialContext
 			t.Proxy = nil // a proxy from the environment would bypass the per-address check
@@ -94,7 +105,5 @@ func InstallEgressPolicy(p EgressPolicy, httpMaxTimeoutSec int, httpMaxBody int6
 		mailer.DialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
 			return d.DialContext(ctx, network, address)
 		}
-		jsvm.HTTPSendMaxTimeout = httpMaxTimeoutSec
-		jsvm.HTTPSendMaxBodySize = httpMaxBody
 	})
 }

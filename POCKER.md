@@ -70,7 +70,49 @@ max_query_duration: 30s   # any SQL statement without its own deadline
 http_send_max_timeout: 60s
 http_send_max_body: 10MiB
 quarantine: { strikes: 3, window: 10m, first_pause: 30s, max_pause: 15m, reset_after: 1h }   # or: quarantine: off
+max_concurrent_js: 16     # JS calls an instance runs at once; more wait up to max_js_execution, then fail
+rate_limits:              # per client IP and per instance; trusted clients get the trusted set
+  ip_hourly: 1000
+  instance_hourly: 10000
+  ip_concurrent: 15
+  instance_concurrent: 250
+  file_weight: 0.1        # a /api/files request costs a tenth
+  trusted: { ip_hourly: 5000, instance_hourly: 20000, ip_concurrent: 50, instance_concurrent: 250 }
+  # off: true             # no rate limiting (the default in --dev unless rate_limits is set)
+trusted_clients: []       # client IPs with the trusted limits (also per instance)
+cors_origins: []          # allowed browser origins (PocketBase matching: exact, *, wildcards); empty = any
+
+firewall:
+  allow_cidrs: []               # peers allowed to connect (empty = everyone); others get 403
+  trusted_proxies: []           # peers whose client-IP headers are believed
+  client_ip_headers: [CF-Connecting-IP, True-Client-IP, X-Forwarded-For, X-Real-IP]
+  trusted_clients: []           # client IPs with the trusted limits on every instance
+  rate_limit_header_prefix: X-RateLimit
+
+tls:
+  # either certificate files (re-read when they change; no restart for renewals) ...
+  cert: /path/fullchain.pem
+  key: /path/privkey.pem
+  # ... or automatic certificates (ACME, via CertMagic, Caddy's certificate engine):
+  # auto: true
+  # email: ops@example.com
+  # ca: letsencrypt             # letsencrypt (default), letsencrypt-staging, zerossl, or an ACME directory URL
+  # storage: ./pb_root/.pocker-certs
+  # domains: ["*.example.com", "example.com"]   # obtained up front; wildcards need dns
+  # dns: { provider: cloudflare, api_token_env: CF_API_TOKEN }   # only needed for wildcards
+  http_listen: ":80"            # optional: plain HTTP redirects to HTTPS (and answers ACME HTTP-01 challenges)
 ```
+
+**Firewall.** Peers outside `allow_cidrs` get 403. The client IP comes from `client_ip_headers` only when the peer is
+a trusted proxy, otherwise it is the peer. Rate-limited requests get 429 with `Retry-After` and a message naming the
+limit; every routed response carries `<prefix>-{Ip,Instance}-{Hourly,Concurrent}-{Limit,Remaining}` and
+`<prefix>-{Ip,Instance}-Hourly-Reset`, listed in `Access-Control-Expose-Headers`. Long-lived responses (realtime) hold
+their concurrency slot until they end.
+
+**TLS.** With `auto: true` and no `dns`, every hostname the instance source maps gets its own certificate on its first
+TLS handshake (HTTP-01 / TLS-ALPN-01), with any DNS host and no API token; hostnames no instance serves never trigger
+issuance. A DNS provider (Cloudflare for now) is only needed for wildcard `domains`, proved through DNS-01; a wildcard
+without one is a config error.
 
 Each instance can override any of those limits (zero or missing fields keep the default):
 
@@ -85,6 +127,13 @@ instances:
   - id: my-own-app
     hosts: [mine.example.com]
     limits: { quarantine: off }   # only interrupt, never pause
+  - id: api
+    hosts: [api.example.com]
+    limits:
+      rate_limits: { ip_hourly: 5000, instance_concurrent: 500 }
+      trusted_clients: [203.0.113.0/24]
+      cors_origins: [https://app.example.com]
+      max_concurrent_js: 32
 ```
 
 ## Platform values and logs
@@ -121,7 +170,7 @@ route from one instance against another instance and the host; all of these are 
 | CPU | Every JS call is interrupted after `max_js_execution`; `sleep()` is capped at 10 s. |
 | Memory, one shot | Built-ins that allocate a large result in one step refuse results over `max_js_allocation`: `String.repeat/padStart/padEnd`, `Array.join/toString`, `ArrayBuffer`, typed arrays (incl. array-likes, `.from`, and reaching the constructor through an instance), `Buffer.alloc*` / `new Buffer`, `$os.readFile`, `fileFromPath`, `readerToString`/`toBytes` limits. Recursion depth is capped (a JS stack overflow would otherwise crash the Go process). |
 | Memory, gradual | goja has no per-VM heap accounting, so `pocker/memwatch.go` watches the process heap every 50 ms. Above `memory_soft_limit` and still growing, it interrupts JS calls running longer than 100 ms and strikes their instances (above 1.4x, every JS call). With the instance's quarantine policy (default 3 strikes in 10 minutes) it is paused: its app is stopped and requests get 503 with `Retry-After`. Pauses back off (30 s, 1 m, 2 m, ... up to 15 m) and reset after an hour without strikes; `quarantine: off` only interrupts. Strikes, pauses and restarts are reported as events (`Server.OnEvent`, or an instance source implementing `EventSink`). |
-| Outbound network: `$http.send`, `$filesystem.fileFromURL`, S3 storage and backups, OAuth2/JWK fetches, SMTP | Public addresses only, checked on the address actually connected to (after DNS, so rebinding doesn't help): loopback, private ranges, link-local and cloud metadata, CGNAT, multicast, reserved and documentation ranges, and IPv6 equivalents/IPv4-in-IPv6 are refused unless listed in `egress_allow`. Installed process-wide on Go's default HTTP transport and PocketBase's SMTP client (`pocker/egress.go`). `$http.send` timeouts and response bodies are capped. |
+| Outbound network: `$http.send`, `$filesystem.fileFromURL`, S3 storage and backups, OAuth2/JWK fetches, SMTP | Public addresses only, checked on the address actually connected to (after DNS, so rebinding doesn't help): loopback, private ranges, link-local and cloud metadata, CGNAT, multicast, reserved and documentation ranges, and IPv6 equivalents/IPv4-in-IPv6 are refused unless listed in `egress_allow`. Installed process-wide on Go's default HTTP transport and PocketBase's SMTP client (`pocker/egress.go`). Host code that must reach private addresses (e.g. a control plane over a private network) uses its own `http.Client` with its own transport. `$http.send` timeouts and response bodies are capped. |
 
 **Limits of the memory controls:** the watch attributes growth to whoever is running JS at the time (usually right,
 not guaranteed), and a hook that allocates faster than the 50 ms sample through a path not covered by the one-shot caps
