@@ -58,6 +58,11 @@ type Sandbox struct {
 	// Owner identifies the app in InterruptActive results (e.g. the instance id).
 	Owner string
 
+	// HTTPSendMaxTimeout (seconds) and HTTPSendMaxBody (bytes) cap $http.send for this app; 0 = the process-wide
+	// HTTPSendMaxTimeout / HTTPSendMaxBodySize.
+	HTTPSendMaxTimeout int
+	HTTPSendMaxBody    int64
+
 	once    sync.Once
 	openErr error
 	dir     string
@@ -405,6 +410,11 @@ func (s *Sandbox) apply(vm *goja.Runtime, templates *template.Registry) {
 	vm.SetMaxCallStackSize(callStack)
 	s.capAllocations(vm)
 
+	// $http.send caps for this app, pinned read-only on the VM (binds.go reads them at call time)
+	_ = vm.GlobalObject().DefineDataProperty(httpLimitsKey,
+		vm.ToValue(httpLimits{Timeout: s.HTTPSendMaxTimeout, Body: s.HTTPSendMaxBody}),
+		goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_FALSE)
+
 	// sleep: capped, so a hook can't park a goroutine forever
 	maxSleep := s.maxSleep()
 	vm.Set("sleep", func(ms int64) {
@@ -672,4 +682,27 @@ func (m sandboxMapper) MethodName(t reflect.Type, meth reflect.Method) string {
 		}
 	}
 	return m.FieldMapper.MethodName(t, meth)
+}
+
+const httpLimitsKey = "__pocker_http_limits"
+
+type httpLimits struct {
+	Timeout int
+	Body    int64
+}
+
+// httpSendLimits returns the $http.send caps for vm: the app's sandbox values where set, else the process-wide ones.
+func httpSendLimits(vm *goja.Runtime) (int, int64) {
+	timeout, body := HTTPSendMaxTimeout, HTTPSendMaxBodySize
+	if v := vm.GlobalObject().Get(httpLimitsKey); v != nil {
+		if l, ok := v.Export().(httpLimits); ok {
+			if l.Timeout > 0 {
+				timeout = l.Timeout
+			}
+			if l.Body > 0 {
+				body = l.Body
+			}
+		}
+	}
+	return timeout, body
 }

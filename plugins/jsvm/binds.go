@@ -968,8 +968,9 @@ func BindHTTP(vm *goja.Runtime) {
 		if config.Timeout <= 0 {
 			config.Timeout = 120
 		}
-		if HTTPSendMaxTimeout > 0 && config.Timeout > HTTPSendMaxTimeout { // POCKER
-			config.Timeout = HTTPSendMaxTimeout
+		maxTimeout, maxBody := httpSendLimits(vm) // POCKER: per-app (sandbox) or process-wide caps
+		if maxTimeout > 0 && config.Timeout > maxTimeout {
+			config.Timeout = maxTimeout
 		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(config.Timeout)*time.Second)
@@ -1024,9 +1025,9 @@ func BindHTTP(vm *goja.Runtime) {
 		defer res.Body.Close()
 
 		var bodyRaw []byte
-		if HTTPSendMaxBodySize > 0 { // POCKER: bounded response body
-			bodyRaw, _ = io.ReadAll(io.LimitReader(res.Body, HTTPSendMaxBodySize+1))
-			if int64(len(bodyRaw)) > HTTPSendMaxBodySize {
+		if maxBody > 0 { // POCKER: bounded response body
+			bodyRaw, _ = io.ReadAll(io.LimitReader(res.Body, maxBody+1))
+			if int64(len(bodyRaw)) > maxBody {
 				return nil, errors.New("$http.send: response body larger than the allowed size")
 			}
 		} else {
