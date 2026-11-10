@@ -4,7 +4,6 @@ import (
 	"context"
 	"io"
 	"log/slog"
-	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -17,15 +16,10 @@ func (s staticSource) Watch(context.Context) (<-chan Change, error) { return nil
 
 func newTestManager(t *testing.T, dev bool, list ...Instance) *Manager {
 	t.Helper()
-	trusted, err := parseCIDRs([]string{"127.0.0.1/32", "::1/128"})
-	if err != nil {
-		t.Fatal(err)
-	}
 	m := NewManager(staticSource(list), ManagerOptions{
-		PBRoot:         t.TempDir(),
-		Dev:            dev,
-		TrustedProxies: trusted,
-		Logger:         slog.New(slog.NewTextHandler(io.Discard, nil)),
+		PBRoot: t.TempDir(),
+		Dev:    dev,
+		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 	})
 	m.mu.Lock()
 	for _, inst := range list {
@@ -36,13 +30,8 @@ func newTestManager(t *testing.T, dev bool, list ...Instance) *Manager {
 	return m
 }
 
-func req(host, remote, idHeader string) *http.Request {
-	r := httptest.NewRequest(http.MethodGet, "http://"+host+"/api/health", nil)
-	r.RemoteAddr = remote
-	if idHeader != "" {
-		r.Header.Set(IDHeader, idHeader)
-	}
-	return r
+func req(host string) *http.Request {
+	return httptest.NewRequest(http.MethodGet, "http://"+host+"/api/health", nil)
 }
 
 func TestValidID(t *testing.T) {
@@ -63,33 +52,23 @@ func TestResolveProduction(t *testing.T) {
 		Instance{ID: "blog", Hosts: []string{"blog.example.com", "www.blog.example.com"}},
 		Instance{ID: "shop", Hosts: []string{"shop.example.com"}},
 	)
-
 	cases := []struct {
-		name, host, remote, header string
-		wantID                     string
-		wantStatus                 int
+		host       string
+		wantID     string
+		wantStatus int
 	}{
-		{"mapped host", "blog.example.com", "203.0.113.5:1234", "", "blog", 0},
-		{"host with port and case", "WWW.Blog.Example.com:443", "203.0.113.5:1234", "", "blog", 0},
-		{"unknown host", "other.example.com", "203.0.113.5:1234", "", "", http.StatusNotFound},
-		{"header from loopback", "blog.example.com", "127.0.0.1:5555", "shop", "shop", 0},
-		{"header from the internet is ignored", "blog.example.com", "203.0.113.5:1234", "shop", "blog", 0},
-		{"header for unknown id", "blog.example.com", "127.0.0.1:5555", "nope", "", http.StatusNotFound},
-		{"unsafe header id", "blog.example.com", "127.0.0.1:5555", "../etc", "", http.StatusBadRequest},
+		{"blog.example.com", "blog", 0},
+		{"WWW.Blog.Example.com:443", "blog", 0},
+		{"shop.example.com", "shop", 0},
+		{"other.example.com", "", http.StatusNotFound},
+		{"../etc", "", http.StatusNotFound},
 	}
 	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			r := req(c.host, c.remote, c.header)
-			inst, status, _ := m.resolve(r)
-			if status != c.wantStatus || inst.ID != c.wantID {
-				t.Fatalf("got id=%q status=%d, want id=%q status=%d", inst.ID, status, c.wantID, c.wantStatus)
-			}
-			if r.Header.Get(IDHeader) != "" {
-				t.Fatalf("%s must be stripped before reaching the app", IDHeader)
-			}
-		})
+		inst, status, _ := m.resolve(req(c.host))
+		if status != c.wantStatus || inst.ID != c.wantID {
+			t.Errorf("%s: got id=%q status=%d, want id=%q status=%d", c.host, inst.ID, status, c.wantID, c.wantStatus)
+		}
 	}
-
 	if _, ok := m.Lookup("other.example.com"); ok {
 		t.Fatal("production must not create instances for unknown hosts")
 	}
@@ -98,39 +77,30 @@ func TestResolveProduction(t *testing.T) {
 func TestResolveDev(t *testing.T) {
 	m := newTestManager(t, true, Instance{ID: "mapped", Hosts: []string{"mapped.localhost"}})
 
-	inst, status, _ := m.resolve(req("Blog.Localhost:8090", "203.0.113.5:1", ""))
-	if status != 0 || inst.ID != "blog.localhost" || !inst.Dev {
+	inst, status, _ := m.resolve(req("Blog.Localhost:8090"))
+	if status != 0 || inst.ID != DevID("blog.localhost") || !inst.Dev || !ValidID(inst.ID) {
 		t.Fatalf("dev host: got %+v status=%d", inst, status)
 	}
-	if again, _ := m.Lookup("blog.localhost"); again.ID != "blog.localhost" {
-		t.Fatal("dev instance should be registered for later requests")
+	if again, _, _ := m.resolve(req("blog.localhost")); again.ID != inst.ID {
+		t.Fatal("same host must map to the same dev id")
 	}
-
-	inst, status, _ = m.resolve(req("anything.localhost", "203.0.113.5:1", "by-header"))
-	if status != 0 || inst.ID != "by-header" {
-		t.Fatalf("dev header: got %+v status=%d", inst, status)
+	if other, _, _ := m.resolve(req("shop.localhost")); other.ID == inst.ID {
+		t.Fatal("different hosts must get different dev ids")
 	}
-
-	inst, _, _ = m.resolve(req("mapped.localhost", "203.0.113.5:1", ""))
-	if inst.ID != "mapped" {
-		t.Fatalf("mapped host should win in dev too, got %q", inst.ID)
+	if mapped, _, _ := m.resolve(req("mapped.localhost")); mapped.ID != "mapped" {
+		t.Fatalf("a mapped host wins in dev too, got %q", mapped.ID)
 	}
-
-	if _, status, _ = m.resolve(req("bad_host", "203.0.113.5:1", "")); status != http.StatusBadRequest {
-		t.Fatalf("unsafe dev hostname: got status %d", status)
+	if weird, status, _ := m.resolve(req("../../etc")); status != 0 || !ValidID(weird.ID) {
+		t.Fatalf("any hostname hashes to a safe id, got %+v status=%d", weird, status)
 	}
 }
 
-func TestParseCIDRs(t *testing.T) {
-	nets, err := parseCIDRs([]string{"10.0.0.0/8", "192.0.2.7", "::1"})
-	if err != nil {
-		t.Fatal(err)
+func TestDevIDStable(t *testing.T) {
+	if DevID("blog.localhost") != DevID("BLOG.localhost:8090") {
+		t.Fatal("DevID must normalize case and port")
 	}
-	if !nets[1].Contains(net.ParseIP("192.0.2.7")) || nets[1].Contains(net.ParseIP("192.0.2.8")) {
-		t.Fatal("bare IPv4 should be a /32")
-	}
-	if _, err := parseCIDRs([]string{"not-an-ip"}); err == nil {
-		t.Fatal("expected an error")
+	if len(DevID("x")) != 16 {
+		t.Fatal("DevID is 16 hex chars")
 	}
 }
 

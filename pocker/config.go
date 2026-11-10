@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"net"
 	"os"
 	"time"
 
@@ -16,7 +15,6 @@ import (
 //	listen: ":8090"
 //	pb_root: "./pb_root"
 //	instances_file: "./instances.yaml"
-//	trusted_proxies: ["127.0.0.1/32", "::1/128"]
 //	hooks_pool_size: 2
 type Config struct {
 	// Listen is the HTTP address (default ":8090").
@@ -25,18 +23,14 @@ type Config struct {
 	// PBRoot holds one PocketBase folder per instance: <pb_root>/<instance id> (default "./pb_root").
 	PBRoot string `yaml:"pb_root"`
 
-	// Dev serves any hostname: the instance id is the hostname (or the X-PocketBase-Id header) and its folder is
-	// created on first use. Apps also run in PocketBase dev mode. Without Dev, only instances from the instance
-	// source are served.
+	// Dev serves any hostname: a host the instance source doesn't map gets the FNV hash of the hostname as its id
+	// ([DevID]) and its folder is created on first use. Apps also run in PocketBase dev mode. Without Dev, only
+	// hosts mapped by the instance source are served.
 	Dev bool `yaml:"dev"`
 
 	// InstancesFile is read by the default YAML instance source (default "./instances.yaml"). Required unless Dev or
 	// a host application provides its own source.
 	InstancesFile string `yaml:"instances_file"`
-
-	// TrustedProxies are the networks whose X-PocketBase-Id header is honoured (default loopback only). The header
-	// is stripped from every other request.
-	TrustedProxies []string `yaml:"trusted_proxies"`
 
 	// HooksPoolSize is the number of prewarmed JS runtimes per app (default 2; 0 = one runtime per hook run).
 	HooksPoolSize *int `yaml:"hooks_pool_size"`
@@ -52,7 +46,6 @@ func DefaultConfig() Config {
 		Listen:          ":8090",
 		PBRoot:          "./pb_root",
 		InstancesFile:   "./instances.yaml",
-		TrustedProxies:  []string{"127.0.0.1/32", "::1/128"},
 		HooksPoolSize:   &pool,
 		ShutdownTimeout: 10 * time.Second,
 	}
@@ -85,9 +78,6 @@ func LoadConfig(path string) (Config, error) {
 	if fromFile.InstancesFile != "" {
 		cfg.InstancesFile = fromFile.InstancesFile
 	}
-	if fromFile.TrustedProxies != nil {
-		cfg.TrustedProxies = fromFile.TrustedProxies
-	}
 	if fromFile.HooksPoolSize != nil {
 		cfg.HooksPoolSize = fromFile.HooksPoolSize
 	}
@@ -95,25 +85,4 @@ func LoadConfig(path string) (Config, error) {
 		cfg.ShutdownTimeout = fromFile.ShutdownTimeout
 	}
 	return cfg, nil
-}
-
-// parseCIDRs turns the trusted proxy list into networks; a bare IP is treated as a single host.
-func parseCIDRs(list []string) ([]*net.IPNet, error) {
-	nets := make([]*net.IPNet, 0, len(list))
-	for _, s := range list {
-		if _, n, err := net.ParseCIDR(s); err == nil {
-			nets = append(nets, n)
-			continue
-		}
-		ip := net.ParseIP(s)
-		if ip == nil {
-			return nil, fmt.Errorf("trusted_proxies: %q is not an IP or CIDR", s)
-		}
-		bits := 128
-		if ip.To4() != nil {
-			ip, bits = ip.To4(), 32
-		}
-		nets = append(nets, &net.IPNet{IP: ip, Mask: net.CIDRMask(bits, bits)})
-	}
-	return nets, nil
 }

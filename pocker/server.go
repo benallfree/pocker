@@ -31,10 +31,6 @@ func (s *Server) Run(ctx context.Context) error {
 		// production needs the host -> id map; dev mode works with or without it
 		source = &YAMLSource{Path: s.Config.InstancesFile, Required: !s.Config.Dev}
 	}
-	trusted, err := parseCIDRs(s.Config.TrustedProxies)
-	if err != nil {
-		return err
-	}
 	if _, err := source.Snapshot(ctx); err != nil {
 		return err // fail fast, e.g. missing instances file in production
 	}
@@ -43,11 +39,10 @@ func (s *Server) Run(ctx context.Context) error {
 		pool = *s.Config.HooksPoolSize
 	}
 	s.Manager = NewManager(source, ManagerOptions{
-		PBRoot:         s.Config.PBRoot,
-		Dev:            s.Config.Dev,
-		TrustedProxies: trusted,
-		HooksPoolSize:  pool,
-		Logger:         log,
+		PBRoot:        s.Config.PBRoot,
+		Dev:           s.Config.Dev,
+		HooksPoolSize: pool,
+		Logger:        log,
 	})
 
 	var handler http.Handler = s.Manager

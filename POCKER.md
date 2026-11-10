@@ -4,8 +4,7 @@ Pocker hosts many PocketBase instances in one process. It is PocketBase itself (
 [upstream PocketBase](https://ganigeorgiev.com/git/pocketbase/pocketbase) and shares its history) plus a small engine in
 [`pocker/`](pocker) and a CLI in [`cmd/pocker/`](cmd/pocker).
 
-- One port, many instances. A request goes to the instance named by the `X-PocketBase-Id` header (from a trusted
-  proxy only) or else by its hostname.
+- One port, many instances. Each request's hostname maps to a canonical instance id.
 - Each instance is a normal PocketBase folder, `<pbRoot>/<id>` (`pb_data`, `pb_hooks`, `pb_migrations`, `pb_public`),
   with its own environment for JS hooks (`$os.getenv`, `process.env`), its own JS migrations and its own settings
   encryption key.
@@ -16,11 +15,12 @@ Pocker hosts many PocketBase instances in one process. It is PocketBase itself (
 ```sh
 go build -o pocker ./cmd/pocker
 ./pocker serve --dev --pbRoot ./pb_root
-curl -H 'Host: blog.localhost' http://127.0.0.1:8090/api/health   # creates and serves ./pb_root/blog.localhost
+curl -H 'Host: blog.localhost' http://127.0.0.1:8090/api/health   # creates and serves ./pb_root/<id>
 ```
 
-The instance id is the hostname (or `X-PocketBase-Id`), its folder is created on first use, and apps run in
-PocketBase dev mode.
+A hostname the instance source doesn't map gets the FNV-1a hash of the hostname as its id (e.g. `3fbfbf3829c2dd74`,
+stable across restarts), its folder is created on first use, and apps run in PocketBase dev mode. The instances file
+(or another provider) is optional in dev mode; hosts it maps keep their own ids.
 
 ## Production: mapped hostnames only
 
@@ -45,9 +45,8 @@ instances:
 ```
 
 Unknown hosts get 404 and no folder is ever created from a request. Ids are lowercase letters, digits, dots and dashes.
-`X-PocketBase-Id` is honoured only from `trusted_proxies` (default loopback) and stripped from every request. Hosting
-platforms plug in their own [`InstanceSource`](pocker/instance.go) (for example a control plane streaming changes over
-SSE) instead of the file.
+Hosting platforms plug in their own [`InstanceSource`](pocker/instance.go) (for example a control plane streaming the
+hostname -> id map over SSE) instead of the file.
 
 Optional `pocker.yaml` (every field has a default):
 
@@ -56,7 +55,6 @@ listen: ":8090"
 pb_root: "./pb_root"
 dev: false
 instances_file: "./instances.yaml"
-trusted_proxies: ["127.0.0.1/32", "::1/128"]
 hooks_pool_size: 2
 shutdown_timeout: 10s
 ```

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"hash/fnv"
 	"log/slog"
 	"net"
 	"net/http"
@@ -15,10 +16,6 @@ import (
 
 // HealthPath answers on any host with the engine's status.
 const HealthPath = "/_pocker/health"
-
-// IDHeader selects the instance by canonical id instead of by Host. It is honoured only from trusted proxies
-// (see [Config.TrustedProxies]) and removed from every request before it reaches an app.
-const IDHeader = "X-PocketBase-Id"
 
 var validID = regexp.MustCompile(`^[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?$`)
 
@@ -35,8 +32,7 @@ type Manager struct {
 	opts   appOptions
 	log    *slog.Logger
 
-	dev     bool
-	trusted []*net.IPNet
+	dev bool
 
 	mu        sync.RWMutex
 	instances map[string]Instance // by ID
@@ -56,11 +52,9 @@ type appSlot struct {
 type ManagerOptions struct {
 	// PBRoot is the folder that holds one PocketBase folder per instance (<PBRoot>/<instance id>).
 	PBRoot string
-	// Dev serves any hostname (or X-PocketBase-Id): the id is the name, its folder is created on first use, and
-	// apps run in PocketBase dev mode.
+	// Dev serves any hostname: a host the source doesn't map gets [DevID] as its id and its folder is created on
+	// first use. Apps run in PocketBase dev mode.
 	Dev bool
-	// TrustedProxies are the networks whose X-PocketBase-Id header is honoured.
-	TrustedProxies []*net.IPNet
 	// HooksPoolSize is the number of prewarmed JS runtimes per app (0 = create one per hook run).
 	HooksPoolSize int
 	// Logger defaults to slog.Default().
@@ -77,7 +71,6 @@ func NewManager(source InstanceSource, opts ManagerOptions) *Manager {
 		opts:      appOptions{PBRoot: opts.PBRoot, HooksPoolSize: opts.HooksPoolSize, ForceDev: opts.Dev},
 		log:       opts.Logger,
 		dev:       opts.Dev,
-		trusted:   opts.TrustedProxies,
 		instances: map[string]Instance{},
 		hosts:     map[string]string{},
 		apps:      map[string]*appSlot{},
@@ -197,73 +190,37 @@ func (m *Manager) Lookup(host string) (Instance, bool) {
 	return inst, ok
 }
 
-// fromTrustedProxy reports whether the request's direct peer is in the trusted proxy list.
-func (m *Manager) fromTrustedProxy(r *http.Request) bool {
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		host = r.RemoteAddr
-	}
-	ip := net.ParseIP(host)
-	if ip == nil {
-		return false
-	}
-	for _, n := range m.trusted {
-		if n.Contains(ip) {
-			return true
-		}
-	}
-	return false
+// DevID is the canonical id dev mode gives a hostname the instance source doesn't map: the FNV-1a 64-bit hash of
+// the normalized hostname, in hex. Stable across restarts, always path-safe.
+func DevID(host string) string {
+	h := fnv.New64a()
+	_, _ = h.Write([]byte(normalizeHost(host)))
+	return fmt.Sprintf("%016x", h.Sum64())
 }
 
-// resolve finds the request's instance: by X-PocketBase-Id from a trusted proxy, else by Host. In dev mode an
-// unknown name becomes a new instance. The header is always removed before the request reaches an app.
-// A non-zero status means the request can't be routed.
+// resolve maps the request's Host to an instance through the source's hostname -> id map. In dev mode an unmapped
+// host becomes a new instance with id [DevID]. A non-zero status means the request can't be routed.
 func (m *Manager) resolve(r *http.Request) (Instance, int, string) {
-	id := strings.ToLower(strings.TrimSpace(r.Header.Get(IDHeader)))
-	r.Header.Del(IDHeader)
-	if id != "" && !m.dev && !m.fromTrustedProxy(r) {
-		id = "" // untrusted header: route by Host as if it were absent
-	}
-
-	if id != "" {
-		if !ValidID(id) {
-			return Instance{}, http.StatusBadRequest, "invalid " + IDHeader
-		}
-		m.mu.RLock()
-		inst, ok := m.instances[id]
-		m.mu.RUnlock()
-		if ok {
-			return inst, 0, ""
-		}
-		if m.dev {
-			return m.devInstance(id, nil), 0, ""
-		}
-		return Instance{}, http.StatusNotFound, id + " not found"
-	}
-
 	host := normalizeHost(r.Host)
 	if inst, ok := m.Lookup(host); ok {
 		return inst, 0, ""
 	}
-	if m.dev {
-		if !ValidID(host) {
-			return Instance{}, http.StatusBadRequest, "hostname can't be used as an instance name: " + host
-		}
-		return m.devInstance(host, []string{host}), 0, ""
+	if m.dev && host != "" {
+		return m.devInstance(DevID(host), host), 0, ""
 	}
 	return Instance{}, http.StatusNotFound, host + " not found"
 }
 
-// devInstance registers (or returns) a dev-mode instance named id.
-func (m *Manager) devInstance(id string, hosts []string) Instance {
+// devInstance registers (or returns) the dev-mode instance for host.
+func (m *Manager) devInstance(id, host string) Instance {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if inst, ok := m.instances[id]; ok {
 		return inst
 	}
-	inst := Instance{ID: id, Hosts: hosts, Dev: true}
+	inst := Instance{ID: id, Hosts: []string{host}, Dev: true}
 	m.upsertLocked(inst)
-	m.log.Info("pocker: dev instance", "id", id)
+	m.log.Info("pocker: dev instance", "host", host, "id", id)
 	return inst
 }
 
