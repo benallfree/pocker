@@ -33,10 +33,14 @@ type Manager struct {
 
 	dev bool
 
+	quarantine quarantineOptions
+
 	mu        sync.RWMutex
-	instances map[string]Instance // by ID
-	hosts     map[string]string   // host -> ID
-	apps      map[string]*appSlot // by ID
+	strikes   map[string][]time.Time // by ID: recent memory strikes
+	paused    map[string]time.Time   // by ID: quarantined until
+	instances map[string]Instance    // by ID
+	hosts     map[string]string      // host -> ID
+	apps      map[string]*appSlot    // by ID
 	ready     bool
 }
 
@@ -58,6 +62,10 @@ type ManagerOptions struct {
 	HooksPoolSize int
 	// MaxJSExecution interrupts a JS call that runs longer (0 = 30s).
 	MaxJSExecution time.Duration
+	// MaxJSAllocation caps one-shot JS allocations in bytes (0 = 64 MiB).
+	MaxJSAllocation int64
+	// Quarantine: an instance with Strikes memory strikes within Window is paused (app stopped, 503) for Pause.
+	Quarantine quarantineOptions
 	// Logger defaults to slog.Default().
 	Logger *slog.Logger
 }
@@ -68,13 +76,17 @@ func NewManager(source InstanceSource, opts ManagerOptions) *Manager {
 		opts.Logger = slog.Default()
 	}
 	return &Manager{
-		source:    source,
-		opts:      appOptions{PBRoot: opts.PBRoot, HooksPoolSize: opts.HooksPoolSize, ForceDev: opts.Dev, MaxJSExecution: opts.MaxJSExecution},
-		log:       opts.Logger,
-		dev:       opts.Dev,
-		instances: map[string]Instance{},
-		hosts:     map[string]string{},
-		apps:      map[string]*appSlot{},
+		source: source,
+		opts: appOptions{PBRoot: opts.PBRoot, HooksPoolSize: opts.HooksPoolSize, ForceDev: opts.Dev,
+			MaxJSExecution: opts.MaxJSExecution, MaxJSAllocation: opts.MaxJSAllocation},
+		quarantine: opts.Quarantine.withDefaults(),
+		strikes:    map[string][]time.Time{},
+		paused:     map[string]time.Time{},
+		log:        opts.Logger,
+		dev:        opts.Dev,
+		instances:  map[string]Instance{},
+		hosts:      map[string]string{},
+		apps:       map[string]*appSlot{},
 	}
 }
 
@@ -292,6 +304,12 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if until, paused := m.pausedUntil(inst.ID); paused {
+		w.Header().Set("Retry-After", fmt.Sprint(int(time.Until(until).Seconds())+1))
+		http.Error(w, "this instance is paused for using too much memory; retry later", http.StatusServiceUnavailable)
+		return
+	}
+
 	app, err := m.app(inst)
 	if err != nil {
 		http.Error(w, "instance failed to start: "+err.Error(), http.StatusBadGateway)
@@ -345,4 +363,73 @@ func (m *Manager) Shutdown() {
 		}()
 	}
 	wg.Wait()
+}
+
+type quarantineOptions struct {
+	Strikes int           // default 3
+	Window  time.Duration // default 10m
+	Pause   time.Duration // default 5m
+}
+
+func (q quarantineOptions) withDefaults() quarantineOptions {
+	if q.Strikes <= 0 {
+		q.Strikes = 3
+	}
+	if q.Window <= 0 {
+		q.Window = 10 * time.Minute
+	}
+	if q.Pause <= 0 {
+		q.Pause = 5 * time.Minute
+	}
+	return q
+}
+
+// Strike records a memory strike against an instance (from the [MemoryWatch]). Enough strikes within the window
+// pause it: its app is stopped to free memory and requests get 503 until the pause ends.
+func (m *Manager) Strike(id string) {
+	now := time.Now()
+	m.mu.Lock()
+	recent := m.strikes[id][:0]
+	for _, t := range m.strikes[id] {
+		if now.Sub(t) < m.quarantine.Window {
+			recent = append(recent, t)
+		}
+	}
+	recent = append(recent, now)
+	m.strikes[id] = recent
+	var slot *appSlot
+	if len(recent) >= m.quarantine.Strikes {
+		m.paused[id] = now.Add(m.quarantine.Pause)
+		delete(m.strikes, id)
+		slot = m.apps[id]
+		delete(m.apps, id)
+	}
+	m.mu.Unlock()
+
+	m.log.Warn("pocker: memory strike", "id", id, "strikes", len(recent))
+	if slot != nil {
+		m.log.Warn("pocker: instance paused for memory", "id", id, "for", m.quarantine.Pause)
+		go func() {
+			<-slot.done
+			if slot.app != nil {
+				stopApp(slot.app)
+			}
+		}()
+	}
+}
+
+func (m *Manager) pausedUntil(id string) (time.Time, bool) {
+	m.mu.RLock()
+	until, ok := m.paused[id]
+	m.mu.RUnlock()
+	if !ok {
+		return time.Time{}, false
+	}
+	if time.Now().After(until) {
+		m.mu.Lock()
+		delete(m.paused, id)
+		m.mu.Unlock()
+		return time.Time{}, false
+	}
+	return until, true
 }

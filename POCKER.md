@@ -62,6 +62,9 @@ max_query_duration: 30s   # any SQL statement without its own deadline
 egress_allow: []          # private networks apps may still reach (default none)
 http_send_max_timeout: 60s
 http_send_max_body: 10485760
+max_js_allocation: 67108864   # one-shot JS allocations (64 MiB)
+memory_limit: 0               # Go soft memory limit (GOMEMLIMIT) in bytes; 0 = leave as is
+memory_soft_limit: 0          # live heap where the memory watch steps in; 0 = 70% of memory_limit or 1 GiB
 ```
 
 `GET /_pocker/health` on any host reports `{status, instances, running}`.
@@ -80,10 +83,16 @@ route from one instance against another instance and the host; all of these are 
 | Go internals: `$app.restart/bootstrap/runAllMigrations/onServe/onTerminate/onBootstrap/cron/unsafeWithoutHooks`, `hook.bindFunc/bind/trigger/unbind*`, `*sql.DB/Conn/Tx/Stmt` (e.g. `dbx.DB.DB()`), `database/sql/driver`, `os/exec`, `net`, `syscall`, `http.Server` controls | Hidden from JS (the field-name mapper maps them to nothing). Top-level `onRecord*`, `routerAdd`, `cronAdd` and the rest of `$app` work as usual. |
 | Raw SQL (`$app.db().newQuery`) | Allowed. SQLite's authorizer refuses `ATTACH` (and `VACUUM INTO`) outside the instance's `pb_data`, `PRAGMA temp_store_directory/data_store_directory` and `load_extension`; the CLI-only `readfile`/`writefile`/`fsdir` don't exist in the library. Statements without a deadline get `max_query_duration`. |
 | CPU | Every JS call is interrupted after `max_js_execution`; `sleep()` is capped at 10 s. |
+| Memory, one shot | Built-ins that allocate a large result in one step refuse results over `max_js_allocation`: `String.repeat/padStart/padEnd`, `Array.join/toString`, `ArrayBuffer`, typed arrays (incl. array-likes, `.from`, and reaching the constructor through an instance), `Buffer.alloc*` / `new Buffer`, `$os.readFile`, `fileFromPath`, `readerToString`/`toBytes` limits. Recursion depth is capped (a JS stack overflow would otherwise crash the Go process). |
+| Memory, gradual | goja has no per-VM heap accounting, so `pocker/memwatch.go` watches the process heap every 50 ms. Above `memory_soft_limit` and still growing, it interrupts JS calls running longer than 100 ms and strikes their instances (above 1.4x, every JS call). Three strikes in 10 minutes pause an instance for 5 minutes (its app is stopped, requests get 503 with `Retry-After`). |
 | Outbound network: `$http.send`, `$filesystem.fileFromURL`, S3 storage and backups, OAuth2/JWK fetches, SMTP | Public addresses only, checked on the address actually connected to (after DNS, so rebinding doesn't help): loopback, private ranges, link-local and cloud metadata, CGNAT, multicast, reserved and documentation ranges, and IPv6 equivalents/IPv4-in-IPv6 are refused unless listed in `egress_allow`. Installed process-wide on Go's default HTTP transport and PocketBase's SMTP client (`pocker/egress.go`). `$http.send` timeouts and response bodies are capped. |
 
-**Not covered yet:** per-instance memory (goja has no heap limit; a hook can still allocate the process into GC
-pressure or OOM), per-instance concurrency limits, and OS-level defence in depth: run Pocker as a non-root user with an
+**Limits of the memory controls:** the watch attributes growth to whoever is running JS at the time (usually right,
+not guaranteed), and a hook that allocates faster than the 50 ms sample through a path not covered by the one-shot caps
+could still push the process over its limit. Set `memory_limit` and run Pocker under a cgroup memory limit so the worst
+case is a restart, not a host OOM.
+
+**Not covered yet:** per-instance concurrency limits, and OS-level defence in depth: run Pocker as a non-root user with an
 OS firewall that only lets that user reach public addresses (a second, independent egress layer), plus seccomp and
 Landlock.
 

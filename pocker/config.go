@@ -52,6 +52,16 @@ type Config struct {
 
 	// HTTPSendMaxBody caps $http.send response bodies in bytes (default 10 MiB).
 	HTTPSendMaxBody int64 `yaml:"http_send_max_body"`
+
+	// MaxJSAllocation caps one-shot JS allocations in bytes (default 64 MiB).
+	MaxJSAllocation int64 `yaml:"max_js_allocation"`
+
+	// MemoryLimit sets the Go runtime's soft memory limit (GOMEMLIMIT) in bytes (default 0 = leave as is).
+	MemoryLimit int64 `yaml:"memory_limit"`
+
+	// MemorySoftLimit is the live-heap level at which the memory watch starts interrupting long JS calls and
+	// striking their instances (default 70% of memory_limit, or 1 GiB without one; negative disables the watch).
+	MemorySoftLimit int64 `yaml:"memory_soft_limit"`
 }
 
 // DefaultConfig returns the defaults used when no config file (or field) is given.
@@ -117,6 +127,15 @@ func LoadConfig(path string) (Config, error) {
 	}
 	if fromFile.HTTPSendMaxBody > 0 {
 		cfg.HTTPSendMaxBody = fromFile.HTTPSendMaxBody
+	}
+	if fromFile.MaxJSAllocation > 0 {
+		cfg.MaxJSAllocation = fromFile.MaxJSAllocation
+	}
+	if fromFile.MemoryLimit > 0 {
+		cfg.MemoryLimit = fromFile.MemoryLimit
+	}
+	if fromFile.MemorySoftLimit != 0 {
+		cfg.MemorySoftLimit = fromFile.MemorySoftLimit
 	}
 	return cfg, nil
 }

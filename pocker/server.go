@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
+	"runtime/debug"
 	"time"
 )
 
@@ -72,6 +73,21 @@ func (s *Server) Run(ctx context.Context) error {
 	defer cancel()
 	managerErr := make(chan error, 1)
 	go func() { managerErr <- s.Manager.Run(runCtx) }()
+
+	if s.Config.MemoryLimit > 0 {
+		debug.SetMemoryLimit(s.Config.MemoryLimit)
+	}
+	soft := s.Config.MemorySoftLimit
+	if soft == 0 {
+		soft = 1 << 30
+		if s.Config.MemoryLimit > 0 {
+			soft = s.Config.MemoryLimit * 7 / 10
+		}
+	}
+	if soft > 0 {
+		watch := &MemoryWatch{SoftLimit: uint64(soft), OnStrike: s.Manager.Strike, Logger: log}
+		go watch.Run(runCtx)
+	}
 
 	ln, err := net.Listen("tcp", s.Config.Listen)
 	if err != nil {

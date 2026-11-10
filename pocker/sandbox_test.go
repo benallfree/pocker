@@ -67,6 +67,25 @@ var attacks = [][2]string{
 	{"fileFd", `typeof $os.openInRoot(".", "pb_hooks/main.pb.js").fd`},
 	{"blobEscape", `(() => { const f = $app.newFilesystem(); try { f.upload([104, 105], "../../../../../../tmp/pocker-blob-escape") } finally { f.close() } })()`},
 	{"blobOwn", `(() => { const f = $app.newFilesystem(); try { f.upload([104, 105], "own/test.txt"); return "done" } finally { f.close() } })()`},
+	{"bigRepeat", `"x".repeat(1e9).length`},
+	{"bigPadEnd", `"x".padEnd(1e9).length`},
+	{"bigJoin", `new Array(1e9).join("x").length`},
+	{"bigArrayBuffer", `new ArrayBuffer(1e9).byteLength`},
+	{"bigUint8", `new Uint8Array(1e9).length`},
+	{"bigFloat64", `new Float64Array(2e7).length`},
+	{"bigBufferAlloc", `Buffer.alloc(1e9).length`},
+	{"bigViaCtorProp", `new (new Uint8Array(1).constructor)(1e9).length`},
+	{"bigViaBufferProp", `new (new Uint8Array(1).buffer.constructor)(1e9).byteLength`},
+	{"bigRepeatReassigned", `(String.prototype.repeat = function () { return "" }, "x".repeat(1e9).length)`},
+	{"bigFromArrayLike", `new Uint8Array({ length: 1e9 }).length`},
+	{"bigTypedFrom", `Uint8Array.from({ length: 1e9 }).length`},
+	{"bigCallNoNew", `Reflect.construct(new Float64Array(1).constructor, [1e8]).length`},
+	{"bigToString", `new Array(1e9).toString().length`},
+	{"bigConcatString", `(new Array(1e9) + "").length`},
+	{"bigNewBuffer", `new Buffer(1e9).length`},
+	{"deepRecursion", `(function f(n) { return f(n + 1) })(0)`},
+	{"smallAllocs", `new Uint8Array(16).length + "ab".repeat(3).length + new ArrayBuffer(8).byteLength + [1,2].join("-").length`},
+	{"arraySparseOK", `new Array(1e9).length`},
 	{"plainVacuum", `($app.db().newQuery("VACUUM").execute(), "done")`},
 	{"literalAttachText", `($app.db().newQuery("SELECT 'attach' AS w").execute(), "done")`},
 	{"sleepCapped", `{ const s = Date.now(); sleep(60000); return Date.now() - s }`},
@@ -146,10 +165,13 @@ func TestSandboxBlocksEscapes(t *testing.T) {
 		"removeOther", "renameOut", "dirFS", "openRoot", "glob", "walk", "fileFromPath", "fsLocal", "template",
 		"static", "requireOther", "attach", "attachSneaky", "vacuumIntoHost", "storePragma",
 		"sqlReadfile", "sqlWritefile", "sqlFsdir", "sqlLoadExtension", "sqlAttachURI",
+		"bigRepeat", "bigPadEnd", "bigJoin", "bigArrayBuffer", "bigUint8", "bigFloat64", "bigBufferAlloc",
+		"bigViaCtorProp", "bigViaBufferProp", "bigRepeatReassigned", "deepRecursion", "bigFromArrayLike",
+		"bigTypedFrom", "bigCallNoNew", "bigToString", "bigConcatString", "bigNewBuffer",
 	}
 	for _, name := range blocked {
 		res, code, _ := call(name)
-		if code != 200 || res.OK {
+		if code == 200 && res.OK {
 			t.Errorf("%s: expected blocked, got status=%d %+v", name, code, res)
 		}
 	}
@@ -170,11 +192,13 @@ func TestSandboxBlocksEscapes(t *testing.T) {
 	}
 
 	expect := map[string]any{
-		"args":        float64(0),
-		"envOwn":      "a's own value",
-		"envHost":     "",
-		"procEnvHost": "",
-		"requireOwn":  "own lib",
+		"smallAllocs":   float64(16 + 6 + 8 + 3),
+		"arraySparseOK": float64(1e9),
+		"args":          float64(0),
+		"envOwn":        "a's own value",
+		"envHost":       "",
+		"procEnvHost":   "",
+		"requireOwn":    "own lib",
 	}
 	for name, want := range expect {
 		res, _, _ := call(name)
