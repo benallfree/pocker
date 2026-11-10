@@ -47,6 +47,9 @@ const (
 	DefaultSecurityHeadersMiddlewarePriority = DefaultRateLimitMiddlewarePriority - 10
 	DefaultSecurityHeadersMiddlewareId       = "pbSecurityHeaders"
 
+	DefaultRejectUnknownTokenMiddlewarePriority = 9999
+	DefaultRejectUnknownTokenMiddlewareId       = "pbRejectUnknownToken"
+
 	DefaultRequireGuestOnlyMiddlewareId                 = "pbRequireGuestOnly"
 	DefaultRequireAuthMiddlewareId                      = "pbRequireAuth"
 	DefaultRequireSuperuserAuthMiddlewareId             = "pbRequireSuperuserAuth"
@@ -170,6 +173,18 @@ func RequireSameCollectionContextAuth(collectionPathParam string) *hook.Handler[
 	}
 }
 
+func getAuthTokenFromRequest(e *core.RequestEvent) string {
+	token := e.Request.Header.Get("Authorization")
+
+	// the "Bearer" schema prefix is not required by PocketBase and it is
+	// supported only for compatibility with the defaults of some HTTP clients
+	if len(token) > 7 && strings.EqualFold(token[:7], "Bearer ") {
+		return token[7:]
+	}
+
+	return token
+}
+
 // loadAuthToken attempts to load the auth context based on the "Authorization: TOKEN" header value.
 //
 // This middleware does nothing in case of:
@@ -207,16 +222,21 @@ func loadAuthToken() *hook.Handler[*core.RequestEvent] {
 	}
 }
 
-func getAuthTokenFromRequest(e *core.RequestEvent) string {
-	token := e.Request.Header.Get("Authorization")
+func rejectUnknownToken() *hook.Handler[*core.RequestEvent] {
+	return &hook.Handler[*core.RequestEvent]{
+		Id:       DefaultRejectUnknownTokenMiddlewareId,
+		Priority: DefaultRejectUnknownTokenMiddlewarePriority,
+		Func: func(e *core.RequestEvent) error {
+			// there is a token with the request but no associated auth record,
+			// meaning that most likely the token is unknown, invalid or expired
+			// (e.g. the user changed their password)
+			if e.Auth == nil && getAuthTokenFromRequest(e) != "" {
+				return e.UnauthorizedError("", errors.New("unknown authorization token"))
+			}
 
-	// the "Bearer" schema prefix is not required by PocketBase and it is
-	// supported only for compatibility with the defaults of some HTTP clients
-	if len(token) > 7 && strings.EqualFold(token[:7], "Bearer ") {
-		return token[7:]
+			return e.Next()
+		},
 	}
-
-	return token
 }
 
 // wwwRedirect performs www->non-www redirect(s) if the request host

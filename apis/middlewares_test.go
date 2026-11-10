@@ -48,6 +48,68 @@ func TestPanicRecover(t *testing.T) {
 	}
 }
 
+func TestRejectUnknownToken(t *testing.T) {
+	t.Parallel()
+
+	beforeTestFunc := func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+		e.Router.GET("/my/test", func(e *core.RequestEvent) error {
+			return e.String(200, "test123")
+		})
+	}
+
+	scenarios := []tests.ApiScenario{
+		{
+			Name:            "no auth token",
+			Method:          http.MethodGet,
+			URL:             "/my/test",
+			BeforeTestFunc:  beforeTestFunc,
+			ExpectedStatus:  200,
+			ExpectedContent: []string{"test123"},
+			ExpectedEvents:  map[string]int{"*": 0},
+		},
+		{
+			Name:   "valid auth token",
+			Method: http.MethodGet,
+			URL:    "/my/test",
+			Headers: map[string]string{
+				"Authorization": "eyJhbGciOiJIUzI1NiJ9.eyJpZCI6IjRxMXhsY2xtZmxva3UzMyIsInR5cGUiOiJhdXRoIiwiY29sbGVjdGlvbklkIjoiX3BiX3VzZXJzX2F1dGhfIiwiZXhwIjoyNTI0NjA0NDYxLCJyZWZyZXNoYWJsZSI6dHJ1ZX0.ZT3F0Z3iM-xbGgSG3LEKiEzHrPHr8t8IuHLZGGNuxLo",
+			},
+			BeforeTestFunc:  beforeTestFunc,
+			ExpectedStatus:  200,
+			ExpectedContent: []string{"test123"},
+			ExpectedEvents:  map[string]int{"*": 0},
+		},
+		{
+			Name:   "invalid/expired auth token",
+			Method: http.MethodGet,
+			URL:    "/my/test",
+			Headers: map[string]string{
+				"Authorization": "eyJhbGciOiJIUzI1NiJ9.eyJpZCI6IjRxMXhsY2xtZmxva3UzMyIsInR5cGUiOiJhdXRoIiwiY29sbGVjdGlvbklkIjoiX3BiX3VzZXJzX2F1dGhfIiwiZXhwIjoxNjQwOTkxNjYxLCJyZWZyZXNoYWJsZSI6dHJ1ZX0.2D3tmqPn3vc5LoqqCz8V-iCDVXo9soYiH0d32G7FQT4",
+			},
+			BeforeTestFunc:  beforeTestFunc,
+			ExpectedStatus:  401,
+			ExpectedContent: []string{`"data":{}`},
+			ExpectedEvents:  map[string]int{"*": 0},
+		},
+		{
+			Name:   "unknown token",
+			Method: http.MethodGet,
+			URL:    "/my/test",
+			Headers: map[string]string{
+				"Authorization": "Bearer abc",
+			},
+			BeforeTestFunc:  beforeTestFunc,
+			ExpectedStatus:  401,
+			ExpectedContent: []string{`"data":{}`},
+			ExpectedEvents:  map[string]int{"*": 0},
+		},
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+}
+
 func TestRequireGuestOnly(t *testing.T) {
 	t.Parallel()
 
@@ -90,8 +152,8 @@ func TestRequireGuestOnly(t *testing.T) {
 				"Authorization": "eyJhbGciOiJIUzI1NiJ9.eyJpZCI6IjRxMXhsY2xtZmxva3UzMyIsInR5cGUiOiJhdXRoIiwiY29sbGVjdGlvbklkIjoiX3BiX3VzZXJzX2F1dGhfIiwiZXhwIjoxNjQwOTkxNjYxLCJyZWZyZXNoYWJsZSI6dHJ1ZX0.2D3tmqPn3vc5LoqqCz8V-iCDVXo9soYiH0d32G7FQT4",
 			},
 			BeforeTestFunc:  beforeTestFunc,
-			ExpectedStatus:  200,
-			ExpectedContent: []string{"test123"},
+			ExpectedStatus:  401,
+			ExpectedContent: []string{`"data":{}`},
 			ExpectedEvents:  map[string]int{"*": 0},
 		},
 		{

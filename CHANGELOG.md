@@ -16,6 +16,11 @@
 
 - Added guard for a `cron.Stop()` race in case it happens to be called right before the ticker initialization _(unlikely to trigger in real usage)_.
 
+- Allowed the `update/Config.Channel` field to be optional so that it can be configured to fetch the latest release from any of the repo release channels.
+
+- Added a global middleware to reject with 401 unknown or expired `Auhorization` tokens to allow client-side apps to more easily trigger auth state. As a side-effect this also enables practically any endpoint, not just `authRefresh()`, to be used as a very rudimentary token verification.
+    _⚠️ For most applications this should be a none breaking change but note that previously such `Authorization` header values were silently ignored to allow custom token processing because pre v0.23 middlewares didn't have a way to control the execution priority. Now this global middleware acts as a catch-all fallback and applies as latest as possible and only if `e.Auth` is not already loaded._
+
 - Log harmless mid-response network errors with level `INFO (0)` ([#8361](https://ganigeorgiev.com/pocketbase/discussions/8361)).
 
 
