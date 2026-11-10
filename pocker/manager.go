@@ -40,6 +40,8 @@ type Manager struct {
 	onEvent  func(Event)
 	fw       *Firewall
 
+	held map[string]chan struct{} // by ID: instances under maintenance; requests wait for the channel to close
+
 	mu        sync.RWMutex
 	qstate    map[string]*quarantineState // by ID
 	paused    map[string]time.Time        // by ID: quarantined until
@@ -91,6 +93,7 @@ func NewManager(source InstanceSource, opts ManagerOptions) *Manager {
 		fw:        opts.Firewall,
 		qstate:    map[string]*quarantineState{},
 		paused:    map[string]time.Time{},
+		held:      map[string]chan struct{}{},
 		log:       opts.Logger,
 		dev:       opts.Dev,
 		instances: map[string]Instance{},
@@ -331,6 +334,12 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := m.waitHeld(r.Context(), inst.ID); err != nil {
+		w.Header().Set("Retry-After", "5")
+		http.Error(w, "this instance is being updated; retry shortly", http.StatusServiceUnavailable)
+		return
+	}
+
 	if until, paused := m.pausedUntil(inst.ID); paused {
 		w.Header().Set("Retry-After", fmt.Sprint(int(time.Until(until).Seconds())+1))
 		http.Error(w, "this instance is paused for using too much memory; retry later", http.StatusServiceUnavailable)
@@ -517,4 +526,75 @@ func (m *Manager) pausedUntil(id string) (time.Time, bool) {
 		return time.Time{}, false
 	}
 	return until, true
+}
+
+// InstanceDir returns the folder of a known instance (<pbRoot>/<id> unless the instance sets Dir).
+func (m *Manager) InstanceDir(id string) (string, bool) {
+	m.mu.RLock()
+	inst, ok := m.instances[id]
+	m.mu.RUnlock()
+	if !ok {
+		return "", false
+	}
+	return instanceDir(m.opts, inst), true
+}
+
+// WithInstanceStopped stops the instance's app (if running), holds its new requests, runs fn with the instance
+// folder, then releases the held requests; the next request starts a fresh app. Use it to change an instance's
+// files (deploys, restores) or to work on its databases while nothing has them open. Requests in flight when it
+// starts are cut off, like stopping a process.
+func (m *Manager) WithInstanceStopped(ctx context.Context, id string, fn func(dir string) error) error {
+	m.mu.Lock()
+	inst, ok := m.instances[id]
+	if !ok {
+		m.mu.Unlock()
+		return fmt.Errorf("instance %q not found", id)
+	}
+	if _, busy := m.held[id]; busy {
+		m.mu.Unlock()
+		return fmt.Errorf("instance %q is already being updated", id)
+	}
+	release := make(chan struct{})
+	m.held[id] = release
+	slot := m.apps[id]
+	delete(m.apps, id)
+	m.mu.Unlock()
+
+	defer func() {
+		m.mu.Lock()
+		delete(m.held, id)
+		m.mu.Unlock()
+		close(release)
+	}()
+	if slot != nil {
+		select {
+		case <-slot.done:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+		if slot.app != nil {
+			stopApp(slot.app)
+		}
+	}
+	return fn(instanceDir(m.opts, inst))
+}
+
+// waitHeld blocks while the instance is under maintenance (WithInstanceStopped), up to a minute.
+func (m *Manager) waitHeld(ctx context.Context, id string) error {
+	m.mu.RLock()
+	ch := m.held[id]
+	m.mu.RUnlock()
+	if ch == nil {
+		return nil
+	}
+	t := time.NewTimer(time.Minute)
+	defer t.Stop()
+	select {
+	case <-ch:
+		return nil
+	case <-t.C:
+		return fmt.Errorf("instance %q still being updated", id)
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }

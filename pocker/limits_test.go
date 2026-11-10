@@ -170,3 +170,53 @@ func TestSecretChangeRestartsApp(t *testing.T) {
 		t.Fatalf("hosts change must not restart, events: %v", restarted)
 	}
 }
+
+func TestWithInstanceStopped(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "app", "pb_hooks"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	write := func(v string) {
+		_ = os.WriteFile(filepath.Join(root, "app", "pb_hooks/main.pb.js"), []byte(`routerAdd("GET", "/v", (e) => e.string(200, "`+v+`"))`), 0o644)
+	}
+	write("v1")
+	inst := Instance{ID: "app", Hosts: []string{"app.example.com"}}
+	m := NewManager(staticSource{inst}, ManagerOptions{PBRoot: root, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go m.Run(ctx)
+	defer m.Shutdown()
+	get := func() string {
+		w := httptest.NewRecorder()
+		m.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "http://app.example.com/v", nil))
+		return strings.TrimSpace(w.Body.String())
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for get() != "v1" {
+		if time.Now().After(deadline) {
+			t.Fatal("v1 never served")
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+
+	// a request that arrives during the update waits, then sees the new files
+	got := make(chan string, 1)
+	err := m.WithInstanceStopped(ctx, "app", func(dir string) error {
+		if dir != filepath.Join(root, "app") {
+			t.Errorf("dir: %s", dir)
+		}
+		go func() { got <- get() }()
+		time.Sleep(100 * time.Millisecond)
+		write("v2")
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v := <-got; v != "v2" {
+		t.Fatalf("held request saw %q, want v2", v)
+	}
+	if err := m.WithInstanceStopped(ctx, "nope", func(string) error { return nil }); err == nil {
+		t.Fatal("unknown instance must fail")
+	}
+}
