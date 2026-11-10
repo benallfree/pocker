@@ -158,6 +158,11 @@ in-flight requests first), so a rotated secret takes effect immediately. Host ch
 
 `GET /_pocker/health` on any host reports `{status, instances, running}`.
 
+**Changing an instance's files from host code** (deploys, restores): `Manager.WithInstanceStopped(ctx, id, fn)` stops
+the app, holds new requests for that instance, runs `fn(dir)`, then lets them through to a fresh app.
+`Manager.StartInstance(ctx, id)` starts it right away and returns the start error (for example to tell a deploy that
+a hook is broken), `Manager.Running(id)` says whether it is started, and `Manager.InstanceDir(id)` gives its folder.
+
 ## Sandbox
 
 Every instance's JS hooks and migrations run in a sandbox (`plugins/jsvm/sandbox.go`), and its SQL runs behind

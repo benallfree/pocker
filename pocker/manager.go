@@ -579,6 +579,34 @@ func (m *Manager) WithInstanceStopped(ctx context.Context, id string, fn func(di
 	return fn(instanceDir(m.opts, inst))
 }
 
+// Running reports whether the instance's app is started (or starting).
+func (m *Manager) Running(id string) bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	_, ok := m.apps[id]
+	return ok
+}
+
+// StartInstance starts the instance's app now, if it isn't running, and returns the start error (e.g. a broken
+// hook or migration). Host code uses it after changing an instance's files to report the result right away instead
+// of on the next request. A blocked instance isn't started.
+func (m *Manager) StartInstance(ctx context.Context, id string) error {
+	if err := m.waitHeld(ctx, id); err != nil {
+		return err
+	}
+	m.mu.RLock()
+	inst, ok := m.instances[id]
+	m.mu.RUnlock()
+	if !ok {
+		return fmt.Errorf("instance %q not found", id)
+	}
+	if inst.Blocked != nil {
+		return fmt.Errorf("instance %q is blocked: %s", id, inst.Blocked.Message)
+	}
+	_, err := m.app(inst)
+	return err
+}
+
 // waitHeld blocks while the instance is under maintenance (WithInstanceStopped), up to a minute.
 func (m *Manager) waitHeld(ctx context.Context, id string) error {
 	m.mu.RLock()

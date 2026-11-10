@@ -219,4 +219,25 @@ func TestWithInstanceStopped(t *testing.T) {
 	if err := m.WithInstanceStopped(ctx, "nope", func(string) error { return nil }); err == nil {
 		t.Fatal("unknown instance must fail")
 	}
+
+	// StartInstance reports a broken start right away; Running follows the app
+	_ = m.WithInstanceStopped(ctx, "app", func(dir string) error {
+		return os.WriteFile(filepath.Join(dir, "pb_hooks/main.pb.js"), []byte(`this is not js (`), 0o644)
+	})
+	if m.Running("app") {
+		t.Fatal("stopped app reported running")
+	}
+	if err := m.StartInstance(ctx, "app"); err == nil {
+		t.Fatal("broken hook must fail to start")
+	}
+	write("v3")
+	if err := m.StartInstance(ctx, "app"); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	if !m.Running("app") || get() != "v3" {
+		t.Fatal("app not running v3")
+	}
+	if err := m.StartInstance(ctx, "nope"); err == nil {
+		t.Fatal("unknown instance must fail")
+	}
 }
