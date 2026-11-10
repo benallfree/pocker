@@ -1,6 +1,9 @@
 // Command pocker serves many PocketBase instances from one process.
 //
-//	pocker serve [--config pocker.yaml] [--listen :8090] [--data ./pocker_data] [--instances ./instances.yaml]
+//	pocker serve [--dev] [--pbRoot ./pb_root] [--instances ./instances.yaml] [--listen :8090] [--config pocker.yaml]
+//
+// Production (default) serves only the hostnames mapped in the instances file. --dev serves any hostname: the
+// instance is <pbRoot>/<hostname>, created on first use.
 package main
 
 import (
@@ -17,14 +20,16 @@ import (
 
 func main() {
 	if len(os.Args) < 2 || os.Args[1] != "serve" {
-		fmt.Fprintln(os.Stderr, "usage: pocker serve [--config pocker.yaml] [--listen :8090] [--data DIR] [--instances FILE]")
+		fmt.Fprintln(os.Stderr, "usage: pocker serve [--dev] [--pbRoot DIR] [--instances FILE] [--listen ADDR] [--config FILE]")
 		os.Exit(2)
 	}
 
 	fs := flag.NewFlagSet("serve", flag.ExitOnError)
 	configPath := fs.String("config", "pocker.yaml", "config file (optional; defaults apply when missing)")
 	listen := fs.String("listen", "", "listen address (overrides config)")
-	data := fs.String("data", "", "data root holding instance folders (overrides config)")
+	pbRoot := fs.String("pbRoot", "", "folder holding one PocketBase folder per instance (default ./pb_root)")
+	fs.StringVar(pbRoot, "pb_root", "", "alias of --pbRoot")
+	dev := fs.Bool("dev", false, "serve any hostname as <pbRoot>/<hostname> (created on first use); PocketBase dev mode")
 	instances := fs.String("instances", "", "instances YAML file (overrides config)")
 	_ = fs.Parse(os.Args[2:])
 
@@ -36,8 +41,11 @@ func main() {
 	if *listen != "" {
 		cfg.Listen = *listen
 	}
-	if *data != "" {
-		cfg.DataRoot = *data
+	if *pbRoot != "" {
+		cfg.PBRoot = *pbRoot
+	}
+	if *dev {
+		cfg.Dev = true
 	}
 	if *instances != "" {
 		cfg.InstancesFile = *instances

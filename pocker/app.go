@@ -26,15 +26,16 @@ type runningApp struct {
 
 // appOptions are the process-wide settings applied to every app.
 type appOptions struct {
-	DataRoot      string
+	PBRoot        string
 	HooksPoolSize int
+	ForceDev      bool // Pocker dev mode: every app runs in PocketBase dev mode
 }
 
 func instanceDir(opts appOptions, inst Instance) string {
 	if inst.Dir != "" {
 		return inst.Dir
 	}
-	return filepath.Join(opts.DataRoot, inst.ID)
+	return filepath.Join(opts.PBRoot, inst.ID)
 }
 
 // startApp creates, bootstraps and migrates the instance's PocketBase app and builds its router, the same way
@@ -52,7 +53,7 @@ func startApp(opts appOptions, inst Instance) (*runningApp, error) {
 
 	app := core.NewBaseApp(core.BaseAppConfig{
 		DataDir:       filepath.Join(dir, "pb_data"),
-		IsDev:         inst.Dev,
+		IsDev:         inst.Dev || opts.ForceDev,
 		EncryptionKey: inst.Env["PB_ENCRYPTION_KEY"],
 		AppMigrations: &core.MigrationsList{}, // this app's JS migrations only
 	})

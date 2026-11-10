@@ -23,9 +23,11 @@ import (
 //	    hosts: [shop.localhost, shop.example.com]
 //	    blocked: { status: 402, message: "Payment required" }
 //
-// A missing file means no instances (and is picked up once it appears).
+// A missing file means no instances (and is picked up once it appears), unless Required is set.
 type YAMLSource struct {
 	Path string
+	// Required makes a missing file an error (production) instead of an empty list.
+	Required bool
 	// PollInterval is how often the file is checked for changes (default 2s).
 	PollInterval time.Duration
 }
@@ -37,6 +39,9 @@ type yamlFile struct {
 func (s *YAMLSource) load() ([]Instance, error) {
 	raw, err := os.ReadFile(s.Path)
 	if errors.Is(err, fs.ErrNotExist) {
+		if s.Required {
+			return nil, fmt.Errorf("instances file %s not found (required unless --dev)", s.Path)
+		}
 		return nil, nil
 	}
 	if err != nil {
@@ -48,8 +53,8 @@ func (s *YAMLSource) load() ([]Instance, error) {
 	}
 	seen := map[string]bool{}
 	for _, inst := range f.Instances {
-		if inst.ID == "" {
-			return nil, fmt.Errorf("%s: an instance has no id", s.Path)
+		if !ValidID(inst.ID) {
+			return nil, fmt.Errorf("%s: instance id %q must be lowercase letters, digits, dots and dashes", s.Path, inst.ID)
 		}
 		if seen[inst.ID] {
 			return nil, fmt.Errorf("%s: duplicate instance id %q", s.Path, inst.ID)

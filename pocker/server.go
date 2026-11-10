@@ -28,13 +28,27 @@ func (s *Server) Run(ctx context.Context) error {
 	}
 	source := s.Source
 	if source == nil {
-		source = &YAMLSource{Path: s.Config.InstancesFile}
+		// production needs the host -> id map; dev mode works with or without it
+		source = &YAMLSource{Path: s.Config.InstancesFile, Required: !s.Config.Dev}
+	}
+	trusted, err := parseCIDRs(s.Config.TrustedProxies)
+	if err != nil {
+		return err
+	}
+	if _, err := source.Snapshot(ctx); err != nil {
+		return err // fail fast, e.g. missing instances file in production
 	}
 	pool := 2
 	if s.Config.HooksPoolSize != nil {
 		pool = *s.Config.HooksPoolSize
 	}
-	s.Manager = NewManager(source, ManagerOptions{DataRoot: s.Config.DataRoot, HooksPoolSize: pool, Logger: log})
+	s.Manager = NewManager(source, ManagerOptions{
+		PBRoot:         s.Config.PBRoot,
+		Dev:            s.Config.Dev,
+		TrustedProxies: trusted,
+		HooksPoolSize:  pool,
+		Logger:         log,
+	})
 
 	var handler http.Handler = s.Manager
 	if s.Wrap != nil {
@@ -60,7 +74,7 @@ func (s *Server) Run(ctx context.Context) error {
 	}
 	serveErr := make(chan error, 1)
 	go func() { serveErr <- srv.Serve(ln) }()
-	log.Info("pocker: listening", "addr", ln.Addr().String(), "data_root", s.Config.DataRoot)
+	log.Info("pocker: listening", "addr", ln.Addr().String(), "pb_root", s.Config.PBRoot, "dev", s.Config.Dev)
 
 	select {
 	case <-ctx.Done():

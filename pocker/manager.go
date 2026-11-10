@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -15,12 +16,27 @@ import (
 // HealthPath answers on any host with the engine's status.
 const HealthPath = "/_pocker/health"
 
+// IDHeader selects the instance by canonical id instead of by Host. It is honoured only from trusted proxies
+// (see [Config.TrustedProxies]) and removed from every request before it reaches an app.
+const IDHeader = "X-PocketBase-Id"
+
+var validID = regexp.MustCompile(`^[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?$`)
+
+// ValidID reports whether id is a safe instance id: lowercase letters, digits, dots and dashes, starting and ending
+// with a letter or digit, no "..". Ids are folder names under the PocketBase root.
+func ValidID(id string) bool {
+	return validID.MatchString(id) && !strings.Contains(id, "..")
+}
+
 // Manager keeps the instance list from an [InstanceSource] and serves each instance's app, starting it on its first
 // request and keeping it running.
 type Manager struct {
 	source InstanceSource
 	opts   appOptions
 	log    *slog.Logger
+
+	dev     bool
+	trusted []*net.IPNet
 
 	mu        sync.RWMutex
 	instances map[string]Instance // by ID
@@ -38,8 +54,13 @@ type appSlot struct {
 
 // ManagerOptions configures a [Manager].
 type ManagerOptions struct {
-	// DataRoot is the folder that holds instance folders (<DataRoot>/<instance id>).
-	DataRoot string
+	// PBRoot is the folder that holds one PocketBase folder per instance (<PBRoot>/<instance id>).
+	PBRoot string
+	// Dev serves any hostname (or X-PocketBase-Id): the id is the name, its folder is created on first use, and
+	// apps run in PocketBase dev mode.
+	Dev bool
+	// TrustedProxies are the networks whose X-PocketBase-Id header is honoured.
+	TrustedProxies []*net.IPNet
 	// HooksPoolSize is the number of prewarmed JS runtimes per app (0 = create one per hook run).
 	HooksPoolSize int
 	// Logger defaults to slog.Default().
@@ -53,8 +74,10 @@ func NewManager(source InstanceSource, opts ManagerOptions) *Manager {
 	}
 	return &Manager{
 		source:    source,
-		opts:      appOptions{DataRoot: opts.DataRoot, HooksPoolSize: opts.HooksPoolSize},
+		opts:      appOptions{PBRoot: opts.PBRoot, HooksPoolSize: opts.HooksPoolSize, ForceDev: opts.Dev},
 		log:       opts.Logger,
+		dev:       opts.Dev,
+		trusted:   opts.TrustedProxies,
 		instances: map[string]Instance{},
 		hosts:     map[string]string{},
 		apps:      map[string]*appSlot{},
@@ -124,6 +147,10 @@ func (m *Manager) apply(c Change) {
 // upsertLocked replaces the instance record and its host routes. A running app keeps running with the settings
 // it started with (v1: no in-place reload).
 func (m *Manager) upsertLocked(inst Instance) {
+	if !ValidID(inst.ID) {
+		m.log.Warn("pocker: ignoring instance with an unsafe id", "id", inst.ID)
+		return
+	}
 	m.removeLocked(inst.ID)
 	m.instances[inst.ID] = inst
 	for _, h := range inst.Hosts {
@@ -168,6 +195,76 @@ func (m *Manager) Lookup(host string) (Instance, bool) {
 	}
 	inst, ok := m.instances[id]
 	return inst, ok
+}
+
+// fromTrustedProxy reports whether the request's direct peer is in the trusted proxy list.
+func (m *Manager) fromTrustedProxy(r *http.Request) bool {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		host = r.RemoteAddr
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return false
+	}
+	for _, n := range m.trusted {
+		if n.Contains(ip) {
+			return true
+		}
+	}
+	return false
+}
+
+// resolve finds the request's instance: by X-PocketBase-Id from a trusted proxy, else by Host. In dev mode an
+// unknown name becomes a new instance. The header is always removed before the request reaches an app.
+// A non-zero status means the request can't be routed.
+func (m *Manager) resolve(r *http.Request) (Instance, int, string) {
+	id := strings.ToLower(strings.TrimSpace(r.Header.Get(IDHeader)))
+	r.Header.Del(IDHeader)
+	if id != "" && !m.dev && !m.fromTrustedProxy(r) {
+		id = "" // untrusted header: route by Host as if it were absent
+	}
+
+	if id != "" {
+		if !ValidID(id) {
+			return Instance{}, http.StatusBadRequest, "invalid " + IDHeader
+		}
+		m.mu.RLock()
+		inst, ok := m.instances[id]
+		m.mu.RUnlock()
+		if ok {
+			return inst, 0, ""
+		}
+		if m.dev {
+			return m.devInstance(id, nil), 0, ""
+		}
+		return Instance{}, http.StatusNotFound, id + " not found"
+	}
+
+	host := normalizeHost(r.Host)
+	if inst, ok := m.Lookup(host); ok {
+		return inst, 0, ""
+	}
+	if m.dev {
+		if !ValidID(host) {
+			return Instance{}, http.StatusBadRequest, "hostname can't be used as an instance name: " + host
+		}
+		return m.devInstance(host, []string{host}), 0, ""
+	}
+	return Instance{}, http.StatusNotFound, host + " not found"
+}
+
+// devInstance registers (or returns) a dev-mode instance named id.
+func (m *Manager) devInstance(id string, hosts []string) Instance {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if inst, ok := m.instances[id]; ok {
+		return inst
+	}
+	inst := Instance{ID: id, Hosts: hosts, Dev: true}
+	m.upsertLocked(inst)
+	m.log.Info("pocker: dev instance", "id", id)
+	return inst
 }
 
 // app returns the instance's running app, starting it (once, shared by concurrent callers) if needed.
@@ -215,9 +312,9 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	inst, ok := m.Lookup(r.Host)
-	if !ok {
-		http.Error(w, normalizeHost(r.Host)+" not found", http.StatusNotFound)
+	inst, status, msg := m.resolve(r)
+	if status != 0 {
+		http.Error(w, msg, status)
 		return
 	}
 	if inst.Blocked != nil {
