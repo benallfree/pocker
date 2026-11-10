@@ -6,6 +6,7 @@ package jsvm
 import (
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -45,6 +46,18 @@ type Sandbox struct {
 	// MaxSleep caps the sleep() binding (default 10 seconds).
 	MaxSleep time.Duration
 
+	// MaxAllocation caps single large allocations JS can request in one step (String repeat/pad, Array join,
+	// Buffer/ArrayBuffer/typed arrays, file reads, readerToString/toBytes). Default 64 MiB. Gradual growth is the
+	// host's memory watchdog's job (see InterruptActive).
+	MaxAllocation int64
+
+	// MaxCallStackSize caps JS recursion depth (default 2000). Without it deep recursion overflows the Go stack,
+	// which is fatal for the whole process.
+	MaxCallStackSize int
+
+	// Owner identifies the app in InterruptActive results (e.g. the instance id).
+	Owner string
+
 	once    sync.Once
 	openErr error
 	dir     string
@@ -78,6 +91,13 @@ func (s *Sandbox) maxExecution() time.Duration {
 	default:
 		return s.MaxExecution
 	}
+}
+
+func (s *Sandbox) maxAllocation() int64 {
+	if s.MaxAllocation > 0 {
+		return s.MaxAllocation
+	}
+	return 64 << 20
 }
 
 func (s *Sandbox) maxSleep() time.Duration {
@@ -181,11 +201,7 @@ func (s *Sandbox) apply(vm *goja.Runtime, templates *template.Registry) {
 		return s.root.Stat(r)
 	})
 	osObj.Set("readFile", func(p string) ([]byte, error) {
-		r, err := s.rel(p)
-		if err != nil {
-			return nil, err
-		}
-		return s.root.ReadFile(r)
+		return s.readFileCapped(p)
 	})
 	osObj.Set("writeFile", func(p string, data []byte, perm os.FileMode) error {
 		r, err := s.rel(p)
@@ -330,15 +346,11 @@ func (s *Sandbox) apply(vm *goja.Runtime, templates *template.Registry) {
 	if fsObj, ok := vm.Get("$filesystem").(*goja.Object); ok {
 		fsObj.Set("local", disabled("$filesystem.local"))
 		fsObj.Set("fileFromPath", func(p string) (*filesystem.File, error) {
-			r, err := s.rel(p)
+			b, err := s.readFileCapped(p)
 			if err != nil {
 				return nil, err
 			}
-			b, err := s.root.ReadFile(r)
-			if err != nil {
-				return nil, err
-			}
-			return filesystem.NewFileFromBytes(b, filepath.Base(r))
+			return filesystem.NewFileFromBytes(b, filepath.Base(p))
 		})
 	}
 
@@ -385,6 +397,14 @@ func (s *Sandbox) apply(vm *goja.Runtime, templates *template.Registry) {
 	})
 	vm.Set("$template", tpl)
 
+	// memory: recursion depth and one-shot allocations
+	callStack := s.MaxCallStackSize
+	if callStack <= 0 {
+		callStack = 2000
+	}
+	vm.SetMaxCallStackSize(callStack)
+	s.capAllocations(vm)
+
 	// sleep: capped, so a hook can't park a goroutine forever
 	maxSleep := s.maxSleep()
 	vm.Set("sleep", func(ms int64) {
@@ -396,17 +416,159 @@ func (s *Sandbox) apply(vm *goja.Runtime, templates *template.Registry) {
 	})
 }
 
-// interruptAfter arms vm.Interrupt for one JS call and returns the function that disarms it.
-func (s *Sandbox) interruptAfter(vm *goja.Runtime) func() {
-	limit := s.maxExecution()
-	if limit <= 0 {
-		return func() {}
+// readFileCapped reads a file inside the root, refusing files larger than MaxAllocation.
+func (s *Sandbox) readFileCapped(p string) ([]byte, error) {
+	r, err := s.rel(p)
+	if err != nil {
+		return nil, err
 	}
-	t := time.AfterFunc(limit, func() {
-		vm.Interrupt(fmt.Sprintf("execution timeout: JS ran longer than %s", limit))
+	f, err := s.root.Open(r)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	max := s.maxAllocation()
+	b, err := io.ReadAll(io.LimitReader(f, max+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(b)) > max {
+		return nil, fmt.Errorf("%s: file larger than %d bytes", p, max)
+	}
+	return b, nil
+}
+
+// capAllocations wraps the built-ins that allocate a large result in one step. The originals are only reachable
+// through the wrappers' closures. Results above MaxAllocation throw a RangeError instead of allocating.
+func (s *Sandbox) capAllocations(vm *goja.Runtime) {
+	max := s.maxAllocation()
+
+	// Go-side readers take a JS-supplied limit: clamp it.
+	for _, name := range []string{"readerToString", "toBytes"} {
+		orig, ok := goja.AssertFunction(vm.Get(name))
+		if !ok {
+			continue
+		}
+		vm.Set(name, func(call goja.FunctionCall) goja.Value {
+			limit := call.Argument(1).ToInteger()
+			if limit <= 0 || limit > max {
+				limit = max
+			}
+			res, err := orig(goja.Undefined(), call.Argument(0), vm.ToValue(limit))
+			if err != nil {
+				panic(err)
+			}
+			return res
+		})
+	}
+
+	_, err := vm.RunString(fmt.Sprintf(`(function () {
+  "use strict";
+  const MAX = %d;
+  const tooBig = (what) => new RangeError(what + ": result larger than " + MAX + " bytes is not allowed on this host");
+  const lenOf = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
+  const wrap = (obj, key, check) => {
+    if (!obj || typeof obj[key] !== "function") return;
+    const orig = obj[key];
+    Object.defineProperty(obj, key, { configurable: false, writable: false, enumerable: false,
+      value: function (...args) { check(this, args); return orig.apply(this, args); } });
+  };
+
+  wrap(String.prototype, "repeat", (self, a) => { if (String(self).length * lenOf(a[0]) > MAX) throw tooBig("String.repeat"); });
+  wrap(String.prototype, "padStart", (self, a) => { if (lenOf(a[0]) > MAX) throw tooBig("String.padStart"); });
+  wrap(String.prototype, "padEnd", (self, a) => { if (lenOf(a[0]) > MAX) throw tooBig("String.padEnd"); });
+  wrap(Array.prototype, "join", (self, a) => {
+    const sep = a[0] === undefined ? 1 : String(a[0]).length;
+    if (lenOf(self.length) * Math.max(sep, 1) > MAX) throw tooBig("Array.join");
+  });
+
+  // requested element count: a number, or the length of an array-like (not an existing buffer)
+  const requested = (a) => {
+    if (typeof a === "number") return a;
+    if (a && typeof a === "object" && !(a instanceof ArrayBuffer) && typeof a.length === "number") return a.length;
+    return 0;
+  };
+  const guardCtor = (name, bytesPer) => {
+    const C = globalThis[name];
+    if (typeof C !== "function") return;
+    const check = (n) => { if (requested(n) * bytesPer > MAX) throw tooBig(name); };
+    const P = new Proxy(C, {
+      construct(t, args, nt) { check(args[0]); return Reflect.construct(t, args, nt === P ? t : nt); },
+      apply(t, self, args) { check(args[0]); return Reflect.apply(t, self, args); },
+    });
+    // instances reach their constructor through prototype.constructor: point it at the guard too
+    Object.defineProperty(C.prototype, "constructor", { configurable: false, writable: false, enumerable: false, value: P });
+    if (typeof C.from === "function") wrap(C, "from", (self, a) => check(a[0]));
+    Object.defineProperty(globalThis, name, { configurable: false, writable: false, enumerable: false, value: P });
+  };
+  guardCtor("ArrayBuffer", 1);
+  guardCtor("SharedArrayBuffer", 1);
+  [["Int8Array",1],["Uint8Array",1],["Uint8ClampedArray",1],["Int16Array",2],["Uint16Array",2],["Int32Array",4],
+   ["Uint32Array",4],["Float32Array",4],["Float64Array",8],["BigInt64Array",8],["BigUint64Array",8]]
+    .forEach(([n, b]) => guardCtor(n, b));
+
+  if (typeof Buffer === "function") {
+    ["alloc", "allocUnsafe", "allocUnsafeSlow"].forEach((k) =>
+      wrap(Buffer, k, (self, a) => { if (lenOf(a[0]) > MAX) throw tooBig("Buffer." + k); }));
+    guardCtor("Buffer", 1); // deprecated new Buffer(size)
+  }
+  // Array.toString / toLocaleString join without going through the wrapped join
+  ["toString", "toLocaleString"].forEach((k) =>
+    wrap(Array.prototype, k, (self) => { if (lenOf(self && self.length) > MAX) throw tooBig("Array." + k); }));
+})()`, max))
+	if err != nil {
+		panic(fmt.Errorf("jsvm sandbox: allocation caps: %w", err))
+	}
+}
+
+// activeRun is one JS call in progress, for the host's memory watchdog.
+type activeRun struct {
+	owner   string
+	started time.Time
+	vm      *goja.Runtime
+}
+
+var activeRuns sync.Map // *activeRun -> struct{}
+
+// InterruptActive interrupts every sandboxed JS call that has been running for at least minAge and returns the
+// owners (Sandbox.Owner) it interrupted, once each. The host's memory watchdog calls it when the heap climbs past
+// its soft limit.
+func InterruptActive(minAge time.Duration, reason string) []string {
+	now := time.Now()
+	seen := map[string]bool{}
+	var owners []string
+	activeRuns.Range(func(k, _ any) bool {
+		r := k.(*activeRun)
+		if now.Sub(r.started) < minAge {
+			return true
+		}
+		r.vm.Interrupt(reason)
+		if !seen[r.owner] {
+			seen[r.owner] = true
+			owners = append(owners, r.owner)
+		}
+		return true
 	})
+	return owners
+}
+
+// interruptAfter arms vm.Interrupt for one JS call, registers it for InterruptActive, and returns the function that
+// ends both.
+func (s *Sandbox) interruptAfter(vm *goja.Runtime) func() {
+	run := &activeRun{owner: s.Owner, started: time.Now(), vm: vm}
+	activeRuns.Store(run, struct{}{})
+
+	var t *time.Timer
+	if limit := s.maxExecution(); limit > 0 {
+		t = time.AfterFunc(limit, func() {
+			vm.Interrupt(fmt.Sprintf("execution timeout: JS ran longer than %s", limit))
+		})
+	}
 	return func() {
-		t.Stop()
+		if t != nil {
+			t.Stop()
+		}
+		activeRuns.Delete(run)
 		vm.ClearInterrupt()
 	}
 }
