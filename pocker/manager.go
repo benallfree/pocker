@@ -284,8 +284,10 @@ func (m *Manager) app(inst Instance) (*runningApp, error) {
 			m.mu.Unlock()
 			m.log.Error("pocker: instance failed to start", "id", inst.ID, "error", slot.err)
 			openInstanceLog(instanceDir(m.opts, inst)).Write("stderr", "Instance failed to start: "+slot.err.Error())
+			m.emit(Event{Kind: EventFailed, InstanceID: inst.ID, Reason: slot.err.Error()})
 		} else {
 			m.log.Info("pocker: instance started", "id", inst.ID, "ms", time.Since(t).Milliseconds())
+			m.emit(Event{Kind: EventStarted, InstanceID: inst.ID})
 		}
 		return slot.app, slot.err
 	}
@@ -414,6 +416,8 @@ const (
 	EventStrike    EventKind = "memory_strike" // a JS call was interrupted by the memory watch
 	EventPaused    EventKind = "paused"        // too many strikes: app stopped, requests get 503 until Until
 	EventRestarted EventKind = "restarted"     // settings changed: the app restarts on its next request
+	EventStarted   EventKind = "started"       // the app started and serves requests
+	EventFailed    EventKind = "failed"        // the app failed to start (Reason has the error)
 )
 
 func (m *Manager) emit(e Event) {

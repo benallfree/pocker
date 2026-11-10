@@ -149,15 +149,24 @@ func TestSecretChangeRestartsApp(t *testing.T) {
 	if got := get(); got != "rotated" {
 		t.Fatalf("after rotation: got %q, want rotated", got)
 	}
-	if len(restarted) == 0 || restarted[0] != string(EventRestarted) {
-		t.Fatalf("expected a restarted event, got %v", restarted)
+	if !containsString(restarted, string(EventStarted)) || !containsString(restarted, string(EventRestarted)) {
+		t.Fatalf("expected started and restarted events, got %v", restarted)
+	}
+	countRestarts := func() int {
+		n := 0
+		for _, k := range restarted {
+			if k == string(EventRestarted) {
+				n++
+			}
+		}
+		return n
 	}
 
 	// a hosts-only change keeps the running app
 	inst.Hosts = append(inst.Hosts, "www.app.example.com")
 	src.ch <- Change{Kind: Upsert, Instance: inst}
 	time.Sleep(50 * time.Millisecond)
-	if len(restarted) != 1 {
+	if countRestarts() != 1 {
 		t.Fatalf("hosts change must not restart, events: %v", restarted)
 	}
 }
