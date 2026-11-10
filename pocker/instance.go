@@ -22,9 +22,15 @@ type Instance struct {
 	// Dev runs the app in dev mode (verbose logs, SQL logging).
 	Dev bool `yaml:"dev,omitempty"`
 
-	// Env is the instance's own environment, visible to its JS hooks through $os.getenv and process.env.
-	// PB_ENCRYPTION_KEY, when set, encrypts the app settings (like `pocketbase serve --encryptionEnv`).
-	Env map[string]string `yaml:"env,omitempty"`
+	// Secrets are the instance's environment: visible to its JS hooks through $os.getenv and process.env, and to
+	// nothing else. No names are reserved; platform settings are explicit fields below.
+	Secrets map[string]string `yaml:"secrets,omitempty"`
+
+	// EncryptionKey encrypts the app's stored settings (like `pocketbase serve --encryptionEnv`). Not visible to JS.
+	EncryptionKey string `yaml:"encryption_key,omitempty"`
+
+	// Access is the instance owner's network settings (see [Access]).
+	Access Access `yaml:"access,omitempty"`
 
 	// Superusers are upserted into the app's _superusers when it starts (in Go, never through env), e.g. so a
 	// hosting platform's login works in the dashboard. PasswordHash is the bcrypt hash PocketBase stores.
@@ -40,6 +46,17 @@ type Instance struct {
 	// Blocked, when set, answers every request for this instance with the given status and message instead of
 	// serving it (e.g. suspended, unpaid). A running app is left running.
 	Blocked *Blocked `yaml:"blocked,omitempty"`
+}
+
+// Access is what the instance's owner controls about who may call it.
+type Access struct {
+	// CORSOrigins restricts which browser origins may call the instance cross-origin (PocketBase's matching: exact,
+	// "*", and "*"/"?" wildcards). Empty = any origin.
+	CORSOrigins []string `yaml:"cors_origins,omitempty"`
+
+	// TrustedIPs are client IPs/CIDRs that get the trusted rate limits on this instance, in addition to the
+	// process-wide firewall.trusted_clients (e.g. the owner's account-level list, merged by an instance source).
+	TrustedIPs []string `yaml:"trusted_ips,omitempty"`
 }
 
 // Superuser is a PocketBase superuser kept in sync by Pocker.

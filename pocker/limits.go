@@ -35,14 +35,6 @@ type Limits struct {
 
 	// RateLimits are the firewall's request limits for the instance (see [RateLimits]).
 	RateLimits *RateLimits `yaml:"rate_limits,omitempty"`
-
-	// TrustedClients are client IPs/CIDRs that get the trusted rate limits for this instance (on top of the
-	// process-wide firewall.trusted_clients).
-	TrustedClients []string `yaml:"trusted_clients,omitempty"`
-
-	// CORSOrigins restricts which origins may call the instance cross-origin (PocketBase's matching: exact, "*", and
-	// "*"/"?" wildcards). Empty = any origin ("*").
-	CORSOrigins []string `yaml:"cors_origins,omitempty"`
 }
 
 // RateLimits are request limits per client IP and per instance: an hourly budget and a concurrency cap, each with a
@@ -214,12 +206,6 @@ func (l Limits) over(def Limits) Limits {
 	}
 	if l.MaxConcurrentJS == 0 {
 		l.MaxConcurrentJS = def.MaxConcurrentJS
-	}
-	if l.CORSOrigins == nil {
-		l.CORSOrigins = def.CORSOrigins
-	}
-	if l.TrustedClients == nil {
-		l.TrustedClients = def.TrustedClients
 	}
 	defR := DefaultRateLimits
 	if def.RateLimits != nil {

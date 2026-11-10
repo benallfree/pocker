@@ -168,8 +168,8 @@ func (f *Firewall) rateCheck(w http.ResponseWriter, r *http.Request, inst Instan
 	}
 	client := f.ClientIP(r)
 	trusted := containsAddr(f.trusted, client)
-	if !trusted && len(lim.TrustedClients) > 0 {
-		if inst, err := parsePrefixes("trusted_clients", lim.TrustedClients); err == nil {
+	if !trusted && len(inst.Access.TrustedIPs) > 0 {
+		if inst, err := parsePrefixes("access.trusted_ips", inst.Access.TrustedIPs); err == nil {
 			trusted = containsAddr(inst, client)
 		}
 	}

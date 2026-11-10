@@ -34,7 +34,9 @@ instances:
     hosts: [blog.example.com, www.blog.example.com]
   - id: shop
     hosts: [shop.example.com]
-    env: { STRIPE_KEY: sk_live_..., PB_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef }
+    secrets: { STRIPE_KEY: sk_live_... }               # the app's environment
+    encryption_key: 0123456789abcdef0123456789abcdef   # encrypts PocketBase's stored settings; not visible to JS
+    access: { cors_origins: [https://shop.example.com], trusted_ips: [203.0.113.0/24] }
   - id: old
     hosts: [old.example.com]
     blocked: { status: 402, message: "Payment required" }
@@ -79,8 +81,6 @@ rate_limits:              # per client IP and per instance; trusted clients get 
   file_weight: 0.1        # a /api/files request costs a tenth
   trusted: { ip_hourly: 5000, instance_hourly: 20000, ip_concurrent: 50, instance_concurrent: 250 }
   # off: true             # no rate limiting (the default in --dev unless rate_limits is set)
-trusted_clients: []       # client IPs with the trusted limits (also per instance)
-cors_origins: []          # allowed browser origins (PocketBase matching: exact, *, wildcards); empty = any
 
 firewall:
   allow_cidrs: []               # peers allowed to connect (empty = everyone); others get 403
@@ -129,10 +129,9 @@ instances:
     limits: { quarantine: off }   # only interrupt, never pause
   - id: api
     hosts: [api.example.com]
+    access: { cors_origins: [https://app.example.com], trusted_ips: [203.0.113.0/24] }
     limits:
       rate_limits: { ip_hourly: 5000, instance_concurrent: 500 }
-      trusted_clients: [203.0.113.0/24]
-      cors_origins: [https://app.example.com]
       max_concurrent_js: 32
 ```
 
@@ -143,13 +142,18 @@ instances:
 - **Private values** (`private: {...}`) are for the host application's Go code and never visible to JS. A host
   registers that code with `Server.SetupApp(inst, app)`, which runs after migrations and before the app serves (for
   example a backup route checked against `inst.Private["backup_token"]`).
-- **Env** (`env: {...}`) is what the instance's JS sees through `$os.getenv` / `process.env`, and nothing else.
+- **Secrets** (`secrets: {...}`) are the instance's environment: what its JS sees through `$os.getenv` /
+  `process.env`, and nothing else. No names are reserved; platform settings are explicit fields.
+- **Encryption key** (`encryption_key`) encrypts PocketBase's stored settings (like `--encryptionEnv`). JS never sees it.
+- **Access** (`access: {cors_origins, trusted_ips}`) is the owner's say over who may call the instance: allowed browser
+  origins (PocketBase matching: exact, `*`, wildcards; empty = any) and client IPs that get the trusted rate limits
+  (on top of the process-wide `firewall.trusted_clients`).
 - **Logs:** PocketBase's own logs (the dashboard's Logs) are per instance in its `pb_data`. `console.*` from JS hooks
   goes to `<instance>/logs/exec.log` as JSON lines `{message, stream, time}` (`stdout` for log/info/debug, `stderr`
   for warn/error), rotated to `exec.log.1` at 10 MiB. A start failure (e.g. a broken hooks file) is written there too,
   and only that instance fails.
 
-When an instance's `env`, `limits`, `dev`, `dir`, `superusers` or `private` changes, its app restarts on the next request (the old one finishes
+When an instance's `secrets`, `encryption_key`, `access`, `limits`, `dev`, `dir`, `superusers` or `private` changes, its app restarts on the next request (the old one finishes
 in-flight requests first), so a rotated secret takes effect immediately. Host changes apply without a restart.
 
 `GET /_pocker/health` on any host reports `{status, instances, running}`.
@@ -164,7 +168,7 @@ route from one instance against another instance and the host; all of these are 
 |---|---|
 | Files: `$os.*`, `$filepath.glob/walk*`, `$filesystem.fileFromPath`, `$template.loadFiles`, `$apis.static`, `require()` | Confined to the instance folder with an `os.Root`: the kernel resolves every path beneath it, refusing `..` and symlinks that leave it. Relative paths and absolute paths inside the folder (`__hooks + "/x"`) work as before. |
 | Host primitives: `$os.cmd`, `$os.exec`, `$os.exit`, `$os.args`, `$filesystem.local` | Disabled (`$os.args` is empty). |
-| Environment: `$os.getenv`, `process.env` | Only the instance's own `env`. |
+| Environment: `$os.getenv`, `process.env` | Only the instance's own `secrets`. |
 | Go internals: `$app.restart/bootstrap/runAllMigrations/onServe/onTerminate/onBootstrap/cron/unsafeWithoutHooks`, `hook.bindFunc/bind/trigger/unbind*`, `*sql.DB/Conn/Tx/Stmt` (e.g. `dbx.DB.DB()`), `database/sql/driver`, `os/exec`, `net`, `syscall`, `http.Server` controls | Hidden from JS (the field-name mapper maps them to nothing). Top-level `onRecord*`, `routerAdd`, `cronAdd` and the rest of `$app` work as usual. |
 | Raw SQL (`$app.db().newQuery`) | Allowed. SQLite's authorizer refuses `ATTACH` (and `VACUUM INTO`) outside the instance's `pb_data`, `PRAGMA temp_store_directory/data_store_directory` and `load_extension`; the CLI-only `readfile`/`writefile`/`fsdir` don't exist in the library. Statements without a deadline get `max_query_duration`. |
 | CPU | Every JS call is interrupted after `max_js_execution`; `sleep()` is capped at 10 s. |

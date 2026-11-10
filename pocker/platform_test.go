@@ -72,7 +72,7 @@ routerAdd("GET", "/say", (e) => {
 	a := Instance{
 		ID:         "a",
 		Hosts:      []string{"a.example.com"},
-		Env:        map[string]string{"VISIBLE": "yes"},
+		Secrets:    map[string]string{"VISIBLE": "yes"},
 		Superusers: []Superuser{{Email: "owner@example.com", PasswordHash: string(hash)}},
 		Private:    map[string]string{"backup_token": "t0k-private"},
 	}
@@ -186,5 +186,46 @@ func TestInstanceLogRotates(t *testing.T) {
 	}
 	if _, err := os.Stat(l.path + ".1"); err != nil {
 		t.Fatal("expected exec.log.1 after rotation")
+	}
+}
+
+func TestEncryptionKeyIsExplicit(t *testing.T) {
+	root := t.TempDir()
+	writeHooks(t, root, "enc", `routerAdd("GET", "/env", (e) => e.json(200, {
+  key: $os.getenv("PB_ENCRYPTION_KEY"),
+  all: JSON.stringify(process.env),
+}))`)
+	const key = "0123456789abcdef0123456789abcdef"
+	inst := Instance{
+		ID:            "enc",
+		EncryptionKey: key,
+		Secrets:       map[string]string{"PB_ENCRYPTION_KEY": "just-an-app-variable"},
+	}
+	running, err := startApp(appOptions{PBRoot: root, Defaults: DefaultLimits()}, inst)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// the settings are stored encrypted with encryption_key
+	if running.app.EncryptionKey() != key {
+		t.Fatalf("app encryption key: %q", running.app.EncryptionKey())
+	}
+	w := httptest.NewRecorder()
+	running.handler.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/env", nil))
+	var got map[string]string
+	_ = json.Unmarshal(w.Body.Bytes(), &got)
+	if got["key"] != "just-an-app-variable" || strings.Contains(got["all"], key) {
+		t.Fatalf("JS must see secrets only, never encryption_key: %+v", got)
+	}
+	stopApp(running)
+
+	// the encrypted settings only load with the same key
+	running, err = startApp(appOptions{PBRoot: root, Defaults: DefaultLimits()}, inst)
+	if err != nil {
+		t.Fatalf("restart with the same key: %v", err)
+	}
+	stopApp(running)
+	inst.EncryptionKey = "ffffffffffffffffffffffffffffffff"
+	if _, err := startApp(appOptions{PBRoot: root, Defaults: DefaultLimits()}, inst); err == nil {
+		t.Fatal("a different encryption_key must not open the encrypted settings")
 	}
 }

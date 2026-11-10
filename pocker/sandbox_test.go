@@ -139,9 +139,9 @@ func TestSandboxBlocksEscapes(t *testing.T) {
 	t.Setenv("HOME", "/root/host-home")
 
 	running, err := startApp(appOptions{PBRoot: root, Defaults: DefaultLimits()}, Instance{
-		Limits: Limits{MaxJSExecution: time.Second, MaxQueryDuration: time.Second},
-		ID:     "a",
-		Env:    map[string]string{"A_SECRET": "a's own value", "OTHER_DIR": bDir},
+		Limits:  Limits{MaxJSExecution: time.Second, MaxQueryDuration: time.Second},
+		ID:      "a",
+		Secrets: map[string]string{"A_SECRET": "a's own value", "OTHER_DIR": bDir},
 	})
 	if err != nil {
 		t.Fatal(err)

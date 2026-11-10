@@ -82,7 +82,7 @@ instances:
     limits: { rate_limits: { ip_hourly: 3 } }
   - id: cors
     hosts: [cors.test]
-    limits: { cors_origins: ["https://app.example.com"] }
+    access: { cors_origins: ["https://app.example.com"] }
   - id: strict
     hosts: [strict.test]
     limits: { max_js_execution: 1s }
@@ -257,8 +257,8 @@ func TestRateLimitsTrustedWeightsConcurrency(t *testing.T) {
 	}
 
 	// trusted clients (process list or the instance's own) get the trusted limits
-	inst = Instance{ID: "b"}
-	lim = limits(Limits{RateLimits: &RateLimits{IPHourly: 1, Trusted: &RateLimitSet{IPHourly: 3}}, TrustedClients: []string{"203.0.113.9"}})
+	inst = Instance{ID: "b", Access: Access{TrustedIPs: []string{"203.0.113.9"}}}
+	lim = limits(Limits{RateLimits: &RateLimits{IPHourly: 1, Trusted: &RateLimitSet{IPHourly: 3}}})
 	for _, ip := range []string{"198.51.100.5", "203.0.113.9"} {
 		for i := 0; i < 3; i++ {
 			if code, rel := check(ip+":1", "/api/health", lim); code != 200 {

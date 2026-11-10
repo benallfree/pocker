@@ -430,7 +430,8 @@ type quarantineState struct {
 
 // sameRuntime reports whether two versions of an instance can share a running app.
 func sameRuntime(a, b Instance) bool {
-	return a.Dir == b.Dir && a.Dev == b.Dev && reflect.DeepEqual(a.Env, b.Env) && reflect.DeepEqual(a.Limits, b.Limits) &&
+	return a.Dir == b.Dir && a.Dev == b.Dev && reflect.DeepEqual(a.Secrets, b.Secrets) && a.EncryptionKey == b.EncryptionKey &&
+		reflect.DeepEqual(a.Access, b.Access) && reflect.DeepEqual(a.Limits, b.Limits) &&
 		reflect.DeepEqual(a.Superusers, b.Superusers) && reflect.DeepEqual(a.Private, b.Private)
 }
 

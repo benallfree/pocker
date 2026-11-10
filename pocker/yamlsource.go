@@ -18,7 +18,7 @@ import (
 //	instances:
 //	  - id: blog
 //	    hosts: [blog.localhost]
-//	    env: { SMTP_HOST: mail.example.com }
+//	    secrets: { SMTP_HOST: mail.example.com }
 //	  - id: shop
 //	    hosts: [shop.localhost, shop.example.com]
 //	    blocked: { status: 402, message: "Payment required" }

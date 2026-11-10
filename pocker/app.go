@@ -69,12 +69,12 @@ func startApp(opts appOptions, inst Instance) (r *runningApp, err error) {
 		DBConnect:     guardedDBConnect(lim.MaxQueryDuration), // SQL stays inside this app's files
 		DataDir:       filepath.Join(dir, "pb_data"),
 		IsDev:         inst.Dev || opts.ForceDev,
-		EncryptionKey: inst.Env["PB_ENCRYPTION_KEY"],
+		EncryptionKey: inst.EncryptionKey,
 		AppMigrations: &core.MigrationsList{}, // this app's JS migrations only
 	})
 
-	env := make(map[string]string, len(inst.Env))
-	for k, v := range inst.Env {
+	env := make(map[string]string, len(inst.Secrets))
+	for k, v := range inst.Secrets {
 		env[k] = v
 	}
 
@@ -116,7 +116,7 @@ func startApp(opts appOptions, inst Instance) (r *runningApp, err error) {
 		}
 	}
 
-	handler, err := buildHandler(app, filepath.Join(dir, "pb_public"), lim.CORSOrigins)
+	handler, err := buildHandler(app, filepath.Join(dir, "pb_public"), inst.Access.CORSOrigins)
 	if err != nil {
 		return nil, err
 	}

@@ -117,7 +117,7 @@ func TestSecretChangeRestartsApp(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "app", "pb_hooks/main.pb.js"), []byte(hooks), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	inst := Instance{ID: "app", Hosts: []string{"app.example.com"}, Env: map[string]string{"API_KEY": "old"}}
+	inst := Instance{ID: "app", Hosts: []string{"app.example.com"}, Secrets: map[string]string{"API_KEY": "old"}}
 	src := &chanSource{list: []Instance{inst}, ch: make(chan Change)}
 	var restarted []string
 	m := NewManager(src, ManagerOptions{
@@ -143,7 +143,7 @@ func TestSecretChangeRestartsApp(t *testing.T) {
 		time.Sleep(20 * time.Millisecond)
 	}
 
-	inst.Env = map[string]string{"API_KEY": "rotated"}
+	inst.Secrets = map[string]string{"API_KEY": "rotated"}
 	src.ch <- Change{Kind: Upsert, Instance: inst}
 	time.Sleep(50 * time.Millisecond)
 	if got := get(); got != "rotated" {
