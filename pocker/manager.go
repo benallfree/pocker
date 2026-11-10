@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"hash/fnv"
 	"log/slog"
 	"net"
 	"net/http"
@@ -173,7 +172,7 @@ func (m *Manager) removeLocked(id string) {
 func normalizeHost(h string) string {
 	h = strings.ToLower(strings.TrimSpace(h))
 	if host, _, err := net.SplitHostPort(h); err == nil {
-		return host
+		h = host
 	}
 	return strings.TrimSuffix(h, ".")
 }
@@ -190,23 +189,29 @@ func (m *Manager) Lookup(host string) (Instance, bool) {
 	return inst, ok
 }
 
-// DevID is the canonical id dev mode gives a hostname the instance source doesn't map: the FNV-1a 64-bit hash of
-// the normalized hostname, in hex. Stable across restarts, always path-safe.
+// DevID is the canonical id dev mode gives a hostname the instance source doesn't map: the hostname in normal form
+// (lowercase, no port, no trailing dot). It returns "" when that isn't a safe id (see [ValidID]).
 func DevID(host string) string {
-	h := fnv.New64a()
-	_, _ = h.Write([]byte(normalizeHost(host)))
-	return fmt.Sprintf("%016x", h.Sum64())
+	id := normalizeHost(host)
+	if !ValidID(id) {
+		return ""
+	}
+	return id
 }
 
 // resolve maps the request's Host to an instance through the source's hostname -> id map. In dev mode an unmapped
-// host becomes a new instance with id [DevID]. A non-zero status means the request can't be routed.
+// host becomes a new instance whose id is the hostname ([DevID]). A non-zero status means the request can't be routed.
 func (m *Manager) resolve(r *http.Request) (Instance, int, string) {
 	host := normalizeHost(r.Host)
 	if inst, ok := m.Lookup(host); ok {
 		return inst, 0, ""
 	}
-	if m.dev && host != "" {
-		return m.devInstance(DevID(host), host), 0, ""
+	if m.dev {
+		id := DevID(host)
+		if id == "" {
+			return Instance{}, http.StatusBadRequest, "hostname can't be used as an instance id: " + host
+		}
+		return m.devInstance(id, host), 0, ""
 	}
 	return Instance{}, http.StatusNotFound, host + " not found"
 }

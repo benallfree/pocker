@@ -23,8 +23,8 @@ type Config struct {
 	// PBRoot holds one PocketBase folder per instance: <pb_root>/<instance id> (default "./pb_root").
 	PBRoot string `yaml:"pb_root"`
 
-	// Dev serves any hostname: a host the instance source doesn't map gets the FNV hash of the hostname as its id
-	// ([DevID]) and its folder is created on first use. Apps also run in PocketBase dev mode. Without Dev, only
+	// Dev serves any hostname: a host the instance source doesn't map uses the hostname itself, in normal form, as
+	// its id ([DevID]) and its folder is created on first use. Apps also run in PocketBase dev mode. Without Dev, only
 	// hosts mapped by the instance source are served.
 	Dev bool `yaml:"dev"`
 

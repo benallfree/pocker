@@ -15,11 +15,11 @@ Pocker hosts many PocketBase instances in one process. It is PocketBase itself (
 ```sh
 go build -o pocker ./cmd/pocker
 ./pocker serve --dev --pbRoot ./pb_root
-curl -H 'Host: blog.localhost' http://127.0.0.1:8090/api/health   # creates and serves ./pb_root/<id>
+curl -H 'Host: blog.localhost' http://127.0.0.1:8090/api/health   # creates and serves ./pb_root/blog.localhost
 ```
 
-A hostname the instance source doesn't map gets the FNV-1a hash of the hostname as its id (e.g. `3fbfbf3829c2dd74`,
-stable across restarts), its folder is created on first use, and apps run in PocketBase dev mode. The instances file
+A hostname the instance source doesn't map uses the hostname itself as its id (lowercase, no port, no trailing dot;
+anything that isn't a safe folder name gets 400), its folder is created on first use, and apps run in PocketBase dev mode. The instances file
 (or another provider) is optional in dev mode; hosts it maps keep their own ids.
 
 ## Production: mapped hostnames only

@@ -78,29 +78,29 @@ func TestResolveDev(t *testing.T) {
 	m := newTestManager(t, true, Instance{ID: "mapped", Hosts: []string{"mapped.localhost"}})
 
 	inst, status, _ := m.resolve(req("Blog.Localhost:8090"))
-	if status != 0 || inst.ID != DevID("blog.localhost") || !inst.Dev || !ValidID(inst.ID) {
+	if status != 0 || inst.ID != "blog.localhost" || !inst.Dev {
 		t.Fatalf("dev host: got %+v status=%d", inst, status)
 	}
-	if again, _, _ := m.resolve(req("blog.localhost")); again.ID != inst.ID {
-		t.Fatal("same host must map to the same dev id")
-	}
-	if other, _, _ := m.resolve(req("shop.localhost")); other.ID == inst.ID {
-		t.Fatal("different hosts must get different dev ids")
+	if again, _, _ := m.resolve(req("blog.localhost.")); again.ID != "blog.localhost" {
+		t.Fatal("same host in another form must map to the same id")
 	}
 	if mapped, _, _ := m.resolve(req("mapped.localhost")); mapped.ID != "mapped" {
 		t.Fatalf("a mapped host wins in dev too, got %q", mapped.ID)
 	}
-	if weird, status, _ := m.resolve(req("../../etc")); status != 0 || !ValidID(weird.ID) {
-		t.Fatalf("any hostname hashes to a safe id, got %+v status=%d", weird, status)
+	for _, bad := range []string{"bad_host", "a..b", "-x.localhost"} {
+		if _, status, _ := m.resolve(req(bad)); status != http.StatusBadRequest {
+			t.Errorf("%q: got status %d, want 400", bad, status)
+		}
 	}
 }
 
-func TestDevIDStable(t *testing.T) {
-	if DevID("blog.localhost") != DevID("BLOG.localhost:8090") {
-		t.Fatal("DevID must normalize case and port")
+func TestDevID(t *testing.T) {
+	if DevID("BLOG.localhost:8090") != "blog.localhost" || DevID("blog.localhost.") != "blog.localhost" ||
+		DevID("blog.localhost.:8090") != "blog.localhost" {
+		t.Fatal("DevID must normalize case, port and trailing dot")
 	}
-	if len(DevID("x")) != 16 {
-		t.Fatal("DevID is 16 hex chars")
+	if DevID("bad_host") != "" {
+		t.Fatal("unsafe hostnames have no dev id")
 	}
 }
 

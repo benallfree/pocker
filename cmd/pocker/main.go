@@ -3,7 +3,7 @@
 //	pocker serve [--dev] [--pbRoot ./pb_root] [--instances ./instances.yaml] [--listen :8090] [--config pocker.yaml]
 //
 // Production (default) serves only the hostnames mapped in the instances file. --dev also serves unmapped
-// hostnames: the instance id is the FNV hash of the hostname, its folder <pbRoot>/<id> created on first use.
+// hostnames: the instance id is the hostname (lowercase, no port), its folder <pbRoot>/<hostname> created on first use.
 package main
 
 import (
@@ -29,7 +29,7 @@ func main() {
 	listen := fs.String("listen", "", "listen address (overrides config)")
 	pbRoot := fs.String("pbRoot", "", "folder holding one PocketBase folder per instance (default ./pb_root)")
 	fs.StringVar(pbRoot, "pb_root", "", "alias of --pbRoot")
-	dev := fs.Bool("dev", false, "also serve unmapped hostnames (id = FNV hash of the hostname, folder created on first use); PocketBase dev mode")
+	dev := fs.Bool("dev", false, "also serve unmapped hostnames (id = the hostname, folder created on first use); PocketBase dev mode")
 	instances := fs.String("instances", "", "instances YAML file (overrides config)")
 	_ = fs.Parse(os.Args[2:])
 
