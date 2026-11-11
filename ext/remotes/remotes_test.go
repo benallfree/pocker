@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -229,22 +230,13 @@ func TestWhoamiAndPasswordLoginMintsToken(t *testing.T) {
 	}
 }
 
-func TestPasswordLoginImpersonatesWithoutTokens(t *testing.T) {
+func TestPasswordLoginNeedsTokens(t *testing.T) {
 	isolate(t)
 	_, url := newApp(t, false)
 	cl := &Client{Remote: &Remote{Name: "local", URL: url}, HTTP: NewHTTPClient()}
-	res, err := LoginWithPassword(context.Background(), cl, PasswordLogin{Email: "test@example.com", Password: "1234567890"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if res.Credential.Via != "impersonate" || res.Credential.Expires.IsZero() || !strings.Contains(res.Warning, "tokenKey") {
-		t.Fatalf("%+v", res)
-	}
-	probe := *cl
-	probe.Token = res.Credential.Token
-	w, err := probe.Whoami(context.Background())
-	if err != nil || w.Auth == nil || w.Via != "jwt" {
-		t.Fatalf("%+v %v", w, err)
+	_, err := LoginWithPassword(context.Background(), cl, PasswordLogin{Email: "test@example.com", Password: "1234567890"})
+	if !errors.Is(err, ErrNoTokens) {
+		t.Fatalf("got %v", err)
 	}
 }
 

@@ -251,7 +251,7 @@ func NormalizeURL(raw string) (string, error) {
 // Credential is a saved sign-in for one URL.
 type Credential struct {
 	Token string `json:"token"`
-	// Via: "token" (pasted or minted pbt_/PocketHost token), "impersonate" (superuser JWT), "oauth".
+	// Via: "token" (pasted or minted pbt_/PocketHost token), "jwt" (a pasted PocketBase auth token), "oauth".
 	Via          string    `json:"via"`
 	Email        string    `json:"email,omitempty"`
 	Collection   string    `json:"collection,omitempty"`

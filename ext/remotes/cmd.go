@@ -217,8 +217,7 @@ func loginCommand() *cobra.Command {
 		Use:   "login [remote]",
 		Short: "Signs in to a remote and saves the login",
 		Long: "Signs in to a remote: in the browser when the remote offers OAuth (--device for a code on another device), " +
-			"else with a pasted API token, else with email + password (an API token is minted when the remote has the " +
-			"tokens plugin; otherwise a superuser impersonate token).",
+			"else with a pasted API token, else with email + password (mints an API token; the remote needs the tokens plugin).",
 		Args: cobra.MaximumNArgs(1), SilenceUsage: true,
 		RunE: func(c *cobra.Command, args []string) error {
 			cl, err := Open(cwd(), first(args))
@@ -433,9 +432,6 @@ func logoutCommand() *cobra.Command {
 				return err
 			}
 			fmt.Fprintf(c.OutOrStdout(), "Logged out of %s.\n", r.URL)
-			if cr.Via == "impersonate" {
-				fmt.Fprintln(c.OutOrStdout(), "Note: the impersonate token itself stays valid until it expires or the superuser's tokenKey changes.")
-			}
 			return nil
 		},
 	}

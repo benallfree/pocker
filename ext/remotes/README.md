@@ -23,11 +23,8 @@ Try it: `go run ./example serve` (logins from [devusers](../devusers/devusers.go
 - `login [remote]`: in the browser when the remote offers OAuth (`--device` for a code on another device,
   `--no-browser` to print the URL), else a pasted token (`--token`, `--token-stdin`), else email + password
   (`--email`, `--collection`; `POCKETBASE_PASSWORD` skips the prompt; a one-time code is asked for when the account has
-  MFA). After a password sign-in the CLI keeps a durable credential:
-  - the remote has [tokens](../tokens/README.md): it mints an API token named "pocketbase CLI on <host>" (logout
-    revokes it);
-  - otherwise (any PocketBase, no plugins): a superuser impersonate token valid for 90 days. It can't be revoked on
-    its own (only by changing the superuser's password or tokenKey); `login` says so.
+  MFA). A password sign-in mints an API token named "pocketbase CLI on <host>" (logout revokes it), so the remote
+  needs [tokens](../tokens/README.md); the session itself is never saved.
 - `logout [remote]`, `link <url> [token] [--name default]` (= `remote add` + `login`).
 
 A remote name can also be a URL (`pocketbase deploy https://other.example.com`).

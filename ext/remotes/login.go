@@ -11,13 +11,10 @@ import (
 	"time"
 )
 
-// ImpersonateTTL is the lifetime of a superuser login on a remote without the tokens plugin.
-var ImpersonateTTL = 90 * 24 * time.Hour
-
 // LoginResult is a finished sign-in, ready to save.
 type LoginResult struct {
 	Credential *Credential
-	// Warning, if set, is shown to the user (e.g. an impersonate login can't be revoked on its own).
+	// Warning, if set, is shown to the user .
 	Warning string
 	// Minted: the CLI created an API token on the remote (logout revokes it).
 	Minted  bool
@@ -69,10 +66,12 @@ type authResponse struct {
 	} `json:"record"`
 }
 
-// LoginWithPassword signs in with email + password, then turns the session into a durable credential: an API token
-// minted on the remote when it has the tokens plugin (revocable on its own), else a superuser impersonate token
-// (works on any PocketBase; revoking it means rotating the superuser's tokenKey). Regular users without tokens get
-// their session JWT, which expires.
+// ErrNoTokens: the remote has no tokens plugin, so a password sign-in can't become a revocable API token.
+var ErrNoTokens = errors.New("the remote has no API tokens plugin")
+
+// LoginWithPassword signs in with email + password, then mints an API token on the remote (named after this
+// machine; logout revokes it). The remote must have the tokens plugin: the session itself is never saved, since
+// it expires and can't be revoked on its own.
 func LoginWithPassword(ctx context.Context, c *Client, in PasswordLogin) (*LoginResult, error) {
 	if in.Collection == "" {
 		in.Collection = "_superusers"
@@ -113,52 +112,29 @@ func LoginWithPassword(ctx context.Context, c *Client, in PasswordLogin) (*Login
 
 	session := *c
 	session.Token = auth.Token
-	now := time.Now().UTC()
-	base := Credential{Email: auth.Record.Email, Collection: in.Collection, Created: now}
-
-	w, werr := session.Whoami(ctx)
-	if werr == nil && w.Features["tokens"] != "" {
-		name := in.TokenName
-		if name == "" {
-			host, _ := os.Hostname()
-			name = "pocketbase CLI on " + host
-		}
-		var created struct {
-			Token  string `json:"token"`
-			Record struct {
-				Id string `json:"id"`
-			} `json:"record"`
-		}
-		err := session.JSON(ctx, http.MethodPost, strings.TrimSuffix(w.Features["tokens"], "/"), map[string]any{"name": name}, &created)
-		if err == nil {
-			cred := base
-			cred.Token, cred.Via = created.Token, "token"
-			return &LoginResult{Credential: &cred, Minted: true, TokenId: created.Record.Id}, nil
-		}
-		if !IsStatus(err, http.StatusForbidden) {
-			return nil, fmt.Errorf("create an API token: %w", err)
-		}
-		// this collection may not own tokens: fall through
+	w, err := session.Whoami(ctx)
+	if errors.Is(err, ErrNoWhoami) || (err == nil && w.Features["tokens"] == "") {
+		return nil, fmt.Errorf("%s: %w; paste an API token instead (login --token)", c.Remote.URL, ErrNoTokens)
 	}
-
-	if in.Collection == "_superusers" {
-		var imp authResponse
-		err := session.JSON(ctx, http.MethodPost, "/api/collections/_superusers/impersonate/"+url.PathEscape(auth.Record.Id),
-			map[string]any{"duration": int64(ImpersonateTTL / time.Second)}, &imp)
-		if err != nil {
-			return nil, fmt.Errorf("create a long-lived login: %w", err)
-		}
-		cred := base
-		cred.Token, cred.Via, cred.Expires = imp.Token, "impersonate", now.Add(ImpersonateTTL)
-		return &LoginResult{Credential: &cred, Warning: fmt.Sprintf(
-			"%s has no API tokens plugin, so this login is a superuser impersonate token valid for %d days. "+
-				"It can't be revoked on its own: revoking means changing the superuser's password or tokenKey.",
-			c.Remote.URL, int(ImpersonateTTL.Hours()/24))}, nil
+	if err != nil {
+		return nil, err
 	}
-
-	cred := base
-	cred.Token, cred.Via = auth.Token, "jwt"
-	return &LoginResult{Credential: &cred, Warning: "This login is a session token and will expire; ask for an API token for CI."}, nil
+	name := in.TokenName
+	if name == "" {
+		host, _ := os.Hostname()
+		name = "pocketbase CLI on " + host
+	}
+	var created struct {
+		Token  string `json:"token"`
+		Record struct {
+			Id string `json:"id"`
+		} `json:"record"`
+	}
+	if err := session.JSON(ctx, http.MethodPost, strings.TrimSuffix(w.Features["tokens"], "/"), map[string]any{"name": name}, &created); err != nil {
+		return nil, fmt.Errorf("create an API token: %w", err)
+	}
+	cred := &Credential{Token: created.Token, Via: "token", Email: auth.Record.Email, Collection: in.Collection, Created: time.Now().UTC()}
+	return &LoginResult{Credential: cred, Minted: true, TokenId: created.Record.Id}, nil
 }
 
 // SaveLogin stores a login for the client's remote URL.
