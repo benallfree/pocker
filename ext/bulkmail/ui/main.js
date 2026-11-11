@@ -318,7 +318,8 @@
         };
 
         function field(label, input, hint) {
-            return t.div({ className: "field" }, t.label({}, label), input, hint ? t.div({ className: "field-help" }, hint) : null);
+            // like the stock forms: the help text goes under the field box, not inside it
+            return t.div(null, t.div({ className: "field" }, t.label({}, label), input), hint ? t.div({ className: "field-help" }, hint) : null);
         }
         function text(key, attrs = {}) {
             return t.input({
@@ -641,26 +642,26 @@
                         : t.p({ className: "txt-danger" }, "Bulk mail isn't available for this app."),
                 ),
                 t.div({ className: "col-lg-12" }, t.div({ className: "field" }, t.label({}, "Postal address"),
-                    t.textarea({ rows: 3, value: () => s.postalAddress || "", oninput: (e) => (s.postalAddress = e.target.value) }),
-                    t.div({ className: "field-help" }, "Shown in every campaign footer (anti-spam laws require one)."))),
+                    t.textarea({ rows: 3, value: () => s.postalAddress || "", oninput: (e) => (s.postalAddress = e.target.value) })),
+                    t.div({ className: "field-help" }, "Shown in every campaign footer (anti-spam laws require one).")),
                 t.div({ className: "col-lg-6" }, t.div({ className: "field" }, t.label({}, "Unsubscribe mailbox"),
-                    t.input({ type: "email", value: () => s.unsubscribeMailto || "", oninput: (e) => (s.unsubscribeMailto = e.target.value) }),
-                    t.div({ className: "field-help" }, "Optional mailto: alternative in the List-Unsubscribe header."))),
+                    t.input({ type: "email", value: () => s.unsubscribeMailto || "", oninput: (e) => (s.unsubscribeMailto = e.target.value) })),
+                    t.div({ className: "field-help" }, "Optional mailto: alternative in the List-Unsubscribe header.")),
                 t.div({ className: "col-lg-12" },
                     t.button({ type: "button", className: "btn sm secondary", onclick: () => (data.showFeedback = !data.showFeedback) },
                         t.span({ className: "txt" }, () => data.showFeedback ? "Hide bounces and complaints" : "Bounces and complaints"),
                         t.i({ className: () => data.showFeedback ? "ri-arrow-up-s-line" : "ri-arrow-down-s-line", ariaHidden: true }))),
                 () => !data.showFeedback ? null : t.div({ className: "col-lg-12" }, t.div({ className: "grid" },
                     t.div({ className: "col-lg-12" }, t.div({ className: "field" }, t.label({}, "Amazon SES (SNS) endpoint"),
-                        t.input({ type: "text", readOnly: true, value: s.sesEndpoint }),
-                        t.div({ className: "field-help" }, "Subscribe this HTTPS URL to the SNS topic your SES identity sends bounce and complaint notifications to. Signatures are verified."))),
+                        t.input({ type: "text", readOnly: true, value: s.sesEndpoint })),
+                        t.div({ className: "field-help" }, "Subscribe this HTTPS URL to the SNS topic your SES identity sends bounce and complaint notifications to. Signatures are verified.")),
                     t.div({ className: "col-lg-12" }, t.div({ className: "field" }, t.label({}, "Allowed SNS topic ARNs"),
                         t.input({ type: "text", placeholder: "arn:aws:sns:us-east-1:123456789012:ses-feedback", value: () => (s.snsTopicArns || []).join(", "),
-                            oninput: (e) => (s.snsTopicArns = e.target.value.split(",").map((v) => v.trim())) }),
-                        t.div({ className: "field-help" }, "Comma separated. Empty accepts any topic with a valid AWS signature."))),
+                            oninput: (e) => (s.snsTopicArns = e.target.value.split(",").map((v) => v.trim())) })),
+                        t.div({ className: "field-help" }, "Comma separated. Empty accepts any topic with a valid AWS signature.")),
                     t.div({ className: "col-lg-12" }, t.div({ className: "field" }, t.label({}, "Generic webhook"),
-                        t.input({ type: "text", readOnly: true, value: s.webhookEndpoint }),
-                        t.div({ className: "field-help" }, `POST {"type":"bounce|complaint|unsubscribe","email":"…"} with an X-Bulkmail-Secret header.`))),
+                        t.input({ type: "text", readOnly: true, value: s.webhookEndpoint })),
+                        t.div({ className: "field-help" }, `POST {"type":"bounce|complaint|unsubscribe","email":"…"} with an X-Bulkmail-Secret header.`)),
                     t.div({ className: "col-lg-6" }, t.div({ className: "field" }, t.label({}, "Webhook secret"),
                         t.input({ type: "password", autocomplete: "new-password", placeholder: s.hasWebhookSecret ? "•••••• (set; type to replace)" : "Not set: webhook disabled",
                             value: () => data.webhookSecret, oninput: (e) => (data.webhookSecret = e.target.value) }))),
