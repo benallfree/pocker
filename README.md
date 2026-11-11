@@ -1,3 +1,15 @@
+# PockerBase
+
+PockerBase is an open fork of PocketBase. It tracks upstream while extending the core code to enable a variety of feature extensions such as:
+
+- Multitenant - Run hundreds of untrusted PocketBase instances in a single golang process ([how is this safe?](docs/multitenant.md))
+- PITR (Litestream)
+- Multi Page Applications
+- Bulk Mail
+- [Create your own plugin](docs/plugins.md)
+
+---
+
 <p align="center">
     <a href="https://pocketbase.io" target="_blank" rel="noopener">
         <img src="https://i.imgur.com/aCBbjKx.png" alt="PocketBase - open source backend in 1 file" />
