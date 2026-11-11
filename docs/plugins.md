@@ -139,6 +139,45 @@ Your Go code runs with the host's full power, outside the JS sandbox:
   plugin must reach a private service, give it its own `http.Client` and transport, and never let instance input pick
   the address.
 
+## Contributing a plugin
+
+Plugins are welcome, from us and from you. Open a pull request that adds `ext/<your-plugin>/`.
+
+### Change PocketBase's core as little as possible
+
+PockerBase stays close to upstream so every PocketBase release merges cleanly. If your plugin needs something the
+core doesn't offer yet:
+- **Add the smallest hook that makes it possible:** an extension point or an override, not your plugin's logic. A
+  nil-checked function field, a list callers can append to, or an event, with upstream behavior unchanged when nothing
+  is registered.
+- **Make it generic.** Name it for what it allows ("storage backend for an app"), not for your plugin. Assume someone
+  else's plugin will use it too, and that we'll offer it to upstream PocketBase.
+- **Mark every changed line** in PocketBase's own files with `// POCKER:` and a few words on why, so the next upstream
+  merge knows what to keep.
+- **Keep it separate:** the core change goes in its own commit, with a test, ahead of the plugin.
+- **Prefer what exists:** jsvm `OnInit`, `OnServe`, the record and request hooks, `BaseAppConfig.DBConnect`,
+  `UIExtensions`. Many plugins need no core change at all.
+
+### What a plugin folder contains
+
+```
+ext/<name>/
+  go.mod            module github.com/pockerbase/pocketbase/ext/<name>
+  README.md         what it does, runs on (single app, multitenant or both), config
+  <name>.go         the plugin
+  <name>_test.go
+  example/main.go   a minimal program that builds cleanly and shows the feature
+  ui/               optional: admin screens (embedded main.js)
+```
+
+- **`example/main.go` is required.** Keep it as small as possible: just enough to build a binary that shows the
+  feature working, with no extra harness. `go build ./example` and `go vet ./...` must pass with no warnings.
+  [`examples/pocker-extension`](../examples/pocker-extension) is the size to aim for.
+- **Dependencies stay in your module.** Heavy libraries go in your plugin's `go.mod`, never in core's.
+- **Single app first.** Where it makes sense, a plugin should work on one PocketBase app, and add more under the
+  multitenant host.
+- **MIT**, like PocketBase and the rest of this repo.
+
 ## Planned plugins
 
 Our own plugins will live in this repo under [`ext/`](../ext), each as its own Go module (`github.com/pockerbase/pocketbase/ext/<name>`) with its own version tags. The list and what each will do is in [ext/README.md](../ext/README.md).

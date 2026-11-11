@@ -1,12 +1,36 @@
 # PockerBase
 
-PockerBase is an open fork of PocketBase. It tracks upstream while extending the core code to enable a variety of feature extensions such as:
+PockerBase is an open fork of PocketBase. It tracks upstream and aims to keep its own changes to the core small: just the
+hooks that let plugins extend and override PocketBase. Everything else is a plugin.
 
-- Multitenant - Run hundreds of untrusted PocketBase instances in a single golang process ([how is this safe?](docs/multitenant.md))
-- PITR (Litestream)
-- Multi Page Applications
-- Bulk Mail
-- [Create your own plugin](docs/plugins.md)
+## Plugins
+
+| Plugin | What it does |
+|---|---|
+| [multitenant](ext/multitenant/README.md) | Run hundreds of untrusted PocketBase instances in one Go process ([how is this safe?](docs/multitenant.md)) |
+| [sandbox](ext/sandbox/README.md) | Confine untrusted JS hooks, SQL and outbound network |
+| [pitr](ext/pitr/README.md) | Point-in-time restore (Litestream) |
+| [bulkmail](ext/bulkmail/README.md) | Bulk mail campaigns to your app's own users |
+| [pages](ext/pages/README.md) | Server-rendered multi-page applications (PocketPages) |
+| [storage](ext/storage/README.md) | A default storage backend when an app's own S3 is off |
+| [s3redirect](ext/s3redirect/README.md) | File downloads as signed S3 redirects |
+| [mothership](ext/mothership/README.md) | A control plane and its edges for multi-server hosting |
+| [vacuum](ext/vacuum/README.md) | Scheduled SQLite VACUUM |
+| [deploy](ext/deploy/README.md) | Deploy API: push hooks, migrations and public files |
+| [firewall](ext/firewall/README.md) | Peer allow-lists, trusted proxies and rate limits |
+| [autotls](ext/autotls/README.md) | Automatic TLS: on-demand certificates and wildcards |
+| [servertiming](ext/servertiming/README.md) | Server-Timing headers |
+| [schedules](ext/schedules/README.md) | Scheduled webhooks that wake sleeping instances |
+
+All plugins are planned or in progress. They live in [`ext/`](ext), each as its own Go module.
+
+## Contribute a plugin
+
+Plugins are welcome. Read [Create your own plugin](docs/plugins.md), then open a pull request that adds
+`ext/<your-plugin>/`. Keep changes to PocketBase's own code to the minimum hook your plugin needs, and include a small
+`example/main.go` that builds and shows the feature.
+
+MIT, like PocketBase.
 
 ---
 
