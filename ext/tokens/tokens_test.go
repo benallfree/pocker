@@ -256,3 +256,31 @@ func TestCommand(t *testing.T) {
 	}
 	_ = app
 }
+
+func TestAudienceBinding(t *testing.T) {
+	app, tk := newApp(t, Config{})
+	su := superuser(t, app)
+	mcpTok, _, err := tk.Create(su, CreateOptions{Audience: "https://app.example.com/mcp"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
+		se.Router.GET("/mcp", func(e *core.RequestEvent) error { return e.String(200, "mcp "+e.Auth.Email()) })
+		return se.Next()
+	})
+	factory := func(testing.TB) *tests.TestApp { return app }
+	for _, s := range []tests.ApiScenario{
+		{Name: "bound token on its resource", Method: http.MethodGet, URL: "/mcp", Headers: authHeader(mcpTok),
+			ExpectedStatus: 200, ExpectedContent: []string{"mcp test@example.com"}},
+		{Name: "bound token elsewhere", Method: http.MethodGet, URL: "/api/collections", Headers: authHeader(mcpTok),
+			ExpectedStatus: 403, ExpectedContent: []string{"bound to another resource"}},
+		{Name: "bound token on deploy", Method: http.MethodGet, URL: "/api/deploytest/ping", Headers: authHeader(mcpTok),
+			ExpectedStatus: 403, ExpectedContent: []string{"bound to another resource"}},
+		{Name: "bound token may ask who it is", Method: http.MethodGet, URL: "/_pocker/whoami", Headers: authHeader(mcpTok),
+			ExpectedStatus: 200, ExpectedContent: []string{"me test@example.com"}},
+	} {
+		s.TestAppFactory = factory
+		s.DisableTestAppCleanup = true
+		s.Test(t)
+	}
+}

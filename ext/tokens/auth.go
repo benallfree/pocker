@@ -1,6 +1,7 @@
 package tokens
 
 import (
+	"net/url"
 	"strings"
 
 	"ganigeorgiev.com/pocketbase/pocketbase/apis"
@@ -40,6 +41,9 @@ func (t *Tokens) middleware() *hook.Handler[*core.RequestEvent] {
 			if isTokenMintingPath(path) {
 				return e.ForbiddenError("API tokens can't be exchanged for other auth tokens.", nil)
 			}
+			if !audienceAllows(info.Audience, path) {
+				return e.ForbiddenError("This API token is bound to another resource ("+info.Audience+").", nil)
+			}
 			if !t.registry.allows(info.Scopes, path) {
 				return e.ForbiddenError("This API token's scopes ("+strings.Join(info.Scopes, ", ")+") don't allow this request.", nil)
 			}
@@ -51,6 +55,24 @@ func (t *Tokens) middleware() *hook.Handler[*core.RequestEvent] {
 			return e.Next()
 		},
 	}
+}
+
+// audienceAllows: a token bound to a resource URL works only under that URL's path (and the any-token paths).
+func audienceAllows(audience, path string) bool {
+	if audience == "" {
+		return true
+	}
+	for _, p := range AnyTokenPaths {
+		if pathUnder(path, p) {
+			return true
+		}
+	}
+	u, err := url.Parse(audience)
+	if err != nil {
+		return false
+	}
+	ap := strings.TrimSuffix(u.Path, "/")
+	return ap == "" || pathUnder(path, ap)
 }
 
 func bearer(e *core.RequestEvent) string {

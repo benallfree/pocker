@@ -36,6 +36,8 @@ func tokensCollection() *core.Collection {
 		&core.DateField{Id: "tok_last_used", Name: "last_used"},
 		&core.TextField{Id: "tok_last_ip", Name: "last_ip", Max: 100},
 		&core.TextField{Id: "tok_client_id", Name: "client_id", Max: 200, Help: "The OAuth client that issued it, if any."},
+		&core.TextField{Id: "tok_audience", Name: "audience", Max: 2000,
+			Help: "RFC 8707 resource the token is bound to (it only works under that URL's path); empty: anywhere."},
 		&core.AutodateField{Id: "tok_created", Name: "created", OnCreate: true, System: true},
 		&core.AutodateField{Id: "tok_updated", Name: "updated", OnCreate: true, OnUpdate: true, System: true},
 	)

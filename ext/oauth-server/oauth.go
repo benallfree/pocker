@@ -17,9 +17,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"ganigeorgiev.com/pocketbase/pocketbase"
@@ -64,8 +66,17 @@ type Config struct {
 	AccessTTL  time.Duration
 	RefreshTTL time.Duration
 
-	// DynamicRegistration turns on POST /oauth/register (RFC 7591), e.g. for MCP connectors.
+	// DynamicRegistration turns on POST /oauth/register (RFC 7591), e.g. for MCP connectors. A plugin can also turn
+	// it on later with [Server.EnableDynamicRegistration].
 	DynamicRegistration bool
+
+	// CIMDHosts are the hosts whose https client ids are trusted as client ID metadata documents (the client id is
+	// the URL of a JSON document with its name and redirect URIs). Default: claude.ai, claude.com. Set to an empty,
+	// non-nil slice to turn CIMD off.
+	CIMDHosts []string
+
+	// HTTPClient fetches client metadata documents (default: 5 s timeout).
+	HTTPClient *http.Client
 
 	// Issuer is the server's public base URL (default: Settings → Application URL, else the request's own URL).
 	Issuer string
@@ -89,6 +100,9 @@ type Server struct {
 	secret []byte
 
 	limiter *limiter
+
+	dcr  atomic.Bool
+	cimd sync.Map // client id URL -> cimdEntry
 }
 
 // MustRegister is [Register] that panics on error.
@@ -116,7 +130,14 @@ func Register(app core.App, cfg Config) (*Server, error) {
 	if cfg.Now == nil {
 		cfg.Now = time.Now
 	}
+	if cfg.CIMDHosts == nil {
+		cfg.CIMDHosts = []string{"claude.ai", "claude.com"}
+	}
+	if cfg.HTTPClient == nil {
+		cfg.HTTPClient = &http.Client{Timeout: 5 * time.Second}
+	}
 	s := &Server{app: app, cfg: cfg, limiter: newLimiter(10, 5*time.Minute)}
+	s.dcr.Store(cfg.DynamicRegistration)
 	app.Store().Set(storeKey, s)
 	remotes.Advertise(app, "oauth", MetadataPath)
 
@@ -151,6 +172,13 @@ func For(app core.App) *Server {
 }
 
 func (s *Server) tokens() *tokens.Tokens { return tokens.For(s.app) }
+
+// EnableDynamicRegistration turns on POST /oauth/register (e.g. ext/mcp does when it registers).
+func (s *Server) EnableDynamicRegistration() { s.dcr.Store(true) }
+
+// OfflineAccess is accepted in scope requests (clients ask for it to get refresh tokens, which this server always
+// issues); it isn't stored on tokens.
+const OfflineAccess = "offline_access"
 
 func (s *Server) allowedCollection(c *core.Collection) bool {
 	return c != nil && c.IsAuth() && slices.Contains(s.cfg.Collections, c.Name)
@@ -216,7 +244,7 @@ func (s *Server) resolveScopes(raw string, owner *core.Collection) ([]ScopeInfo,
 	seen := map[string]bool{}
 	for _, name := range strings.Fields(raw) {
 		name = strings.ToLower(name)
-		if seen[name] {
+		if seen[name] || name == OfflineAccess {
 			continue
 		}
 		seen[name] = true

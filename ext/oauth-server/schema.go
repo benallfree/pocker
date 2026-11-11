@@ -63,6 +63,7 @@ func codesCollection() *core.Collection {
 		&core.TextField{Id: "oad_owner_collection", Name: "owner_collection", Max: 100},
 		&core.TextField{Id: "oad_owner", Name: "owner", Max: 100},
 		&core.SelectField{Id: "oad_status", Name: "status", MaxSelect: 1, Values: []string{StatusPending, StatusApproved, StatusDenied}},
+		&core.TextField{Id: "oad_resource", Name: "resource", Max: 2000, Help: "RFC 8707 resource (token audience)."},
 		&core.TextField{Id: "oad_token_id", Name: "token_id", Max: 100, Help: "The access token a refresh token belongs to."},
 		&core.DateField{Id: "oad_expires", Name: "expires"},
 		&core.DateField{Id: "oad_last_poll", Name: "last_poll"},

@@ -26,12 +26,18 @@ Try it: `go run ./example serve`, then `go run ./example login http://127.0.0.1:
 | Path | What |
 |---|---|
 | `GET /.well-known/oauth-authorization-server` | Metadata (RFC 8414). The issuer is `Config.Issuer`, else the request's own URL. |
-| `GET /.well-known/oauth-protected-resource` | Resource metadata (RFC 9728), for MCP clients. |
 | `GET/POST /oauth/authorize` | Sign-in and consent pages. Authorization code with PKCE (S256 only; required). |
 | `POST /oauth/token` | `authorization_code`, `refresh_token` (rotated; the old access token is revoked), `urn:ietf:params:oauth:grant-type:device_code`. |
 | `POST /oauth/device` + `/oauth/device/verify` | Device flow (RFC 8628): codes like `WDJB-MJHT`, valid 10 minutes. |
 | `POST /oauth/revoke` | Revocation (RFC 7009): an access token or a refresh token (revokes both). |
-| `POST /oauth/register` | Dynamic client registration (RFC 7591), when `DynamicRegistration` is on. Public clients by default. |
+| `POST /oauth/register` | Dynamic client registration (RFC 7591), when `DynamicRegistration` is on or a plugin called `EnableDynamicRegistration()` (ext/mcp does). Public clients by default. |
+
+Protected resource metadata (RFC 9728) belongs to the resource: ext/mcp serves `/.well-known/oauth-protected-resource`.
+
+**Audience (RFC 8707).** A `resource` parameter on `/oauth/authorize`, `/oauth/device` or `/oauth/token` (a URL on this
+server) binds the access token to it: the token then only authenticates under that URL's path, so a token issued for
+`/mcp` can't deploy and a deploy token can't drive MCP. Refreshed tokens keep it. `offline_access` is accepted in
+`scope` (refresh tokens are always issued) and listed in `scopes_supported`.
 
 Access tokens are `pbt_…` API tokens with the client's id and the granted scopes, so they show up (and can be
 revoked) under Settings → API tokens, and every scope a plugin registers can be requested. No scope requested means
@@ -47,6 +53,10 @@ carry a CSRF token. Sign-in with OAuth2 providers (Google, GitHub) isn't offered
 
 - **`pocketbase-cli`** is built in: public, any `http://127.0.0.1:<port>/…` or `[::1]` redirect, device codes. It's
   what `pocketbase login` uses ([remotes](../remotes/README.md)).
+- **Client ID metadata documents (CIMD):** an `https://` client id is fetched as a JSON document (`client_id` must
+  equal the URL; its `client_name` and `redirect_uris` are used; cached 10 minutes). Only `Config.CIMDHosts` are
+  trusted (default `claude.ai`, `claude.com`, so Claude and Claude Code connect without registering); the metadata
+  says `client_id_metadata_document_supported`.
 - Registered clients live in `_oauth_clients`. Loopback redirect URIs match any port (RFC 8252); other URIs match
   exactly; plain `http` only for loopback.
 - CLI: `pocketbase oauth clients list`, `oauth clients add --name "My app" --redirect https://…/callback [--public]`

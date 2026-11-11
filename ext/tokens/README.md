@@ -46,6 +46,12 @@ se.Router.POST("/_pocker/deploy/v1/commit", h).Bind(apis.RequireSuperuserAuth(),
 JWTs and unscoped tokens. Plugins that don't import this package can read the request store keys `tokens.scopes` and
 `tokens.id`.
 
+## Audience
+
+A token created with `CreateOptions.Audience` (oauth-server sets it from the RFC 8707 `resource` parameter) only
+authenticates under that URL's path, plus `/_pocker/whoami`; elsewhere it gets 403. `tokens.FromRequest(e).Audience`
+tells a route what the token was issued for.
+
 ## Go API
 
 `tokens.For(app)` returns the service: `Create(owner, CreateOptions{Name, Scopes, Expires, ClientId})` → secret +

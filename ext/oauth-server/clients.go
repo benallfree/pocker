@@ -34,6 +34,9 @@ func (s *Server) FindClient(id string) (*Client, error) {
 		c := CLIClient
 		return &c, nil
 	}
+	if strings.HasPrefix(id, "https://") {
+		return s.cimdClient(id)
+	}
 	rec, err := s.app.FindFirstRecordByData(ClientsCollectionId, "client_id", id)
 	if err != nil {
 		return nil, errors.New("unknown client")

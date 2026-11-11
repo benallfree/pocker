@@ -19,6 +19,7 @@ type TokenView struct {
 	LastUsed        string   `json:"lastUsed"`
 	LastIP          string   `json:"lastIp"`
 	ClientId        string   `json:"clientId"`
+	Audience        string   `json:"audience"`
 	Created         string   `json:"created"`
 	OwnerCollection string   `json:"ownerCollection"` // collection name
 	Owner           string   `json:"owner"`
@@ -36,6 +37,7 @@ func (t *Tokens) View(rec *core.Record) TokenView {
 		LastUsed: rec.GetString("last_used"),
 		LastIP:   rec.GetString("last_ip"),
 		ClientId: rec.GetString("client_id"),
+		Audience: rec.GetString("audience"),
 		Created:  rec.GetString("created"),
 		Owner:    rec.GetString("owner"),
 	}

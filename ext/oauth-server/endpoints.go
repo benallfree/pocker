@@ -8,6 +8,7 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -30,7 +31,6 @@ const (
 	deviceVerifyPath = "/oauth/device/verify"
 	revokePath       = "/oauth/revoke"
 	registerPath     = "/oauth/register"
-	resourcePath     = "/.well-known/oauth-protected-resource"
 )
 
 // pollInterval is the device flow's polling interval in seconds (tests shorten it).
@@ -38,7 +38,6 @@ var pollInterval = 5
 
 func (s *Server) bindRoutes(se *core.ServeEvent) {
 	se.Router.GET(MetadataPath, s.metadata)
-	se.Router.GET(resourcePath, s.protectedResource)
 	se.Router.GET(authorizePath, s.authorize)
 	se.Router.POST(authorizePath, s.authorize)
 	se.Router.POST(tokenPath, s.token)
@@ -46,9 +45,7 @@ func (s *Server) bindRoutes(se *core.ServeEvent) {
 	se.Router.GET(deviceVerifyPath, s.deviceVerify)
 	se.Router.POST(deviceVerifyPath, s.deviceVerify)
 	se.Router.POST(revokePath, s.revoke)
-	if s.cfg.DynamicRegistration {
-		se.Router.POST(registerPath, s.register)
-	}
+	se.Router.POST(registerPath, s.register) // answers 404 unless dynamic registration is on
 }
 
 // issuer is the public base URL: Config.Issuer, else the request's own scheme and host (so it always matches the
@@ -66,38 +63,28 @@ func (s *Server) issuer(e *core.RequestEvent) string {
 
 func (s *Server) metadata(e *core.RequestEvent) error {
 	iss := s.issuer(e)
-	scopes := []string{}
+	scopes := []string{OfflineAccess}
 	for _, sc := range s.tokens().Scopes() {
 		scopes = append(scopes, sc.Name)
 	}
 	m := map[string]any{
-		"issuer":                                iss,
-		"authorization_endpoint":                iss + authorizePath,
-		"token_endpoint":                        iss + tokenPath,
-		"device_authorization_endpoint":         iss + devicePath,
-		"revocation_endpoint":                   iss + revokePath,
-		"response_types_supported":              []string{"code"},
-		"grant_types_supported":                 []string{"authorization_code", "refresh_token", "urn:ietf:params:oauth:grant-type:device_code"},
-		"code_challenge_methods_supported":      []string{"S256"},
-		"token_endpoint_auth_methods_supported": []string{"none", "client_secret_post", "client_secret_basic"},
-		"scopes_supported":                      scopes,
+		"issuer":                                         iss,
+		"authorization_endpoint":                         iss + authorizePath,
+		"token_endpoint":                                 iss + tokenPath,
+		"device_authorization_endpoint":                  iss + devicePath,
+		"revocation_endpoint":                            iss + revokePath,
+		"response_types_supported":                       []string{"code"},
+		"grant_types_supported":                          []string{"authorization_code", "refresh_token", "urn:ietf:params:oauth:grant-type:device_code"},
+		"code_challenge_methods_supported":               []string{"S256"},
+		"token_endpoint_auth_methods_supported":          []string{"none", "client_secret_post", "client_secret_basic"},
+		"scopes_supported":                               scopes,
+		"client_id_metadata_document_supported":          len(s.cfg.CIMDHosts) > 0,
+		"authorization_response_iss_parameter_supported": true,
 	}
-	if s.cfg.DynamicRegistration {
+	if s.dcr.Load() {
 		m["registration_endpoint"] = iss + registerPath
 	}
 	return e.JSON(http.StatusOK, m)
-}
-
-func (s *Server) protectedResource(e *core.RequestEvent) error {
-	iss := s.issuer(e)
-	scopes := []string{}
-	for _, sc := range s.tokens().Scopes() {
-		scopes = append(scopes, sc.Name)
-	}
-	return e.JSON(http.StatusOK, map[string]any{
-		"resource": iss, "authorization_servers": []string{iss}, "scopes_supported": scopes,
-		"bearer_methods_supported": []string{"header"},
-	})
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -110,7 +97,18 @@ type authRequest struct {
 	state       string
 	challenge   string
 	scope       string
+	resource    string       // RFC 8707 audience, "" for none
 	device      *core.Record // set on the device verification page
+}
+
+// validResource: an absolute http(s) URL on this server's host, without a fragment (RFC 8707).
+func (s *Server) validResource(e *core.RequestEvent, r string) bool {
+	u, err := url.Parse(r)
+	if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Fragment != "" {
+		return false
+	}
+	iss, _ := url.Parse(s.issuer(e))
+	return strings.EqualFold(u.Host, e.Request.Host) || (iss != nil && strings.EqualFold(u.Host, iss.Host))
 }
 
 func param(e *core.RequestEvent, name string) string {
@@ -128,12 +126,15 @@ func (s *Server) parseAuthorize(e *core.RequestEvent) (*authRequest, string, boo
 		return nil, "Unknown client.", false
 	}
 	ar := &authRequest{client: c, redirectURI: param(e, "redirect_uri"), state: param(e, "state"),
-		challenge: param(e, "code_challenge"), scope: param(e, "scope")}
+		challenge: param(e, "code_challenge"), scope: param(e, "scope"), resource: param(e, "resource")}
 	if ar.redirectURI == "" && len(c.RedirectURIs) == 1 {
 		ar.redirectURI = c.RedirectURIs[0]
 	}
 	if !c.AllowsRedirect(ar.redirectURI) {
 		return nil, "This client didn't register that redirect address.", false
+	}
+	if ar.resource != "" && !s.validResource(e, ar.resource) {
+		return ar, "invalid_target: resource must be a URL on this server", true
 	}
 	if param(e, "response_type") != "code" {
 		return ar, "unsupported_response_type", true
@@ -151,6 +152,7 @@ func (ar *authRequest) hidden() map[string]string {
 	return map[string]string{
 		"client_id": ar.client.Id, "redirect_uri": ar.redirectURI, "state": ar.state, "scope": ar.scope,
 		"response_type": "code", "code_challenge": ar.challenge, "code_challenge_method": "S256",
+		"resource": ar.resource,
 	}
 }
 
@@ -488,6 +490,7 @@ func (s *Server) decide(e *core.RequestEvent, ar *authRequest, d PageData, user 
 	rec.Set("client_id", ar.client.Id)
 	rec.Set("redirect_uri", ar.redirectURI)
 	rec.Set("challenge", ar.challenge)
+	rec.Set("resource", ar.resource)
 	rec.Set("scopes", scopeNames(scopes))
 	rec.Set("owner_collection", user.Collection().Id)
 	rec.Set("owner", user.Id)
@@ -529,6 +532,10 @@ func (s *Server) deviceAuthorization(e *core.RequestEvent) error {
 	if _, err := s.resolveScopes(scope, nil); err != nil {
 		return oauthError(e, http.StatusBadRequest, "invalid_scope", err.Error())
 	}
+	resource := e.Request.PostFormValue("resource")
+	if resource != "" && !s.validResource(e, resource) {
+		return oauthError(e, http.StatusBadRequest, "invalid_target", "resource must be a URL on this server")
+	}
 	deviceCode := security.RandomString(40)
 	userCode := normalizeUserCode(security.RandomStringWithAlphabet(8, userCodeAlphabet))
 	col, err := s.app.FindCachedCollectionByNameOrId(CodesCollectionId)
@@ -541,6 +548,7 @@ func (s *Server) deviceAuthorization(e *core.RequestEvent) error {
 	rec.Set("user_code", userCode)
 	rec.Set("client_id", c.Id)
 	rec.Set("scopes", strings.Fields(scope))
+	rec.Set("resource", resource)
 	rec.Set("status", StatusPending)
 	rec.Set("expires", s.cfg.Now().Add(deviceTTL).UTC())
 	if err := s.app.Save(rec); err != nil {
@@ -717,9 +725,20 @@ func (s *Server) issue(e *core.RequestEvent, c *Client, rec *core.Record) error 
 	}
 	var scopes []string
 	_ = rec.UnmarshalJSONField("scopes", &scopes)
+	scopes = slices.DeleteFunc(scopes, func(v string) bool { return v == OfflineAccess })
+	audience := rec.GetString("resource")
+	if r := e.Request.PostFormValue("resource"); r != "" {
+		switch {
+		case audience != "" && r != audience:
+			return oauthError(e, http.StatusBadRequest, "invalid_target", "resource differs from the authorized one")
+		case audience == "" && !s.validResource(e, r):
+			return oauthError(e, http.StatusBadRequest, "invalid_target", "resource must be a URL on this server")
+		}
+		audience = r
+	}
 	now := s.cfg.Now()
 	access, tokRec, err := s.tokens().Create(owner, tokens.CreateOptions{
-		Name: c.Name + " (OAuth)", Scopes: scopes, Expires: now.Add(s.cfg.AccessTTL), ClientId: c.Id,
+		Name: c.Name + " (OAuth)", Scopes: scopes, Expires: now.Add(s.cfg.AccessTTL), ClientId: c.Id, Audience: audience,
 	})
 	if err != nil {
 		return oauthError(e, http.StatusBadRequest, "invalid_scope", err.Error())
@@ -737,6 +756,7 @@ func (s *Server) issue(e *core.RequestEvent, c *Client, rec *core.Record) error 
 	r.Set("owner_collection", col.Id)
 	r.Set("owner", owner.Id)
 	r.Set("token_id", tokRec.Id)
+	r.Set("resource", audience)
 	r.Set("expires", now.Add(s.cfg.RefreshTTL).UTC())
 	if err := s.app.Save(r); err != nil {
 		return err
@@ -779,6 +799,9 @@ func (s *Server) revoke(e *core.RequestEvent) error {
 }
 
 func (s *Server) register(e *core.RequestEvent) error {
+	if !s.dcr.Load() {
+		return e.NotFoundError("", nil)
+	}
 	var body struct {
 		ClientName   string   `json:"client_name"`
 		RedirectURIs []string `json:"redirect_uris"`

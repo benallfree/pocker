@@ -159,6 +159,9 @@ type CreateOptions struct {
 	Expires time.Time
 	// ClientId is the OAuth client issuing it, if any.
 	ClientId string
+	// Audience binds the token to a resource URL (RFC 8707): it authenticates only under that URL's path (and
+	// /_pocker/whoami). Empty: anywhere its scopes allow.
+	Audience string
 }
 
 // Create issues a token for owner and returns its secret (shown once, never stored) and its record.
@@ -194,6 +197,7 @@ func (t *Tokens) Create(owner *core.Record, opts CreateOptions) (string, *core.R
 	rec.Set("prefix", secret[:displayLen])
 	rec.Set("scopes", scopes)
 	rec.Set("client_id", opts.ClientId)
+	rec.Set("audience", strings.TrimSpace(opts.Audience))
 	if !opts.Expires.IsZero() {
 		rec.Set("expires", opts.Expires.UTC())
 	}
@@ -225,9 +229,10 @@ func (t *Tokens) normalizeScopes(owner *core.Collection, in []string) ([]string,
 
 // Info is a verified token.
 type Info struct {
-	Token  *core.Record
-	Owner  *core.Record
-	Scopes []string // empty: the owner's full rights
+	Token    *core.Record
+	Owner    *core.Record
+	Scopes   []string // empty: the owner's full rights
+	Audience string   // RFC 8707 resource it's bound to, or ""
 }
 
 // HasScope reports whether the token may act with scope: unscoped tokens have every scope.
@@ -258,7 +263,7 @@ func (t *Tokens) Verify(secret string) (*Info, error) {
 	if err != nil {
 		return nil, ErrInvalid
 	}
-	return &Info{Token: rec, Owner: owner, Scopes: scopesOf(rec)}, nil
+	return &Info{Token: rec, Owner: owner, Scopes: scopesOf(rec), Audience: rec.GetString("audience")}, nil
 }
 
 func scopesOf(rec *core.Record) []string {
