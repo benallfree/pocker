@@ -14,9 +14,9 @@ import (
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	_ "ganigeorgiev.com/pocketbase/pocketbase/migrations" // registers PocketBase's system migrations, as pocketbase.go does
 	"ganigeorgiev.com/pocketbase/pocketbase/plugins/jsvm"
-	"github.com/pockerbase/pocketbase/ext/sandbox"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/security"
 	"ganigeorgiev.com/pocketbase/pocketbase/ui"
+	"github.com/pockerbase/pocketbase/ext/sandbox"
 )
 
 // runningApp is a bootstrapped PocketBase app and the HTTP handler that serves it.
