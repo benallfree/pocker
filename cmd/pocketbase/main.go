@@ -11,6 +11,7 @@ import (
 
 	"ganigeorgiev.com/pocketbase/pocketbase"
 	"ganigeorgiev.com/pocketbase/pocketbase/apis"
+	"ganigeorgiev.com/pocketbase/pocketbase/ceplugin"
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"ganigeorgiev.com/pocketbase/pocketbase/plugins/jsvm"
 	"ganigeorgiev.com/pocketbase/pocketbase/plugins/migratecmd"
@@ -25,6 +26,13 @@ import (
 
 func main() {
 	app := pocketbase.New()
+
+	// PocketBase CE plugins that ship in the standard binary and follow the plugin contract (ceplugin): Register
+	// here, and BindJS in the jsvm below. Bulk mail: campaigns to the app's own users (Mail in the dashboard, Bulk
+	// mail on Settings > Mail); nothing happens until someone starts a campaign. Defaults: 5/s, 5,000/day.
+	cePlugins := []ceplugin.Plugin{
+		bulkmail.New(bulkmail.Config{}),
+	}
 
 	// ---------------------------------------------------------------
 	// Optional plugin flags:
@@ -123,7 +131,7 @@ func main() {
 		HooksWatch:    hooksWatch,
 		HooksPoolSize: hooksPool,
 		OnInit: func(vm *goja.Runtime) {
-			bulkmail.BindJS(vm, app) // $bulkmail in pb_hooks
+			ceplugin.BindJS(app, vm, cePlugins...) // e.g. $bulkmail in pb_hooks
 		},
 	})
 
@@ -134,9 +142,7 @@ func main() {
 	// S3 redirects: with S3 file storage on, downloads redirect to a signed bucket URL after the access check
 	s3redirect.MustRegister(app, s3redirect.Config{Enabled: &s3Redirect, TTL: s3RedirectTTL})
 
-	// Bulk mail: campaigns to the app's own users (Mail in the dashboard, Bulk mail on Settings > Mail). Nothing
-	// happens until someone starts a campaign; the defaults are 5 messages per second and 5,000 per day.
-	bulkmail.MustRegister(app, bulkmail.Config{})
+	ceplugin.MustRegister(app, cePlugins...)
 
 	// migrate command (with js templates)
 	migratecmd.MustRegister(app, app.RootCmd, migratecmd.Config{

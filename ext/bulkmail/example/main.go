@@ -13,6 +13,7 @@ import (
 	"log"
 
 	"ganigeorgiev.com/pocketbase/pocketbase"
+	"ganigeorgiev.com/pocketbase/pocketbase/ceplugin"
 	"ganigeorgiev.com/pocketbase/pocketbase/plugins/jsvm"
 	"github.com/dop251/goja"
 	"github.com/pockethost/pocketbase/ext/bulkmail"
@@ -25,13 +26,15 @@ func main() {
 
 	registerDemoView(app) // a "newsletter_audience" view to use as a campaign audience (demo.go)
 
-	bulkmail.MustRegister(app, bulkmail.Config{
+	// the same plugin value pocker would host on every instance (srv.Plugins = append(srv.Plugins, mail))
+	mail := bulkmail.New(bulkmail.Config{
 		Rate:  5,    // messages per second
 		Daily: 5000, // messages per day; bulkmail.NoBulkMail forbids sending
 	})
+	ceplugin.MustRegister(app, mail)
 
 	jsvm.MustRegister(app, jsvm.Config{
-		OnInit: func(vm *goja.Runtime) { bulkmail.BindJS(vm, app) },
+		OnInit: func(vm *goja.Runtime) { ceplugin.BindJS(app, vm, mail) }, // $bulkmail in JS hooks
 	})
 
 	if err := app.Start(); err != nil {

@@ -18,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	"ganigeorgiev.com/pocketbase/pocketbase/ceplugin"
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"ganigeorgiev.com/pocketbase/pocketbase/tests"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/mailer"
@@ -677,5 +678,42 @@ func TestViewAudience(t *testing.T) {
 	}
 	if got := toString(types.JSONRaw(`3`)); got != "3" {
 		t.Fatalf("json number renders as %q", got)
+	}
+}
+
+func TestCEPlugin(t *testing.T) {
+	p := New(Config{Rate: 3})
+	if p.Name() != Name {
+		t.Fatal(p.Name())
+	}
+
+	app, err := tests.NewTestApp()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer app.Cleanup()
+	// process settings, then the app's own: daily 0 means no bulk mail
+	if err := p.Register(app, ceplugin.Config{{"rate": 9, "daily": 100}, {"daily": 0}}); err != nil {
+		t.Fatal(err)
+	}
+	bm := For(app)
+	if bm == nil {
+		t.Fatal("not registered")
+	}
+	if rate, daily, _, _ := bm.Limits(); rate != 9 || daily != NoBulkMail {
+		t.Fatalf("rate %v daily %d", rate, daily)
+	}
+	vm := goja.New()
+	p.BindJS(app, vm)
+	if v, err := vm.RunString("typeof $bulkmail.start"); err != nil || v.String() != "function" {
+		t.Fatalf("$bulkmail: %v %v", v, err)
+	}
+
+	// a single app with no settings keeps the defaults given to New
+	plain, _ := tests.NewTestApp()
+	defer plain.Cleanup()
+	ceplugin.MustRegister(plain, p)
+	if rate, daily, _, _ := For(plain).Limits(); rate != 3 || daily != 0 && daily != 5000 {
+		t.Fatalf("defaults: rate %v daily %d", rate, daily)
 	}
 }

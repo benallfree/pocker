@@ -2,25 +2,27 @@
 
 Bulk mail: campaigns to an app's own users with one-click unsubscribe, bounce and complaint handling, and a dashboard page.
 
-**Runs on:** Single app (in the standard `pocketbase` binary), or every instance under [pocker](../pocker/README.md)
-through `pockerplugin`, which is also how the mothership and multitenant levels get it.
-
-```go
-srv.Plugins = append(srv.Plugins, pockerplugin.New(bulkmail.Config{})) // under pocker
-```
-
-Under pocker, process defaults come from the config file's top-level `bulkmail:` key and per-instance settings from
-`plugins: {bulkmail: {enabled, rate, daily}}`; `daily: 0` means the instance may not send bulk mail.
+**Runs on:** every level. It's in the standard `pocketbase` binary, and the same plugin value runs on every
+instance under [pocker](../pocker/README.md) (so the mothership and multitenant levels get it too). It follows the
+PocketBase CE plugin contract ([`ceplugin`](../../ceplugin/ceplugin.go)).
 
 ## Use it
 
 ```go
-app := pocketbase.New()
-bulkmail.MustRegister(app, bulkmail.Config{Rate: 5, Daily: 5000})
+mail := bulkmail.New(bulkmail.Config{Rate: 5, Daily: 5000})
 
-// optional: $bulkmail in JS hooks
-jsvm.MustRegister(app, jsvm.Config{OnInit: func(vm *goja.Runtime) { bulkmail.BindJS(vm, app) }})
+// a single app
+app := pocketbase.New()
+ceplugin.MustRegister(app, mail)
+jsvm.MustRegister(app, jsvm.Config{OnInit: func(vm *goja.Runtime) { ceplugin.BindJS(app, vm, mail) }}) // $bulkmail
+
+// or every pocker instance
+srv.Plugins = append(srv.Plugins, mail)
 ```
+
+Under pocker, settings come from the config file's top-level `bulkmail:` key, then each instance's
+`plugins: {bulkmail: {enabled, rate, daily}}`, over the Config given to `New`; `daily: 0` means the instance may
+not send bulk mail, `enabled: false` turns it off.
 
 ```sh
 go run ./example serve --dev  # test mail shows in the dev mail trap at http://127.0.0.1:8025

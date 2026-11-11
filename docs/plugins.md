@@ -8,9 +8,42 @@ A PocketBase CE plugin is Go code compiled into your build. It can add, to every
 
 It can also run process-wide jobs and middleware.
 
-> **Status.** Everything below works today through `pocker.Server`. A packaged plugin API (one `Plugin` interface,
-> per-plugin config, a `pocker.Main(plugins...)` entry point) is planned. It will wrap these same hooks, so code
-> written this way moves over with little change.
+## The plugin contract: `ceplugin`
+
+Write a plugin once, against [`ceplugin`](../ceplugin/ceplugin.go) in core, and the same value runs on a single app
+and on every instance under pocker:
+
+```go
+type Plugin struct{ cfg Config }
+
+func New(cfg Config) *Plugin { return &Plugin{cfg: cfg} }
+
+func (p *Plugin) Name() string { return "hello" } // config key, `_hello_` collections, logs
+
+func (p *Plugin) Register(app core.App, cfg ceplugin.Config) error {
+    c := p.cfg
+    if err := cfg.Decode(&c); err != nil { // this app's settings over the defaults (json tags)
+        return err
+    }
+    app.OnServe().BindFunc(func(se *core.ServeEvent) error { /* routes, UI extensions */ return se.Next() })
+    return nil
+}
+
+// optional: a $hello global in the app's JS hooks
+func (p *Plugin) BindJS(app core.App, vm *goja.Runtime) { /* vm.Set("$hello", ...) */ }
+```
+
+- **Single app:** `ceplugin.MustRegister(app, plugins...)`, and `ceplugin.BindJS(app, vm, plugins...)` in jsvm's
+  `OnInit`. The standard binary does this for the plugins it ships ([`cmd/pocketbase`](../cmd/pocketbase/main.go)).
+- **Pocker:** put the plugin in `Server.Plugins`. Pocker calls `Register` for every instance with that instance's
+  settings: the config file's top-level `<name>:` key, then the instance's `plugins.<name>`, over the defaults given
+  to your constructor. `enabled: false` (the instance wins) means `Register` and `BindJS` are never called for it.
+- **No pocker import:** a contract plugin doesn't depend on ext/pocker, so single-app builds don't link it. Reach for
+  the host interfaces below only for what's process-wide (a request gate, TLS, background jobs).
+- [bulkmail](../ext/bulkmail/plugin.go) is the reference implementation.
+
+> **Status.** `ceplugin` covers per-app plugins. The process-wide host interfaces below (`pocker.Server` fields and
+> `Server.Plugins` host interfaces) are pocker's for now; a `pocketbase.Main(plugins...)` entry point is planned.
 
 A complete, runnable example is in [`ext/pocker/example`](../ext/pocker/example).
 

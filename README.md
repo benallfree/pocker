@@ -89,7 +89,8 @@ other.
 ## Contribute a plugin
 
 Plugins are welcome. Read [Create your own plugin](docs/plugins.md), then open a pull request that adds
-`ext/<your-plugin>/`. Keep changes to PocketBase's own code to the minimum hook your plugin needs, and include a small
+`ext/<your-plugin>/`. Write it against the plugin contract ([`ceplugin`](ceplugin/ceplugin.go)) and the same plugin works at
+every level: on a single app and on every instance under pocker. Keep changes to PocketBase's own code to the minimum hook your plugin needs, and include a small
 `example/main.go` that builds and shows the feature.
 
 MIT, like PocketBase.
