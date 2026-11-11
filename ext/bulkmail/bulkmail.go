@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	validation "ganigeorgiev.com/pocketbase/ozzo-validation/v4"
 	"io/fs"
 	"net/http"
 	"strings"
@@ -174,6 +175,20 @@ func Register(app core.App, cfg Config) (*BulkMail, error) {
 	// a campaign changed (dashboard, records API, JS): let an idle sender look again now
 	app.OnRecordAfterUpdateSuccess(CampaignsCollection).BindFunc(func(e *core.RecordEvent) error {
 		bm.poke()
+		return e.Next()
+	})
+
+	// suppressions added or edited anywhere (dashboard record form, records API, JS) store the normalized address,
+	// the same one IsSuppressed looks up; a manual entry without a reason is "manual"
+	app.OnRecordValidate(SuppressionsCollection).BindFunc(func(e *core.RecordEvent) error {
+		email := NormalizeEmail(e.Record.GetString("email"))
+		if email == "" {
+			return validation.Errors{"email": validation.NewError("validation_invalid_email", "Must be a valid email address.")}
+		}
+		e.Record.Set("email", email)
+		if e.Record.GetString("reason") == "" {
+			e.Record.Set("reason", ReasonManual)
+		}
 		return e.Next()
 	})
 

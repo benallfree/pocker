@@ -648,3 +648,33 @@ func TestPreviewAndTestSend(t *testing.T) {
 		t.Fatal("test send wrote ledger rows")
 	}
 }
+
+func TestSuppressionRecordsAreNormalized(t *testing.T) {
+	app, bm := newApp(t, Config{})
+	col, err := app.FindCollectionByNameOrId(SuppressionsCollection)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// a record saved like the dashboard's record form does it
+	rec := core.NewRecord(col)
+	rec.Set("email", "  Mixed@Example.COM ")
+	if err := app.Save(rec); err != nil {
+		t.Fatal(err)
+	}
+	if got := rec.GetString("email"); got != "mixed@example.com" {
+		t.Fatalf("email = %q", got)
+	}
+	if got := rec.GetString("reason"); got != ReasonManual {
+		t.Fatalf("reason = %q", got)
+	}
+	if ok, _ := bm.IsSuppressed("mixed@example.com"); !ok {
+		t.Fatal("not suppressed")
+	}
+
+	bad := core.NewRecord(col)
+	bad.Set("email", "not an address")
+	if err := app.Save(bad); err == nil {
+		t.Fatal("saved an invalid address")
+	}
+}

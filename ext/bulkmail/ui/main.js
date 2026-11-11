@@ -32,7 +32,6 @@
         const links = [
             ["#/bulkmail", "ri-mail-send-line", "Campaigns"],
             ["#/bulkmail/suppressions", "ri-mail-forbid-line", "Suppressions"],
-            ["#/settings/mail", "ri-settings-3-line", "Settings"],
         ];
         return app.components.pageSidebar(
             { className: "bulkmail-sidebar" },
@@ -62,19 +61,37 @@
         );
     }
 
-    function layout(crumbs, ...content) {
+    // layout mirrors the stock pages: breadcrumbs with secondary (icon) and primary buttons in the header, a
+    // full-width body for lists (like Collections) or a centered wrapper for forms (like Settings), and the
+    // footer with an optional total and the credits.
+    function layout({ crumbs, secondary = [], primary = [], wide = false, total = null }, ...content) {
         return t.div(
             { className: "page page-bulkmail" },
             sidebar(),
             t.div(
                 { className: "page-content full-height" },
                 t.header(
-                    { className: "page-header" },
+                    { className: "page-header flex-nowrap" },
                     t.nav({ className: "breadcrumbs" }, ...crumbs.map((c) => t.div({ className: "breadcrumb-item" }, c))),
+                    secondary.length ? t.div({ className: "page-header-secondary-btns" }, ...secondary) : null,
+                    primary.length ? t.div({ className: "page-header-primary-btns" }, ...primary) : null,
                 ),
-                t.div({ className: "wrapper m-b-base" }, ...content),
+                wide ? content : t.div({ className: "wrapper m-b-base" }, ...content),
+                t.footer({ className: "page-footer" },
+                    total ? t.span({ className: "total-count" }, "Total: ", total) : null,
+                    app.components.credits(),
+                ),
             ),
         );
+    }
+
+    function emptyRow(text, ...children) {
+        return t.tr(null, t.td({ colSpan: 99, style: "height:59px" },
+            t.div({ className: "sticky-content txt-center txt-hint" }, t.div({ className: "txt-bold" }, text), ...children)));
+    }
+
+    function date(value) {
+        return value ? app.components.formattedDate({ value, short: true }) : t.span({ className: "txt-hint" }, "N/A");
     }
 
     function statusLabel(c) {
@@ -95,6 +112,7 @@
         const data = store({ loading: true, items: [] });
 
         async function load() {
+            data.loading = true;
             try {
                 data.items = await app.pb.collection(C).getFullList({ sort: "-created" });
             } catch (err) {
@@ -119,32 +137,39 @@
 
         load();
 
-        return layout(["Mail", "Campaigns"],
-            t.div(
-                { className: "flex gap-sm m-b-base" },
-                t.button({ type: "button", className: "btn", onclick: create }, t.i({ className: "ri-add-line" }), t.span({ className: "txt" }, "New campaign")),
+        const newButton = (cls) => t.button({ type: "button", className: cls, onclick: create },
+            t.i({ className: "ri-add-line", ariaHidden: true }), t.span({ className: "txt" }, "New campaign"));
+
+        return layout({
+            crumbs: ["Mail", "Campaigns"],
+            secondary: [app.components.refreshButton({ onclick: load })],
+            primary: [newButton("btn")],
+            wide: true,
+            total: () => data.items.length,
+        },
+            t.div({ className: "page-table-wrapper m-t-sm" },
+                t.table({ className: "responsive-table" },
+                    t.thead({ className: "sticky" }, t.tr(null,
+                        t.th(null, "Name"), t.th(null, "Status"), t.th(null, "Progress"), t.th(null, "Updated"))),
+                    t.tbody(null, () => {
+                        if (!data.items.length) {
+                            return data.loading
+                                ? t.tr(null, t.td({ colSpan: 99, style: "height:59px" }, t.span({ className: "skeleton-loader" })))
+                                : emptyRow("No campaigns yet.", newButton("btn secondary expanded-lg m-t-10"));
+                        }
+                        return data.items.map((c) => {
+                            const open = () => (window.location.hash = "#/bulkmail/campaigns/" + c.id);
+                            return t.tr({ tabIndex: 0, className: "handle", onclick: open,
+                                onkeypress: (e) => { if (e.key == "Enter" || e.key == " ") { e.preventDefault(); open(); } } },
+                                t.td({ className: "txt-bold" }, c.name),
+                                t.td(null, statusLabel(c)),
+                                t.td(null, progress(c)),
+                                t.td(null, date(c.updated)),
+                            );
+                        });
+                    }),
+                ),
             ),
-            () => {
-                if (data.loading) {
-                    return t.div({ className: "block txt-center" }, t.span({ className: "loader lg" }));
-                }
-                if (!data.items.length) {
-                    return t.p({ className: "txt-hint" }, "No campaigns yet.");
-                }
-                return t.table(
-                    {},
-                    t.thead({}, t.tr({}, t.th({}, "Name"), t.th({}, "Status"), t.th({}, "Progress"), t.th({}, "Updated"))),
-                    t.tbody({}, ...data.items.map((c) =>
-                        t.tr(
-                            {},
-                            t.td({}, t.a({ href: "#/bulkmail/campaigns/" + c.id }, c.name)),
-                            t.td({}, statusLabel(c)),
-                            t.td({}, progress(c)),
-                            t.td({ className: "txt-hint" }, (c.updated || "").replace("T", " ").slice(0, 16)),
-                        )
-                    )),
-                );
-            },
         );
     });
 
@@ -307,7 +332,26 @@
         load();
 
         return t.div({ className: "page-bulkmail-campaign", onunmount: () => unsubscribe?.() },
-            layout([t.a({ href: "#/bulkmail" }, "Mail"), () => app.store.title],
+            layout({
+                crumbs: [t.a({ href: "#/bulkmail" }, "Mail"), () => app.store.title],
+                primary: [
+                    () => !data.c ? null : (["draft", "done"].includes(data.c.status)
+                                ? t.button({ type: "button", className: "btn success", onclick: action("start", data.c.status === "done"
+                                    ? "Send to new matches? Addresses already in the ledger aren't mailed again."
+                                    : "Start sending this campaign to its audience?") },
+                                t.i({ className: "ri-send-plane-line" }), t.span({ className: "txt" }, data.c.scheduled_at ? "Schedule" : "Send"))
+                                : null),
+                    () => !data.c ? null : (["sending", "scheduled"].includes(data.c.status)
+                                ? t.button({ type: "button", className: "btn warning", onclick: action("pause") }, t.span({ className: "txt" }, "Pause"))
+                                : null),
+                    () => !data.c ? null : (data.c.status === "paused"
+                                ? t.button({ type: "button", className: "btn success", onclick: action("resume") }, t.span({ className: "txt" }, "Resume"))
+                                : null),
+                    () => !data.c ? null : (["sending", "scheduled", "paused"].includes(data.c.status)
+                                ? t.button({ type: "button", className: "btn danger transparent", onclick: action("cancel", "Cancel this campaign? Queued recipients won't be mailed.") }, t.span({ className: "txt" }, "Cancel"))
+                                : null),
+                ],
+            },
                 () => {
                     if (data.loading || !data.c) {
                         return t.div({ className: "block txt-center" }, t.span({ className: "loader lg" }));
@@ -322,22 +366,6 @@
                             () => statusLabel(data.c),
                             () => progress(data.c),
                             () => data.c.status_reason ? t.span({ className: "txt-hint" }, "· " + data.c.status_reason) : null,
-                            t.div({ className: "flex-fill" }),
-                            () => ["draft", "done"].includes(data.c.status)
-                                ? t.button({ type: "button", className: "btn success", onclick: action("start", data.c.status === "done"
-                                    ? "Send to new matches? Addresses already in the ledger aren't mailed again."
-                                    : "Start sending this campaign to its audience?") },
-                                t.i({ className: "ri-send-plane-line" }), t.span({ className: "txt" }, data.c.scheduled_at ? "Schedule" : "Send"))
-                                : null,
-                            () => ["sending", "scheduled"].includes(data.c.status)
-                                ? t.button({ type: "button", className: "btn warning", onclick: action("pause") }, t.span({ className: "txt" }, "Pause"))
-                                : null,
-                            () => data.c.status === "paused"
-                                ? t.button({ type: "button", className: "btn success", onclick: action("resume") }, t.span({ className: "txt" }, "Resume"))
-                                : null,
-                            () => ["sending", "scheduled", "paused"].includes(data.c.status)
-                                ? t.button({ type: "button", className: "btn danger transparent", onclick: action("cancel", "Cancel this campaign? Queued recipients won't be mailed.") }, t.span({ className: "txt" }, "Cancel"))
-                                : null,
                         ),
 
                         // content
@@ -374,11 +402,12 @@
                             ))
                             : [
                                 t.div({ className: "col-lg-4" }, field("Collection",
-                                    t.select({
+                                    app.components.select({
                                         disabled: () => !editable(),
+                                        options: () => data.collections.map((col) => ({ value: col.name, label: col.name })),
                                         value: () => audience().collection || "",
-                                        onchange: (e) => setAudience({ collection: e.target.value }),
-                                    }, ...data.collections.map((col) => t.option({ value: col.name, selected: () => audience().collection === col.name }, col.name))),
+                                        onchange: (sel) => setAudience({ collection: sel?.[0]?.value || "" }),
+                                    }),
                                 )),
                                 t.div({ className: "col-lg-6" }, field("Filter",
                                     t.input({
@@ -424,10 +453,15 @@
                             oninput: (e) => (data.c.rate_per_sec = parseFloat(e.target.value) || 0),
                         }), "Can only lower the app's limit.")),
 
+                        t.div({ className: "col-lg-12" }, t.hr()),
                         t.div({ className: "col-lg-12 flex gap-sm" },
-                            t.button({ type: "button", className: "btn", disabled: () => !editable(), onclick: doSave }, "Save"),
-                            t.button({ type: "button", className: "btn secondary", onclick: doPreview }, "Preview"),
-                            t.button({ type: "button", className: "btn secondary", onclick: doTest }, "Send test"),
+                            t.button({ type: "button", className: "btn outline", onclick: doPreview },
+                                t.i({ className: "ri-eye-line", ariaHidden: true }), t.span({ className: "txt" }, "Preview")),
+                            t.button({ type: "button", className: "btn outline", onclick: doTest },
+                                t.i({ className: "ri-mail-send-line", ariaHidden: true }), t.span({ className: "txt" }, "Send test")),
+                            t.div({ className: "m-r-auto" }),
+                            t.button({ type: "button", className: "btn expanded", disabled: () => !editable(), onclick: doSave },
+                                t.span({ className: "txt" }, "Save changes")),
                         ),
 
                         () => data.preview
@@ -441,22 +475,24 @@
                         t.div({ className: "col-lg-12 flex gap-sm m-t-base" },
                             t.h6({}, "Recipients"),
                             t.div({ className: "flex-fill" }),
-                            t.select({ onchange: (e) => { data.ledgerFilter = e.target.value; loadLedger(); } },
-                                ...["", "queued", "sent", "skipped", "failed"].map((s) => t.option({ value: s }, s || "all"))),
-                            t.button({ type: "button", className: "btn transparent sm", onclick: loadLedger }, t.i({ className: "ri-refresh-line" })),
+                            app.components.refreshButton({ className: "btn sm transparent secondary circle rotate-btn", onclick: loadLedger }),
+                            t.div({ style: "width:160px" }, app.components.select({
+                                options: ["", "queued", "sent", "skipped", "failed"].map((v) => ({ value: v, label: v || "All statuses" })),
+                                value: () => data.ledgerFilter,
+                                onchange: (sel) => { data.ledgerFilter = sel?.[0]?.value || ""; loadLedger(); },
+                            })),
                         ),
-                        t.div({ className: "col-lg-12" }, () => data.ledger.length
-                            ? t.table({},
-                                t.thead({}, t.tr({}, t.th({}, "Email"), t.th({}, "Status"), t.th({}, "Reason"), t.th({}, "Sent"))),
-                                t.tbody({}, ...data.ledger.map((s) => t.tr({},
-                                    t.td({}, s.email),
-                                    t.td({}, t.span({ className: `label ${s.status === "sent" ? "success" : s.status === "failed" ? "danger" : ""}` }, s.status)),
+                        t.div({ className: "col-lg-12" }, t.table({ className: "responsive-table" },
+                            t.thead(null, t.tr(null, t.th(null, "Email"), t.th(null, "Status"), t.th(null, "Reason"), t.th(null, "Sent"))),
+                            t.tbody(null, () => !data.ledger.length
+                                ? emptyRow(data.ledgerFilter ? `No ${data.ledgerFilter} recipients.` : "Nobody queued yet.")
+                                : data.ledger.map((s) => t.tr(null,
+                                    t.td(null, s.email),
+                                    t.td(null, t.span({ className: `label ${s.status === "sent" ? "success" : s.status === "failed" ? "danger" : ""}` }, s.status)),
                                     t.td({ className: "txt-hint" }, s.reason || ""),
-                                    t.td({ className: "txt-hint" }, (s.sent_at || "").slice(0, 16)),
+                                    t.td(null, date(s.sent_at)),
                                 ))),
-                            )
-                            : t.p({ className: "txt-hint" }, "Nobody queued yet."),
-                        ),
+                        )),
                     );
                 },
             ),
@@ -468,72 +504,76 @@
 
     app.routes.superuserOnly("#/bulkmail/suppressions", () => {
         app.store.title = "Suppressions";
-        const data = store({ loading: true, items: [], search: "", email: "" });
+        const data = store({ collection: null, filter: "", sort: "-created", reset: 0, total: 0 });
 
         async function load() {
             try {
-                const res = await app.pb.collection(X).getList(1, 200, {
-                    sort: "-created",
-                    filter: data.search ? app.pb.filter("email ~ {:q}", { q: data.search }) : "",
-                });
-                data.items = res.items;
+                data.collection = await app.pb.collections.getOne(X);
             } catch (err) {
                 fail(err);
             }
-            data.loading = false;
+            count();
         }
-        async function add(e) {
-            e.preventDefault();
+        async function count() {
             try {
-                await app.pb.collection(X).create({ email: data.email.trim().toLowerCase(), reason: "manual", source: "dashboard" });
-                data.email = "";
-                load();
+                data.total = (await app.pb.collection(X).getList(1, 1, { fields: "id", filter: data.filter, skipTotal: false })).totalItems;
+            } catch (err) {
+                if (!err.isAbort) fail(err);
+            }
+        }
+        const refresh = () => {
+            data.reset = Date.now();
+            count();
+        };
+        const edit = (record = null) => app.modals.openRecordUpsert(data.collection, record, {
+            onsave: refresh,
+            ondelete: refresh,
+        });
+        async function exportCSV() {
+            try {
+                const items = await app.pb.collection(X).getFullList({ sort: "-created", filter: data.filter });
+                const rows = [["email", "reason", "source", "campaign", "created"], ...items.map((s) => [s.email, s.reason, s.source, s.campaign, s.created])];
+                const blob = new Blob([rows.map((r) => r.map((v) => `"${String(v ?? "").replaceAll('"', '""')}"`).join(",")).join("\n")], { type: "text/csv" });
+                const a = document.createElement("a");
+                a.href = URL.createObjectURL(blob);
+                a.download = "suppressions.csv";
+                a.click();
             } catch (err) {
                 fail(err);
             }
-        }
-        function remove(s) {
-            app.modals.confirm(`Remove ${s.email}? They'll receive campaigns again, even if they unsubscribed.`, async () => {
-                try {
-                    await app.pb.collection(X).delete(s.id);
-                    load();
-                } catch (err) {
-                    fail(err);
-                }
-            });
-        }
-        function exportCSV() {
-            const rows = [["email", "reason", "source", "created"], ...data.items.map((s) => [s.email, s.reason, s.source, s.created])];
-            const blob = new Blob([rows.map((r) => r.map((v) => `"${String(v ?? "").replaceAll('"', '""')}"`).join(",")).join("\n")], { type: "text/csv" });
-            const a = document.createElement("a");
-            a.href = URL.createObjectURL(blob);
-            a.download = "suppressions.csv";
-            a.click();
         }
 
         load();
 
-        return layout(["Mail", "Suppressions"],
-            t.p({ className: "txt-hint" }, "Addresses here never receive campaign mail, whatever the audience says."),
-            t.form({ className: "flex gap-sm m-b-base", onsubmit: add },
-                t.input({ type: "email", required: true, placeholder: "Add an address", value: () => data.email, oninput: (e) => (data.email = e.target.value) }),
-                t.button({ type: "submit", className: "btn" }, "Add"),
-                t.div({ className: "flex-fill" }),
-                t.input({ type: "search", placeholder: "Search", value: () => data.search, oninput: (e) => { data.search = e.target.value; load(); } }),
-                t.button({ type: "button", className: "btn secondary", onclick: exportCSV }, "Export CSV"),
-            ),
-            () => data.loading
-                ? t.div({ className: "block txt-center" }, t.span({ className: "loader lg" }))
-                : t.table({},
-                    t.thead({}, t.tr({}, t.th({}, "Email"), t.th({}, "Reason"), t.th({}, "Source"), t.th({}, "Added"), t.th({}, ""))),
-                    t.tbody({}, ...data.items.map((s) => t.tr({},
-                        t.td({}, s.email),
-                        t.td({}, t.span({ className: "label" }, s.reason)),
-                        t.td({ className: "txt-hint" }, s.source || ""),
-                        t.td({ className: "txt-hint" }, (s.created || "").slice(0, 16)),
-                        t.td({ className: "txt-right" }, t.button({ type: "button", className: "btn transparent danger sm", onclick: () => remove(s) }, "Remove")),
-                    ))),
-                ),
+        return layout({
+            crumbs: ["Mail", "Suppressions"],
+            secondary: [app.components.refreshButton({ onclick: refresh })],
+            primary: [
+                t.button({ type: "button", className: "btn outline", onclick: exportCSV },
+                    t.i({ className: "ri-download-line", ariaHidden: true }), t.span({ className: "txt" }, "Export CSV")),
+                t.button({ type: "button", className: "btn", disabled: () => !data.collection, onclick: () => edit() },
+                    t.i({ className: "ri-add-line", ariaHidden: true }), t.span({ className: "txt" }, "Add address")),
+            ],
+            wide: true,
+            total: () => data.total,
+        },
+            t.p({ className: "txt-hint m-b-sm" }, "Addresses here never receive campaign mail, whatever the audience says. Unsubscribes, bounces and complaints are added automatically."),
+            () => !data.collection ? null : [
+                app.components.recordsSearchbar({
+                    collection: () => data.collection,
+                    value: () => data.filter,
+                    onsubmit: (v) => { data.filter = v; count(); },
+                }),
+                app.components.recordsList({
+                    className: "m-t-sm",
+                    reset: () => data.reset,
+                    collection: () => data.collection,
+                    filter: () => data.filter,
+                    sort: () => data.sort,
+                    onselect: (record) => edit(record),
+                    onchange: (filter, sort) => { data.filter = filter; data.sort = sort; count(); },
+                }),
+            ],
         );
     });
 
