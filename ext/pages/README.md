@@ -6,7 +6,7 @@ in Go and page code in the app's JS VM.
 **Runs on:** Single app, or many under [pocker](../pocker/README.md).
 
 > **In progress.** Working: the `pb_pages` route table, static files with ETags and fingerprints, live rescans,
-> rendering (middleware, `+page.js` / `+api.js`, EJS compiled in Go, includes, slots, layouts, Markdown, `ctx`,
+> rendering (middleware, `+page.js` / `+api.js`, EJS compiled in Go, JSX/TSX and TypeScript via built-in esbuild, includes, slots, layouts, Markdown, `ctx`,
 > `+error.ejs`, `+404.ejs`, Markdown images through `asset()`), JS plugins, `ctx.res.sse()`, the built-in `realtime` and `auth` plugins (password, OTP, anonymous,
 > register, OAuth2, email flows, cookie sessions), `ctx.pb()` (the bundled JS SDK, in-process, as the visitor) and the
 > Datastar add-on. Every starter kit and the site render. Not yet:

@@ -37,7 +37,7 @@ A path segment (file or folder name) starting with one of these characters is ne
 
 | Prefix | Meaning |
 |---|---|
-| `+` | Framework file: `+config.js`, `+layout.ejs`, `+middleware.js`, `+page.js`, `+api.js`. Any other `+` name is an error at startup. |
+| `+` | Framework file: `+config`, `+middleware`, `+page`, `+api` (`.js` or `.ts`); `+layout`, `+error`, `+404` (`.ejs`, `.jsx` or `.tsx`). One of each per folder. Any other `+` name is an error at startup. |
 | `_` | Private. `_private/` folders hold partials and modules for `include()` and `ctx.resolve()`. Other `_` names are ignored. |
 | `-` | Ignored (drafts, notes). |
 | `.` | Ignored (dotfiles). |
@@ -53,7 +53,7 @@ carry their own `+layout.ejs`, `+middleware.js` and `_private/`.
 
 ### 2.1 Pages
 
-A **page** is a template file: `.ejs` or `.md`.
+A **page** is a template file: `.ejs`, `.md`, `.jsx` or `.tsx` (4.5).
 
 | File | URL |
 |---|---|
@@ -253,6 +253,45 @@ A `.md` page is EJS first, then Markdown (CommonMark + GFM tables, strikethrough
 - Relative image paths go through `ctx.asset`.
 - A `.md` partial is rendered (EJS, then Markdown) on its own and inserted as HTML; Markdown never runs twice on the
   same text. Leave blank lines around an `include` in Markdown so the HTML stays a block.
+
+### 4.5 JSX and TSX
+
+`.jsx` and `.tsx` files are templates too: pages, layouts (`+layout.tsx`), `+error`/`+404`, and partials in
+`_private/`. They're compiled when first used by esbuild, which is built into the binary (no Node, no build step), and
+cached by content like EJS. TypeScript types are stripped, not checked.
+
+```tsx
+// pb_pages/products/[id].tsx
+import Price from './_private/Price'
+
+export default function Product({ data, slot }: any) {
+  slot('title', data.product.getString('name'))
+  return (
+    <article class="product">
+      <h1>{data.product.getString('name')}</h1>
+      <Price cents={data.product.getInt('price')} />
+    </article>
+  )
+}
+```
+
+- The file's default export is a component: a function from props to markup. Props: `ctx`, `data`, `params`,
+  `meta`, `asset`, `include`, `slot`, `children`, plus an `include`'s locals.
+- JSX renders straight to HTML on the server. There's no virtual DOM, no hydration, no client-side React. Event
+  handler props (functions) are dropped; use plain attributes (`onclick="..."`, `hx-get`, `data-on:click`).
+- Text and attribute values are escaped. `dangerouslySetInnerHTML={{ __html }}` inserts raw HTML. `class` and
+  `className` both work, as do `for` and `htmlFor`. `style` takes a string or an object (`{ marginTop: 4 }` →
+  `margin-top:4`). `true` renders a bare attribute; `false`, `null` and `undefined` leave it out.
+- In a layout, `children` is the inner content. `slot(name)` reads a named slot, `slot(name, content)` sets one
+  (content is JSX or a string), `slot()` is the same as `children`.
+- `include(name, locals)` returns the partial's HTML, ready to put in JSX. EJS can `include` a `.jsx`/`.tsx` partial:
+  its locals become props.
+- Components are ordinary modules: `import Card from './_private/Card'` (resolved like `require`, 3.2). Partials
+  are looked up with extensions in this order: `.ejs`, `.md`, `.jsx`, `.tsx`.
+
+**TypeScript modules.** `+page.ts`, `+api.ts`, `+middleware.ts`, `+config.ts` and any `.ts` file reached by
+`require`/`import` work like their `.js` versions. A module whose only export is `export default` behaves like
+`module.exports = ...`.
 
 ## 5. Responses
 

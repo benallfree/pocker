@@ -65,18 +65,24 @@ type Table struct {
 
 	// NotFoundRoute renders +404.ejs with the root middleware and layout (nil if there's no +404.ejs).
 	NotFoundRoute *Route
+
+	RootLayout string // pb_pages/+layout.* ("" if none)
 }
 
 var (
 	paramRe     = regexp.MustCompile(`^\[([A-Za-z_][A-Za-z0-9_]*)\]$`)
-	templateExt = map[string]bool{".ejs": true, ".md": true}
+	templateExt = map[string]bool{".ejs": true, ".md": true, ".jsx": true, ".tsx": true}
 )
 
-// rootOnly are + files allowed only at the top of pb_pages.
-var rootOnly = map[string]bool{"+config.js": true, "+error.ejs": true, "+404.ejs": true}
-
-// perFolder are + files allowed in any folder.
-var perFolder = map[string]bool{"+layout.ejs": true, "+middleware.js": true, "+page.js": true, "+api.js": true}
+// Framework files by stem, with the extensions each may have.
+var (
+	tplExts  = map[string]bool{".ejs": true, ".jsx": true, ".tsx": true}
+	codeExts = map[string]bool{".js": true, ".ts": true}
+	// rootOnly are + files allowed only at the top of pb_pages.
+	rootOnly = map[string]map[string]bool{"+config": codeExts, "+error": tplExts, "+404": tplExts}
+	// perFolder are + files allowed in any folder.
+	perFolder = map[string]map[string]bool{"+layout": tplExts, "+middleware": codeExts, "+page": codeExts, "+api": codeExts}
+)
 
 // ignored reports whether a path segment never becomes part of a URL and isn't walked.
 func ignored(name string) bool {
@@ -148,31 +154,41 @@ func Build(dir string) (*Table, []error) {
 		}
 		dirName := path.Dir(p)
 		if strings.HasPrefix(name, "+") {
+			ext := path.Ext(name)
+			stem := strings.TrimSuffix(name, ext)
+			// set records a framework file, refusing a second one with the same stem (+layout.ejs and +layout.tsx)
+			set := func(slot *string) {
+				if *slot != "" {
+					addErr(p, "%s and %s: only one %s per folder", path.Base(*slot), name, stem)
+					return
+				}
+				*slot = p
+			}
 			switch {
-			case rootOnly[name]:
+			case rootOnly[stem][ext]:
 				if dirName != "." {
 					addErr(p, "%s is only allowed at the top of pb_pages", name)
 					return nil
 				}
-				switch name {
-				case "+config.js":
-					t.Config = p
-				case "+error.ejs":
-					t.ErrorTpl = p
-				case "+404.ejs":
-					t.NotFound = p
+				switch stem {
+				case "+config":
+					set(&t.Config)
+				case "+error":
+					set(&t.ErrorTpl)
+				case "+404":
+					set(&t.NotFound)
 				}
-			case perFolder[name]:
+			case perFolder[stem][ext]:
 				f := getFolder(dirName)
-				switch name {
-				case "+layout.ejs":
-					f.layout = p
-				case "+middleware.js":
-					f.middleware = p
-				case "+page.js":
-					f.page = p
-				case "+api.js":
-					f.api = p
+				switch stem {
+				case "+layout":
+					set(&f.layout)
+				case "+middleware":
+					set(&f.middleware)
+				case "+page":
+					set(&f.page)
+				case "+api":
+					set(&f.api)
 				}
 			default:
 				addErr(p, "unknown framework file %s", name)
@@ -298,6 +314,9 @@ func Build(dir string) (*Table, []error) {
 		})
 	}
 
+	if f := folders["."]; f != nil {
+		t.RootLayout = f.layout
+	}
 	if t.NotFound != "" {
 		t.NotFoundRoute = &Route{
 			Kind:        KindPage,

@@ -260,6 +260,9 @@ func (r *request) renderFile(file string, locals goja.Value) string {
 	if r.depth > maxIncludeDepth {
 		panic(r.vm.NewGoError(fmt.Errorf("%s: includes nested more than %d deep", file, maxIncludeDepth)))
 	}
+	if isJSX(file) {
+		return r.renderJSX(file, locals)
+	}
 	c, key, err := r.template(file)
 	if err != nil {
 		panic(r.vm.NewGoError(err))
@@ -286,6 +289,18 @@ func (r *request) renderFile(file string, locals goja.Value) string {
 		}
 	}
 	return text
+}
+
+// includeExts are tried, in order, for an include name without an extension.
+var includeExts = []string{".ejs", ".md", ".jsx", ".tsx"}
+
+// includeFrom renders the _private partial name, looked up from file from (SPEC 4.2).
+func (r *request) includeFrom(from, name string, locals goja.Value) string {
+	file, err := r.lookupPrivate(from, name, includeExts)
+	if err != nil {
+		panic(r.vm.NewGoError(fmt.Errorf("%s: %w", from, err)))
+	}
+	return r.renderFile(file, locals)
 }
 
 // lookupPrivate finds name in _private folders from the folder of from upwards (SPEC 4.2). exts are tried when
@@ -370,7 +385,11 @@ func (r *request) load(file string) goja.Value {
 		if err != nil {
 			panic(r.vm.NewGoError(err))
 		}
-		wrapped := "(function (module, exports, require, __filename, __dirname) {\n" + string(src) + "\n})"
+		code, err := transpile(file, src)
+		if err != nil {
+			panic(r.vm.NewGoError(err))
+		}
+		wrapped := "(function (module, exports, require, __filename, __dirname, __h, __Fragment) {\n" + code + "\n})"
 		prog, err := goja.Compile(file, wrapped, false)
 		if err != nil {
 			panic(r.vm.NewGoError(fmt.Errorf("%s: %w", file, err)))
@@ -393,7 +412,7 @@ func (r *request) load(file string) goja.Value {
 			if strings.HasPrefix(target, "../") || target == ".." {
 				panic(r.vm.NewGoError(fmt.Errorf("%s: require(%q) leaves pb_pages", file, name)))
 			}
-			for _, cand := range []string{target, target + ".js", target + ".json", target + "/index.js"} {
+			for _, cand := range []string{target, target + ".js", target + ".ts", target + ".tsx", target + ".jsx", target + ".json", target + "/index.js", target + "/index.ts"} {
 				if st, err := r.root.Stat(cand); err == nil && st.Mode().IsRegular() {
 					return r.load(cand)
 				}
@@ -410,10 +429,21 @@ func (r *request) load(file string) goja.Value {
 		}
 		return v
 	})
-	if _, err := fn(goja.Undefined(), module, exports, requireFn, r.vm.ToValue(file), r.vm.ToValue(dir)); err != nil {
+	var h, frag goja.Value = goja.Undefined(), goja.Undefined()
+	if _, ok := tsExts[path.Ext(file)]; ok {
+		rt := r.jsxRuntime()
+		h, frag = rt.Get("h"), rt.Get("Fragment")
+	}
+	if _, err := fn(goja.Undefined(), module, exports, requireFn, r.vm.ToValue(file), r.vm.ToValue(dir), h, frag); err != nil {
 		panic(err)
 	}
 	out := module.Get("exports")
+	// an ES module whose only export is default (TS `export default ...`) behaves like module.exports = ...
+	if o, ok := out.(*goja.Object); ok && o.Get("__esModule") != nil && o.Get("__esModule").ToBoolean() {
+		if keys := o.Keys(); len(keys) == 1 && keys[0] == "default" {
+			out = o.Get("default")
+		}
+	}
 	r.cache.Set(exportsKey, out)
 	return out
 }
@@ -657,9 +687,9 @@ func (r *request) renderErrorPage(t *Table, status int, message string) (out str
 	r.slots = map[string]string{}
 	r.layouts = true
 	html := r.renderFile(t.ErrorTpl, nil)
-	if f, err := r.root.Stat("+layout.ejs"); err == nil && f.Mode().IsRegular() {
+	if t.RootLayout != "" {
 		r.wrapped = html
-		html = r.renderFile("+layout.ejs", nil)
+		html = r.renderFile(t.RootLayout, nil)
 	}
 	return html, true
 }
@@ -830,15 +860,9 @@ func (r *request) rtObject() *goja.Object {
 	set("metaGet", func(key string) any { return r.meta[key] })
 	set("metaSet", func(key string, value any) { r.meta[key] = value })
 	set("asset", func(from, ref string) string { return r.p.Asset(path.Dir(from), ref) })
-	set("include", func(from, name string, locals goja.Value) string {
-		file, err := r.lookupPrivate(from, name, []string{".ejs", ".md"})
-		if err != nil {
-			panic(vm.NewGoError(fmt.Errorf("%s: %w", from, err)))
-		}
-		return r.renderFile(file, locals)
-	})
+	set("include", func(from, name string, locals goja.Value) string { return r.includeFrom(from, name, locals) })
 	set("resolve", func(from, name, mode string) goja.Value {
-		file, err := r.lookupPrivate(from, name, []string{"", ".js", ".json"})
+		file, err := r.lookupPrivate(from, name, []string{"", ".js", ".ts", ".json"})
 		if err != nil {
 			panic(vm.NewGoError(fmt.Errorf("%s: %w", from, err)))
 		}
