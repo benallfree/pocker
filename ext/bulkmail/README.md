@@ -2,11 +2,15 @@
 
 Bulk mail: campaigns to an app's own users with one-click unsubscribe, bounce and complaint handling, and a dashboard page.
 
-**Runs on:** Single app, or many under [pocker](../pocker/README.md).
+**Runs on:** Single app (in the standard `pocketbase` binary), or every instance under [pocker](../pocker/README.md)
+through `pockerplugin`, which is also how the mothership and multitenant levels get it.
 
-> **Status.** Working on a single app: Go module `github.com/pockethost/pocketbase/ext/bulkmail`, tests, and
-> [`example/main.go`](example/main.go). Not built yet: the pocker extras (per-instance limits from instance config,
-> waking instances that have a campaign to send) and the packaged plugin API wrapper (`bulkmail.New()`).
+```go
+srv.Plugins = append(srv.Plugins, pockerplugin.New(bulkmail.Config{})) // under pocker
+```
+
+Under pocker, process defaults come from the config file's top-level `bulkmail:` key and per-instance settings from
+`plugins: {bulkmail: {enabled, rate, daily}}`; `daily: 0` means the instance may not send bulk mail.
 
 ## Use it
 

@@ -1,5 +1,5 @@
 // Command pocketbase is the standard PocketBase CE binary: PocketBase's examples/base plus the CE plugins that ship
-// by default (ext/pages, ext/s3redirect). It's its own module so core's go.mod stays upstream's.
+// by default (ext/pages, ext/s3redirect, ext/bulkmail). It's its own module so core's go.mod stays upstream's.
 package main
 
 import (
@@ -17,6 +17,8 @@ import (
 	"ganigeorgiev.com/pocketbase/pocketbase/plugins/update"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/hook"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/osutils"
+	"github.com/dop251/goja"
+	"github.com/pockethost/pocketbase/ext/bulkmail"
 	"github.com/pockethost/pocketbase/ext/pages"
 	"github.com/pockethost/pocketbase/ext/s3redirect"
 )
@@ -120,6 +122,9 @@ func main() {
 		HooksDir:      hooksDir,
 		HooksWatch:    hooksWatch,
 		HooksPoolSize: hooksPool,
+		OnInit: func(vm *goja.Runtime) {
+			bulkmail.BindJS(vm, app) // $bulkmail in pb_hooks
+		},
 	})
 
 	// PocketPages: serves pb_pages when the folder exists (page code runs in the jsvm above)
@@ -128,6 +133,10 @@ func main() {
 
 	// S3 redirects: with S3 file storage on, downloads redirect to a signed bucket URL after the access check
 	s3redirect.MustRegister(app, s3redirect.Config{Enabled: &s3Redirect, TTL: s3RedirectTTL})
+
+	// Bulk mail: campaigns to the app's own users (Mail in the dashboard, Bulk mail on Settings > Mail). Nothing
+	// happens until someone starts a campaign; the defaults are 5 messages per second and 5,000 per day.
+	bulkmail.MustRegister(app, bulkmail.Config{})
 
 	// migrate command (with js templates)
 	migratecmd.MustRegister(app, app.RootCmd, migratecmd.Config{

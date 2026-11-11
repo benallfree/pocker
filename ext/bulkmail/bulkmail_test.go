@@ -23,8 +23,6 @@ import (
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/mailer"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/types"
 	"github.com/dop251/goja"
-	"github.com/pockethost/pocketbase/ext/pocker"
-	"gopkg.in/yaml.v3"
 )
 
 const superuserToken = "eyJhbGciOiJIUzI1NiJ9.eyJpZCI6InN5d2JoZWNuaDQ2cmhtMCIsInR5cGUiOiJhdXRoIiwiY29sbGVjdGlvbklkIjoicGJjXzMxNDI2MzU4MjMiLCJleHAiOjI1MjQ2MDQ0NjEsInJlZnJlc2hhYmxlIjp0cnVlfQ.UXgO3j-0BumcugrFjbd7j0M4MQvbrLggLlcu_YNGjoY"
@@ -239,47 +237,6 @@ func TestCampaignSendsOncePerAddressAndHonorsSuppressions(t *testing.T) {
 	drain(t, bm)
 	if n := app.TestMailer.TotalSend(); n != want {
 		t.Fatalf("re-run mailed again: %d", n)
-	}
-}
-
-func TestPockerPlugin(t *testing.T) {
-	p := New(Config{Rate: 3})
-	var doc yaml.Node
-	if err := yaml.Unmarshal([]byte("bulkmail:\n  rate: 9\n  daily: 100\n"), &doc); err != nil {
-		t.Fatal(err)
-	}
-	if err := p.Configure(&doc, pocker.Config{}); err != nil {
-		t.Fatal(err)
-	}
-	if p.cfg.Rate != 3 || p.cfg.Daily != 100 {
-		t.Fatalf("Go fields win, file fills the rest: %+v", p.cfg)
-	}
-
-	app, err := tests.NewTestApp()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer app.Cleanup()
-	if err := p.InitApp(pocker.Instance{ID: "i1", Plugins: map[string]any{Name: map[string]any{"daily": 0}}}, app); err != nil {
-		t.Fatal(err)
-	}
-	bm := For(app)
-	if bm == nil || bm.cfg.Daily != NoBulkMail {
-		t.Fatalf("instance daily: 0 means no bulk mail: %+v", bm)
-	}
-	vm := goja.New()
-	p.InitJS(pocker.Instance{ID: "i1"}, app, vm)
-	if v, err := vm.RunString("typeof $bulkmail.start"); err != nil || v.String() != "function" {
-		t.Fatalf("$bulkmail: %v %v", v, err)
-	}
-
-	off, _ := tests.NewTestApp()
-	defer off.Cleanup()
-	if err := p.InitApp(pocker.Instance{ID: "i2", Plugins: map[string]any{Name: map[string]any{"enabled": false}}}, off); err != nil {
-		t.Fatal(err)
-	}
-	if For(off) != nil {
-		t.Fatal("enabled: false still registered")
 	}
 }
 

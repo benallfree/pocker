@@ -4,6 +4,8 @@ go 1.27
 
 require (
 	ganigeorgiev.com/pocketbase/pocketbase v0.0.0-00010101000000-000000000000
+	github.com/dop251/goja v0.0.0-20261023121931-6ace4dde0b29
+	github.com/pockethost/pocketbase/ext/bulkmail v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketbase/ext/pages v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketbase/ext/s3redirect v0.0.0-00010101000000-000000000000
 )
@@ -17,7 +19,6 @@ require (
 	github.com/dlclark/regexp2/v2 v2.9.1 // indirect
 	github.com/domodwyer/mailyak/v3 v3.6.2 // indirect
 	github.com/dop251/base64dec v0.0.0-20231022112746-c6c9f9a96217 // indirect
-	github.com/dop251/goja v0.0.0-20261023121931-6ace4dde0b29 // indirect
 	github.com/dop251/goja_nodejs v0.0.0-20260212111938-1f56ff5bcf14 // indirect
 	github.com/dustin/go-humanize v1.1.0 // indirect
 	github.com/evanw/esbuild v0.28.2 // indirect
@@ -62,3 +63,5 @@ replace github.com/pockethost/pocketbase/ext/pocker => ../../ext/pocker
 replace github.com/pockethost/pocketbase/ext/sandbox => ../../ext/sandbox
 
 replace github.com/pockethost/pocketbase/ext/devusers => ../../ext/devusers
+
+replace github.com/pockethost/pocketbase/ext/bulkmail => ../../ext/bulkmail

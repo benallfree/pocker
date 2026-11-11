@@ -71,6 +71,9 @@ type Settings struct {
 	WebhookSecret string `json:"webhookSecret"`
 }
 
+// Name is the plugin's name: its key in a pocker config file and under an instance's `plugins:` (see pockerplugin).
+const Name = "bulkmail"
+
 // BulkMail is the bulk mail service of one app. Get it with [For].
 type BulkMail struct {
 	app core.App
