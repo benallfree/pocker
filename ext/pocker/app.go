@@ -33,6 +33,9 @@ type appOptions struct {
 	ForceDev      bool // Pocker dev mode: every app runs in PocketBase dev mode
 	// Defaults are the process-wide limits; an instance's own Limits override them.
 	Defaults Limits
+	// Init, if set, runs for each app right after it is created, before its hooks load and before it bootstraps
+	// (opens its databases): the place to bind OnBootstrap/OnTerminate handlers.
+	Init func(inst Instance, app core.App) error
 	// Setup, if set, runs for each app after migrations and before it serves (host application Go code).
 	Setup func(inst Instance, app core.App) error
 }
@@ -73,6 +76,11 @@ func startApp(opts appOptions, inst Instance) (r *runningApp, err error) {
 		EncryptionKey: inst.EncryptionKey,
 		AppMigrations: &core.MigrationsList{}, // this app's JS migrations only
 	})
+	if opts.Init != nil {
+		if err := opts.Init(inst, app); err != nil {
+			return nil, fmt.Errorf("init: %w", err)
+		}
+	}
 
 	env := make(map[string]string, len(inst.Secrets))
 	for k, v := range inst.Secrets {

@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"gopkg.in/yaml.v3"
 )
 
@@ -41,6 +42,27 @@ type TLSProvider interface {
 // Wrapper wraps the server's handler. Wrappers nest in [Server.Plugins] order: the first listed is the outermost.
 type Wrapper interface {
 	Wrap(next http.Handler) http.Handler
+}
+
+// AppIniter sets up each instance's app right after it is created, before its JS hooks load and before it
+// bootstraps (opens its databases): the place to bind OnBootstrap, OnServe and OnTerminate handlers (e.g. the pitr
+// plugin). It runs on every start of the app, including restarts. An error fails that start.
+type AppIniter interface {
+	InitApp(inst Instance, app core.App) error
+}
+
+func chainIniters(in []AppIniter) func(Instance, core.App) error {
+	if len(in) == 0 {
+		return nil
+	}
+	return func(inst Instance, app core.App) error {
+		for _, i := range in {
+			if err := i.InitApp(inst, app); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
 }
 
 // Starter runs background work once the Manager exists, until ctx is done.
