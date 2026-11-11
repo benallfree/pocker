@@ -113,6 +113,7 @@ document.addEventListener("mount:pageBackupsSettings", (e) => {
 
 | Field | Use it for |
 |---|---|
+| `Server.Plugins` | Packaged host plugins (`Configurer`, `Gate`, `TLSProvider`, `Wrapper`, `Starter`; see [POCKER.md](../ext/pocker/POCKER.md#plugins)), e.g. [firewall](../ext/firewall), [autotls](../ext/autotls), [servertiming](../ext/servertiming). |
 | `Server.Wrap` | Middleware around every instance request, e.g. auth in front of all instances, metrics, headers. |
 | `Server.OnStart` | Gets the `Manager` before the first request: start background jobs (schedules, sweeps) in your own goroutines. |
 | `Server.OnEvent` | Instance events: started, stopped, memory strikes, pauses. |

@@ -19,9 +19,9 @@ endorsed by the PocketBase project.
 | [mothership](ext/mothership/README.md) | 🟥⬜⬜ | A control plane and its edges for multi-server hosting |
 | [vacuum](ext/vacuum/README.md) | 🟧🟧⬜ | Scheduled SQLite VACUUM |
 | [deploy](ext/deploy/README.md) | 🟧🟧⬜ | Deploy API: push hooks, migrations and public files |
-| [firewall](ext/firewall/README.md) | 🟧🟧⬜ | Peer allow-lists, trusted proxies and rate limits |
-| [autotls](ext/autotls/README.md) | 🟧🟧⬜ | Automatic TLS: on-demand certificates and wildcards |
-| [servertiming](ext/servertiming/README.md) | 🟧🟧⬜ | Server-Timing headers |
+| [firewall](ext/firewall/README.md) | 🟩🟩🟩 | Peer allow-lists, trusted proxies and rate limits |
+| [autotls](ext/autotls/README.md) | 🟩🟩🟩 | Automatic TLS: on-demand certificates and wildcards |
+| [servertiming](ext/servertiming/README.md) | 🟩🟩🟩 | Server-Timing headers |
 | [schedules](ext/schedules/README.md) | 🟧🟧⬜ | Scheduled webhooks that wake sleeping instances |
 
 🟥⬜⬜ not started · 🟧🟧⬜ in progress (working code exists, not yet a plugin here) · 🟩🟩🟩 done

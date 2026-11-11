@@ -4,9 +4,9 @@
 
 **Runs on:** Single app, or many under [pocker](../pocker/README.md).
 
-> **Planned.** Nothing is published here yet. This folder will hold the plugin's Go module
-> (`github.com/pockethost/pocketbase/ext/servertiming`), its tests and a minimal `example/main.go` that builds and shows the
-> feature. See [Create your own plugin](../../docs/plugins.md).
+> **Status.** Working: Go module `github.com/pockethost/pocketbase/ext/servertiming`, a plugin for [pocker](../pocker/README.md)
+> (`pocker.Server{Plugins: []pocker.Plugin{servertiming.New()}}`), bundled in the `pocker` command.
+> Settings: nothing; list it first so its header includes every other hop.
 
 ## License
 

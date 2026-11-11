@@ -4,9 +4,9 @@ Peer allow-lists, trusted proxies and per-IP rate limits; under pocker, per-inst
 
 **Runs on:** Single app, or many under [pocker](../pocker/README.md).
 
-> **Planned.** Nothing is published here yet. This folder will hold the plugin's Go module
-> (`github.com/pockethost/pocketbase/ext/firewall`), its tests and a minimal `example/main.go` that builds and shows the
-> feature. See [Create your own plugin](../../docs/plugins.md).
+> **Status.** Working: Go module `github.com/pockethost/pocketbase/ext/firewall`, a plugin for [pocker](../pocker/README.md)
+> (`pocker.Server{Plugins: []pocker.Plugin{firewall.New()}}`), bundled in the `pocker` command.
+> Settings: `firewall:` and `rate_limits:` in pocker.yaml; per instance `plugins.firewall: {rate_limits, trusted_ips}`.
 
 ## License
 

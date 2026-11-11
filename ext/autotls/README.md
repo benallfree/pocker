@@ -4,9 +4,9 @@ Automatic certificates through ACME: on demand for every served hostname, wildca
 
 **Runs on:** Single app, or many under [pocker](../pocker/README.md).
 
-> **Planned.** Nothing is published here yet. This folder will hold the plugin's Go module
-> (`github.com/pockethost/pocketbase/ext/autotls`), its tests and a minimal `example/main.go` that builds and shows the
-> feature. See [Create your own plugin](../../docs/plugins.md).
+> **Status.** Working: Go module `github.com/pockethost/pocketbase/ext/autotls`, a plugin for [pocker](../pocker/README.md)
+> (`pocker.Server{Plugins: []pocker.Plugin{autotls.New()}}`), bundled in the `pocker` command.
+> Settings: `tls: {auto, email, ca, storage, domains, dns}` in pocker.yaml (certificate files stay core).
 
 ## License
 

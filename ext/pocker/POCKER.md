@@ -36,7 +36,8 @@ instances:
     hosts: [shop.example.com]
     secrets: { STRIPE_KEY: sk_live_... }               # the app's environment
     encryption_key: 0123456789abcdef0123456789abcdef   # encrypts PocketBase's stored settings; not visible to JS
-    access: { cors_origins: [https://shop.example.com], trusted_ips: [203.0.113.0/24] }
+    access: { cors_origins: [https://shop.example.com] }
+    plugins: { firewall: { trusted_ips: [203.0.113.0/24] } }   # settings for plugins, by name
   - id: old
     hosts: [old.example.com]
     blocked: { status: 402, message: "Payment required" }
@@ -74,6 +75,7 @@ http_send_max_timeout: 60s
 http_send_max_body: 10MiB
 quarantine: { strikes: 3, window: 10m, first_pause: 30s, max_pause: 15m, reset_after: 1h }   # or: quarantine: off
 max_concurrent_js: 16     # JS calls an instance runs at once; more wait up to max_js_execution, then fail
+# the keys below are read by plugins: rate_limits/firewall by ext/firewall, tls.auto... by ext/autotls
 rate_limits:              # per client IP and per instance; trusted clients get the trusted set
   ip_hourly: 1000
   instance_hourly: 10000
@@ -104,13 +106,14 @@ tls:
   http_listen: ":80"            # optional: plain HTTP redirects to HTTPS (and answers ACME HTTP-01 challenges)
 ```
 
-**Firewall.** Peers outside `allow_cidrs` get 403. The client IP comes from `client_ip_headers` only when the peer is
+**Firewall** ([ext/firewall](../firewall/README.md), included in the `pocker` command). Peers outside `allow_cidrs` get 403. The client IP comes from `client_ip_headers` only when the peer is
 a trusted proxy, otherwise it is the peer. Rate-limited requests get 429 with `Retry-After` and a message naming the
 limit; every routed response carries `<prefix>-{Ip,Instance}-{Hourly,Concurrent}-{Limit,Remaining}` and
 `<prefix>-{Ip,Instance}-Hourly-Reset`, listed in `Access-Control-Expose-Headers`. Long-lived responses (realtime) hold
 their concurrency slot until they end.
 
-**TLS.** With `auto: true` and no `dns`, every hostname the instance source maps gets its own certificate on its first
+**TLS.** Certificate files are core. Automatic certificates are [ext/autotls](../autotls/README.md) (included in the
+`pocker` command): with `auto: true` and no `dns`, every hostname the instance source maps gets its own certificate on its first
 TLS handshake (HTTP-01 / TLS-ALPN-01), with any DNS host and no API token; hostnames no instance serves never trigger
 issuance. A DNS provider (Cloudflare for now) is only needed for wildcard `domains`, proved through DNS-01; a wildcard
 without one is a config error.
@@ -130,11 +133,28 @@ instances:
     limits: { quarantine: off }   # only interrupt, never pause
   - id: api
     hosts: [api.example.com]
-    access: { cors_origins: [https://app.example.com], trusted_ips: [203.0.113.0/24] }
-    limits:
-      rate_limits: { ip_hourly: 5000, instance_concurrent: 500 }
-      max_concurrent_js: 32
+    access: { cors_origins: [https://app.example.com] }
+    limits: { max_concurrent_js: 32 }
+    plugins:
+      firewall: { rate_limits: { ip_hourly: 5000, instance_concurrent: 500 }, trusted_ips: [203.0.113.0/24] }
 ```
+
+## Plugins
+
+`pocker.Server.Plugins` takes plugins (see `plugin.go`). Each implements `Name()` and any of:
+
+| Interface | Used for |
+|---|---|
+| `Configurer` | reading its own keys from pocker.yaml (`Configure(doc, cfg)`) |
+| `Gate` | a peer check before routing, and admission (e.g. rate limits) before an instance is served or forwarded |
+| `TLSProvider` | the main listener's TLS (e.g. automatic certificates) |
+| `Wrapper` | wrapping the server's handler (the first listed is outermost) |
+| `Starter` | background work once the Manager exists |
+
+Per-instance settings for a plugin go under the instance's `plugins.<name>` (read them with `pocker.DecodePluginConfig`).
+Timings for the Server-Timing header are registered with `pocker.Timing(ctx, fn)`. The `pocker` command
+([`cmd/pocker`](cmd/pocker)) bundles [servertiming](../servertiming/README.md), [firewall](../firewall/README.md) and
+[autotls](../autotls/README.md).
 
 ## Platform values and logs
 
@@ -146,9 +166,10 @@ instances:
 - **Secrets** (`secrets: {...}`) are the instance's environment: what its JS sees through `$os.getenv` /
   `process.env`, and nothing else. No names are reserved; platform settings are explicit fields.
 - **Encryption key** (`encryption_key`) encrypts PocketBase's stored settings (like `--encryptionEnv`). JS never sees it.
-- **Access** (`access: {cors_origins, trusted_ips}`) is the owner's say over who may call the instance: allowed browser
-  origins (PocketBase matching: exact, `*`, wildcards; empty = any) and client IPs that get the trusted rate limits
-  (on top of the process-wide `firewall.trusted_clients`).
+- **Access** (`access: {cors_origins}`) is the owner's say over which browser origins may call the instance
+  (PocketBase matching: exact, `*`, wildcards; empty = any). Client IPs that get the trusted rate limits are the
+  firewall plugin's `plugins.firewall.trusted_ips` (on top of the process-wide `firewall.trusted_clients`).
+- **Plugins** (`plugins: {<name>: ...}`) are per-instance settings for plugins; changing them doesn't restart the app.
 - **Logs:** PocketBase's own logs (the dashboard's Logs) are per instance in its `pb_data`. `console.*` from JS hooks
   goes to `<instance>/logs/exec.log` as JSON lines `{message, stream, time}` (`stdout` for log/info/debug, `stderr`
   for warn/error), rotated to `exec.log.1` at 10 MiB. A start failure (e.g. a broken hooks file) is written there too,

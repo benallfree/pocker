@@ -15,7 +15,10 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/pockethost/pocketbase/ext/autotls"
+	"github.com/pockethost/pocketbase/ext/firewall"
 	"github.com/pockethost/pocketbase/ext/pocker"
+	"github.com/pockethost/pocketbase/ext/servertiming"
 )
 
 func main() {
@@ -54,7 +57,11 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	srv := &pocker.Server{Config: cfg}
+	srv := &pocker.Server{Config: cfg, Plugins: []pocker.Plugin{
+		servertiming.New(), // outermost, so its header includes everything below
+		firewall.New(),
+		autotls.New(),
+	}}
 	if err := srv.Run(ctx); err != nil {
 		slog.Error("pocker: serve", "error", err)
 		os.Exit(1)
