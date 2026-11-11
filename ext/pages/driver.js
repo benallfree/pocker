@@ -198,6 +198,22 @@
       }
     })
   }
+  var pbClient = null,
+    pbToken = null
+  ctx.pb = function () {
+    var token = rt.authToken()
+    if (pbClient && pbToken === token) return pbClient
+    var Client = rt.sdk()
+    var pb = new Client(rt.sdkBaseURL)
+    if (token) pb.authStore.save(token, JSON.parse(rt.authRecordJSON()))
+    pb.beforeSend = function (url, options) {
+      options.fetch = rt.apiSend
+      return { url: url, options: options }
+    }
+    pbClient = pb
+    pbToken = token
+    return pb
+  }
   ctx.httpError = function (status, message) {
     var e = new Error(message === undefined ? '' : String(message))
     e.__ppHttp = { status: status, message: message === undefined ? '' : String(message) }

@@ -323,6 +323,7 @@ Query values and cookies are strings unless you ask for JSON. Nothing is parsed 
 |---|---|
 | `ctx.auth` | The authenticated record, or `null`. Set by PocketBase's own auth (an `Authorization` header) or by the `auth` plugin's cookie. |
 | `ctx.app` | The app (`$app`): records, collections, settings. |
+| `ctx.pb()` | A PocketBase JS SDK client (the bundled synchronous build) acting as the signed-in user (`ctx.auth`), or as a guest. Its requests go to the app's own API in-process (no network), so collection API rules, `expand` and field visibility apply exactly as for a browser. API errors throw the SDK's `ClientResponseError` (`e.status`, `e.response`). Only `/api/` routes; file uploads through the SDK aren't supported (use `ctx.app`). |
 | `ctx.env(name)` | Environment variable, `''` if unset (the app's environment; under the sandbox, the instance's). |
 | `ctx.log` | `debug`, `info`, `warn`, `error`: to the app's log. `debug` only shows in dev. |
 | `ctx.meta(key, value?)` | Per-request key/value store for page metadata (title, description). Set with two arguments, read with one. |
@@ -479,6 +480,7 @@ inside `ext/pages` (`starters/`).
 | `asset()` fingerprint: full SHA-256 | First 12 hex characters |
 | `+config.js` plugins: npm package names, EJS options | Built-in names or JS factories; EJS and Markdown always on |
 | auth plugin through the JS SDK over HTTP (`api.pb()`) | `ctx.session.*`, direct app calls |
-| `url()`, `stringify()`, micro-dash, `pb()` globals | Removed: use `ctx.req.url`, `JSON.stringify`, plain JS, `ctx.app` |
+| `url()`, `stringify()`, micro-dash globals | Removed: use `ctx.req.url`, `JSON.stringify`, plain JS |
+| `pb()` (js-sdk plugin over HTTP to `localhost:8090`) | `ctx.pb()`: same SDK, built in, in-process, as the signed-in user |
 | Route with fewer segments could match a longer URL | Segment counts must match |
 | `create-pocketpages` | `pocketbase pages create <name> [--starter <kit>]` |

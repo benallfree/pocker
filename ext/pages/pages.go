@@ -7,6 +7,7 @@ package pages
 import (
 	"errors"
 	"log/slog"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sync"
@@ -15,6 +16,7 @@ import (
 	"ganigeorgiev.com/pocketbase/pocketbase/apis"
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/hook"
+	"ganigeorgiev.com/pocketbase/pocketbase/tools/router"
 )
 
 // MiddlewareID is the id of the router middleware that serves pages.
@@ -54,6 +56,11 @@ type Pages struct {
 
 	hashes   hashCache
 	programs programs
+
+	router  *router.Router[*core.RequestEvent] // for ctx.pb()'s in-process transport
+	muxOnce sync.Once
+	mux     http.Handler
+	muxErr  error
 }
 
 // MustRegister is [Register] that panics on error.
@@ -85,6 +92,7 @@ func Register(app core.App, cfg Config) (*Pages, error) {
 
 	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
 		p.refresh(true)
+		p.router = se.Router
 		se.Router.Bind(&hook.Handler[*core.RequestEvent]{
 			Id:       MiddlewareID,
 			Priority: MiddlewarePriority,

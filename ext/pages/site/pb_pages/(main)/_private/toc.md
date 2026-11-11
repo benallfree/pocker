@@ -57,6 +57,7 @@
 - [flash](/docs/ctx/flash)
 - [auth](/docs/ctx/auth)
 - [app](/docs/ctx/app)
+- [pb (JS SDK)](/docs/ctx/pb)
 - [env](/docs/ctx/env)
 - [log](/docs/ctx/log)
 - [meta](/docs/ctx/meta)

@@ -277,3 +277,37 @@ func TestRealtimeSend(t *testing.T) {
 		}
 	}
 }
+
+func TestJSSDKAppliesAPIRules(t *testing.T) {
+	dir := writeTree(t, map[string]string{
+		"+config.js": "module.exports = { plugins: ['auth'] }",
+		"check/+api.js": `module.exports = { get(ctx) {
+			const guest = ctx.pb().collection('users').getList(1, 50)
+			ctx.session.signInWithPassword('test@example.com', '1234567890')
+			const mine = ctx.pb().collection('users').getList(1, 50)
+			let missing = 0
+			try { ctx.pb().collection('users').getOne('nope') } catch (e) { missing = e.status }
+			return ctx.res.json({ guest: guest.totalItems, mine: mine.totalItems, email: mine.items[0].email, missing })
+		} }`,
+	})
+	h, p := newServer(t, dir)
+	dev := true
+	p.cfg.Dev = &dev
+	users, err := p.app.FindCollectionByNameOrId("users")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rule := "id = @request.auth.id"
+	users.ListRule, users.ViewRule = &rule, &rule
+	if err := p.app.Save(users); err != nil {
+		t.Fatal(err)
+	}
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest("GET", "/check", nil))
+	body := rec.Body.String()
+	// a user sees only their own record; guests see none
+	if rec.Code != 200 || !strings.Contains(body, `"guest":0`) || !strings.Contains(body, `"mine":1`) ||
+		!strings.Contains(body, `"email":"test@example.com"`) || !strings.Contains(body, `"missing":404`) {
+		t.Fatalf("%d %s", rec.Code, body)
+	}
+}

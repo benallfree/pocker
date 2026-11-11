@@ -34,6 +34,7 @@ In templates, `data`, `params`, `asset` and `meta` are shortcuts for `ctx.data`,
 | [`ctx.flash()`](/docs/ctx/flash) | The one-time message from the previous redirect |
 | [`ctx.auth`](/docs/ctx/auth) | The authenticated record, or `null` |
 | [`ctx.app`](/docs/ctx/app) | The app (`$app`) |
+| [`ctx.pb()`](/docs/ctx/pb) | A JS SDK client acting as the visitor (API rules apply) |
 | [`ctx.env(name)`](/docs/ctx/env) | Environment variable |
 | [`ctx.log`](/docs/ctx/log) | `debug`, `info`, `warn`, `error` |
 | [`ctx.meta(key, value?)`](/docs/ctx/meta) | Per-request page metadata |

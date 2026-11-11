@@ -114,7 +114,7 @@ See [+config.js](/docs/config) and [Plugins](/docs/plugins).
 | `url()` | `ctx.req.url` |
 | `stringify()` | `JSON.stringify` |
 | micro-dash | plain JavaScript |
-| `pb()` (JS SDK plugin) | `ctx.app` |
+| `pb()` (JS SDK plugin) | `ctx.pb()`, built in: same SDK, no host setting, runs in-process as the signed-in user |
 
 ## Routing
 

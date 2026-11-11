@@ -85,6 +85,8 @@ type request struct {
 	plugins  []goja.Value
 	builtins map[string]bool
 	auth     *core.Record
+	token    string
+	tokenFor string
 	flashed  bool
 	errorCtx map[string]any
 }
@@ -840,6 +842,11 @@ func (r *request) rtObject() *goja.Object {
 		}
 	})
 	set("load", func(file string) goja.Value { return r.load(file) })
+	set("sdk", func() goja.Value { return r.sdkClass() })
+	set("authToken", func() string { return r.authToken() })
+	set("authRecordJSON", func() string { return r.authRecordJSON() })
+	set("apiSend", func(opts map[string]any) map[string]any { return r.apiSend(opts) })
+	set("sdkBaseURL", sdkBaseURL)
 	set("render", func(file string, locals goja.Value) string { return r.renderFile(file, locals) })
 	set("setWrapped", func(s string) { r.wrapped = s })
 	set("wrapped", func() string { return r.wrapped })
