@@ -6,24 +6,26 @@ PocketBase. Everything else is a plugin. It is not affiliated with or endorsed b
 
 ## Plugins
 
-| Plugin | What it does |
-|---|---|
-| [pocker](ext/pocker/README.md) | Multitenant: run hundreds of untrusted PocketBase instances in one Go process ([how is this safe?](ext/pocker/README.md#how-is-this-safe)) |
-| [sandbox](ext/sandbox/README.md) | Confine untrusted JS hooks, SQL and outbound network |
-| [pitr](ext/pitr/README.md) | Point-in-time restore (Litestream) |
-| [bulkmail](ext/bulkmail/README.md) | Bulk mail campaigns to your app's own users |
-| [pages](ext/pages/README.md) | Server-rendered multi-page applications (PocketPages) |
-| [storage](ext/storage/README.md) | A default storage backend when an app's own S3 is off |
-| [s3redirect](ext/s3redirect/README.md) | File downloads as signed S3 redirects |
-| [mothership](ext/mothership/README.md) | A control plane and its edges for multi-server hosting |
-| [vacuum](ext/vacuum/README.md) | Scheduled SQLite VACUUM |
-| [deploy](ext/deploy/README.md) | Deploy API: push hooks, migrations and public files |
-| [firewall](ext/firewall/README.md) | Peer allow-lists, trusted proxies and rate limits |
-| [autotls](ext/autotls/README.md) | Automatic TLS: on-demand certificates and wildcards |
-| [servertiming](ext/servertiming/README.md) | Server-Timing headers |
-| [schedules](ext/schedules/README.md) | Scheduled webhooks that wake sleeping instances |
+| Plugin | Status | What it does |
+|---|---|---|
+| [pocker](ext/pocker/README.md) | 🟧🟧⬜ | Multitenant: run hundreds of untrusted PocketBase instances in one Go process ([how is this safe?](ext/pocker/README.md#how-is-this-safe)) |
+| [sandbox](ext/sandbox/README.md) | 🟧🟧⬜ | Confine untrusted JS hooks, SQL and outbound network |
+| [pitr](ext/pitr/README.md) | 🟧🟧⬜ | Point-in-time restore (Litestream) |
+| [bulkmail](ext/bulkmail/README.md) | 🟥⬜⬜ | Bulk mail campaigns to your app's own users |
+| [pages](ext/pages/README.md) | 🟥⬜⬜ | Server-rendered multi-page applications (PocketPages) |
+| [storage](ext/storage/README.md) | 🟥⬜⬜ | A default storage backend when an app's own S3 is off |
+| [s3redirect](ext/s3redirect/README.md) | 🟥⬜⬜ | File downloads as signed S3 redirects |
+| [mothership](ext/mothership/README.md) | 🟥⬜⬜ | A control plane and its edges for multi-server hosting |
+| [vacuum](ext/vacuum/README.md) | 🟧🟧⬜ | Scheduled SQLite VACUUM |
+| [deploy](ext/deploy/README.md) | 🟧🟧⬜ | Deploy API: push hooks, migrations and public files |
+| [firewall](ext/firewall/README.md) | 🟧🟧⬜ | Peer allow-lists, trusted proxies and rate limits |
+| [autotls](ext/autotls/README.md) | 🟧🟧⬜ | Automatic TLS: on-demand certificates and wildcards |
+| [servertiming](ext/servertiming/README.md) | 🟧🟧⬜ | Server-Timing headers |
+| [schedules](ext/schedules/README.md) | 🟧🟧⬜ | Scheduled webhooks that wake sleeping instances |
 
-All plugins are planned or in progress. They live in [`ext/`](ext), each as its own Go module.
+🟥⬜⬜ not started · 🟧🟧⬜ in progress (working code exists, not yet a plugin here) · 🟩🟩🟩 done
+
+Plugins live in [`ext/`](ext), each as its own Go module.
 
 ## Contribute a plugin
 
