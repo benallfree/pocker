@@ -1,5 +1,7 @@
 // Command pocker-extension is a Pocker build with one extension: a Go route and an admin dashboard page,
 // added to every instance. See docs/plugins.md.
+//
+// Logins (ext/devusers, local testing only): dashboard admin@example.com / password, app user user@example.com / password.
 package main
 
 import (
@@ -13,6 +15,7 @@ import (
 
 	"ganigeorgiev.com/pocketbase/pocketbase/apis"
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
+	"github.com/pockethost/pocketbase/ext/devusers"
 	"github.com/pockethost/pocketbase/ext/pocker"
 )
 
@@ -32,6 +35,10 @@ func main() {
 		Config: cfg,
 		// Runs for every instance's app after its migrations, before it serves.
 		SetupApp: func(inst pocker.Instance, app core.App) error {
+			// local testing: every instance gets superuser admin@example.com and user user@example.com, password "password"
+			if err := devusers.Ensure(app); err != nil {
+				return err
+			}
 			app.OnServe().BindFunc(func(se *core.ServeEvent) error {
 				// a Go route, superuser only
 				se.Router.GET("/api/hello", func(e *core.RequestEvent) error {

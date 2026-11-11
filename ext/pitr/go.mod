@@ -5,6 +5,7 @@ go 1.27
 require (
 	ganigeorgiev.com/pocketbase/pocketbase v0.0.0-00010101000000-000000000000
 	github.com/benbjohnson/litestream v0.5.18
+	github.com/pockethost/pocketbase/ext/devusers v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketbase/ext/pocker v0.0.0-00010101000000-000000000000
 	github.com/spf13/cobra v1.10.2
 	github.com/superfly/ltx v0.5.2
@@ -76,3 +77,5 @@ replace (
 	github.com/pockethost/pocketbase/ext/pocker => ../pocker
 	github.com/pockethost/pocketbase/ext/sandbox => ../sandbox
 )
+
+replace github.com/pockethost/pocketbase/ext/devusers => ../devusers

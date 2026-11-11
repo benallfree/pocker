@@ -174,6 +174,11 @@ ext/<name>/
 - **`example/main.go` is required.** Keep it as small as possible: just enough to build a binary that shows the
   feature working, with no extra harness. `go build ./example` and `go vet ./...` must pass with no warnings.
   [`ext/pocker/example`](../ext/pocker/example) and [`ext/sandbox/example`](../ext/sandbox/example) are the size to aim for.
+- **Examples come with two logins:** superuser `admin@example.com` and user `user@example.com` (verified, in
+  `users`), both with password `password`. Every `example/main.go` calls
+  `devusers.Register(app)` right after `pocketbase.New()` (under pocker, `devusers.Ensure(app)` in
+  `SetupApp`), from [`ext/devusers`](../ext/devusers/devusers.go). A fresh data dir is then ready to log
+  in to, with no installer page and no CLI step. Never register it in a production build.
 - **Dependencies stay in your module.** Heavy libraries go in your plugin's `go.mod`, never in core's.
 - **Single app first.** Where it makes sense, a plugin should work on one PocketBase app, and add more under the
   pocker (multitenant) host.

@@ -2,6 +2,8 @@
 // host primitives ($os.exec, $os.exit, ...) are disabled, and every JS call has a time limit.
 //
 //	go run ./example serve
+//
+// Logins (ext/devusers, local testing only): dashboard admin@example.com / password, app user user@example.com / password.
 package main
 
 import (
@@ -12,11 +14,13 @@ import (
 
 	"ganigeorgiev.com/pocketbase/pocketbase"
 	"ganigeorgiev.com/pocketbase/pocketbase/plugins/jsvm"
+	"github.com/pockethost/pocketbase/ext/devusers"
 	"github.com/pockethost/pocketbase/ext/sandbox"
 )
 
 func main() {
 	app := pocketbase.New()
+	devusers.Register(app) // local testing: superuser admin@example.com and user user@example.com, password "password"
 
 	dir, _ := os.Getwd()
 	sb := &sandbox.Sandbox{

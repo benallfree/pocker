@@ -21,6 +21,7 @@ Each folder here will be one plugin, with its own Go module (`github.com/pocketh
 | [`firewall`](firewall/README.md) | Peer allow-lists, trusted proxies and per-IP rate limits; under pocker, per-instance and cross-instance limits too. | Single app, or many under pocker |
 | [`autotls`](autotls/README.md) | Automatic certificates through ACME: on demand for every served hostname, wildcards through DNS-01, more CAs. | Single app, or many under pocker |
 | [`servertiming`](servertiming/README.md) | `Server-Timing` headers with timings for each step of a request (and each hop under pocker). | Single app, or many under pocker |
+| [`devusers`](devusers/devusers.go) | Local testing only: on bootstrap, upserts superuser admin@example.com and user user@example.com (verified, in `users`), both with password `password`. Every plugin's `example/` registers it; production builds never do. | Example and test builds |
 | [`schedules`](schedules/README.md) | Scheduled webhooks per instance, called in-process even while the instance sleeps, with a catch-up run after downtime. | pocker |
 
 All MIT, like PocketBase.
