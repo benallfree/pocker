@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title><%= meta('title') || 'PocketPages' %></title>
+    <link href="<%=asset('/assets/prism.css')%>" rel="stylesheet" />
+    <link href="<%=asset(`/assets/app.css`)%>" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@docsearch/css" />
+    <script src="https://cdn.jsdelivr.net/npm/@docsearch/js"></script>
+    <meta name="algolia-site-verification" content="715D807F817B1875" />
+    <link
+      rel="preconnect"
+      href="https://BRYSO1SKCE-dsn.algolia.net"
+      crossorigin
+    />
+    <meta
+      name="description"
+      content="<%=meta('description') || 'Server-side pages for PocketBase'%>"
+    />
+    <meta property="og:title" content="<%=meta('title') || 'PocketPages'%>" />
+    <meta
+      property="og:description"
+      content="<%=meta('description') || 'Server-side pages for PocketBase'%>"
+    />
+    <meta
+      property="og:image"
+      content="<%=meta('image') || 'https://pocketpages.dev/android-chrome-512x512.png'%>"
+    />
+    <meta
+      property="og:url"
+      content="<%= meta('path') ? `https://pocketpages.dev${meta('path')}` : meta('url') || `https://pocketpages.dev${ctx.req.url.pathname}` %>"
+    />
+    <style>
+      :root {
+        --docsearch-primary-color: var(--color-accent);
+        --docsearch-text-color: var(--color-base-content);
+        --docsearch-spacing: 12px;
+        --docsearch-icon-stroke-width: 1.4;
+        --docsearch-highlight-color: var(--docsearch-primary-color);
+        --docsearch-muted-color: color-mix(
+          in srgb,
+          var(--color-base-content) 60%,
+          transparent
+        );
+        --docsearch-container-background: color-mix(
+          in srgb,
+          var(--color-base-200) 80%,
+          transparent
+        );
+        --docsearch-logo-color: var(--color-primary);
+        --docsearch-modal-width: 560px;
+        --docsearch-modal-height: 600px;
+        --docsearch-modal-background: var(--color-base-100);
+        --docsearch-modal-shadow:
+          inset 1px 1px 0 0
+            color-mix(in srgb, var(--color-base-100) 50%, transparent),
+          0 3px 8px 0 var(--color-base-300);
+        --docsearch-searchbox-height: 56px;
+        --docsearch-searchbox-background: var(--color-base-200);
+        --docsearch-searchbox-focus-background: var(--color-base-100);
+        --docsearch-searchbox-shadow: inset 0 0 0 2px
+          var(--docsearch-primary-color);
+        --docsearch-hit-height: 56px;
+        --docsearch-hit-color: var(--color-base-content);
+        --docsearch-hit-active-color: var(--color-primary-content);
+        --docsearch-hit-background: var(--color-base-100);
+        --docsearch-hit-shadow: 0 1px 3px 0 var(--color-base-300);
+        --docsearch-key-gradient: linear-gradient(
+          -225deg,
+          var(--color-base-200),
+          var(--color-base-100)
+        );
+        --docsearch-key-shadow:
+          inset 0 -2px 0 0 var(--color-base-300),
+          inset 0 0 1px 1px var(--color-base-100),
+          0 1px 2px 1px
+            color-mix(in srgb, var(--color-base-300) 40%, transparent);
+        --docsearch-key-pressed-shadow:
+          inset 0 -2px 0 0 var(--color-base-300),
+          inset 0 0 1px 1px var(--color-base-100),
+          0 1px 1px 0 color-mix(in srgb, var(--color-base-300) 40%, transparent);
+        --docsearch-footer-height: 44px;
+        --docsearch-footer-background: var(--color-base-100);
+        --docsearch-footer-shadow:
+          0 -1px 0 0 var(--color-base-300),
+          0 -3px 6px 0 color-mix(in srgb, var(--color-primary) 12%, transparent);
+      }
+    </style>
+    <%- ctx.datastar.scripts({ spa: { scope: '#toc', selector: '#content' } }) %>
+    <%- slot('head') %>
+  </head>
+
+  <body>
+    <section class="-mt-px border-y border-border bg-background">
+      <div class="mx-auto max-w-screen-xl px-4 py-2">
+        <div class="flex flex-row items-center justify-end gap-1.5">
+          <div id="docsearch">Search</div>
+          <div>
+            <a href="https://github.com/pockerbase/pocketbase" target="_blank">
+              <img
+                src="https://api.iconify.design/simple-icons:github.svg?color=%23536dfe"
+              />
+            </a>
+          </div>
+
+          <div>
+            <a href="https://discord.gg/nVTxCMEcGT" target="_blank">
+              <img
+                src="https://api.iconify.design/simple-icons:discord.svg?color=%23536dfe"
+              />
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+    <%- slot() %>
+    <script src="<%=asset('/assets/prism.js')%>" defer></script>
+    <script
+      defer
+      src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/js/all.min.js"
+      integrity="sha512-6sSYJqDreZRZGkJ3b+YfdhB3MzmuP9R7X1QZ6g5aIXhRvR1Y/N/P47jmnkENm7YL3oqsmI6AK+V6AD99uWDnIw=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+      defer
+    ></script>
+    <script>
+      docsearch({
+        container: '#docsearch',
+        appId: 'BRYSO1SKCE',
+        indexName: 'PocketPages Crawler',
+        apiKey: '8f90b040a2f9726fdf47acc203b9bedb',
+      })
+    </script>
+  </body>
+</html>
