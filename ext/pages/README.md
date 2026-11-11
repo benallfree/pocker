@@ -18,6 +18,9 @@ in Go and page code in the app's JS VM.
 
 ## Use it
 
+The standard CE binary ([`cmd/pocketbase`](../../cmd/pocketbase/main.go)) includes pages: put a `pb_pages` folder next
+to `pb_data` and run `pocketbase serve`. `--pagesDir` points it somewhere else. In your own Go build:
+
 ```go
 app := pocketbase.New()
 jsvm.MustRegister(app, jsvm.Config{})    // page code runs in the app's JS VM

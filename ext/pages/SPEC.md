@@ -20,6 +20,8 @@ myapp/
 
 - A single app finds it at `pb_pages` next to `pb_data`, or at `--pagesDir` (a relative path resolves against the
   working directory, like `--hooksDir`).
+- Serving is automatic: the standard CE binary includes pages, and an app serves its `pb_pages` whenever the folder
+  exists (it starts serving if the folder appears later). There is no on/off switch; no folder, no pages.
 - Under the multitenant host every instance has its own `pb_pages`.
 - If the folder doesn't exist, the plugin does nothing for that app.
 - Page code can `require()` modules from `pb_pages/node_modules`, then from the app's usual module paths.

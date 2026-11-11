@@ -10,7 +10,9 @@ before:
 
 builds:
   - id: build_noncgo
-    main: ./examples/base
+    # the standard CE binary: examples/base + the default CE plugins (ext/pages), in its own module
+    dir: cmd/pocketbase
+    main: .
     binary: pocketbase
     ldflags:
       - -s -w -X ganigeorgiev.com/pocketbase/pocketbase.Version={{ .Version }}
