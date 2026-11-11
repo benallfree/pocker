@@ -221,7 +221,7 @@ The module path stays `ganigeorgiev.com/pocketbase/pocketbase`, so a build pins 
 `replace` line:
 
 ```
-replace ganigeorgiev.com/pocketbase/pocketbase => github.com/pockerbase/pockerbase v0.0.1
+replace ganigeorgiev.com/pocketbase/pocketbase => github.com/pockerbase/pocketbase v0.0.1
 ```
 
 ## Upstream tracking

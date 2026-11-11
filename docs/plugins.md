@@ -31,7 +31,7 @@ PockerBase keeps PocketBase's module path, so upstream merges stay clean. Point 
 ```
 require ganigeorgiev.com/pocketbase/pocketbase v0.41.1
 
-replace ganigeorgiev.com/pocketbase/pocketbase => github.com/pockerbase/pockerbase <commit or version>
+replace ganigeorgiev.com/pocketbase/pocketbase => github.com/pockerbase/pocketbase <commit or version>
 ```
 
 Go only honors `replace` in the main module, so the final binary's `go.mod` needs this line, not only your
