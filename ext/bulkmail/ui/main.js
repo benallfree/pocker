@@ -19,9 +19,6 @@
         icon: "ri-mail-send-line",
         label: "Mail",
     });
-    app.store.settingsNavGroups["Bulk mail"] = [
-        { href: "#/bulkmail/settings", icon: "ri-mail-settings-line", label: "Bulk mail" },
-    ];
 
     function api(path, method = "POST", body) {
         return app.pb.send("/api/bulkmail" + path, { method, body });
@@ -35,7 +32,7 @@
         const links = [
             ["#/bulkmail", "ri-mail-send-line", "Campaigns"],
             ["#/bulkmail/suppressions", "ri-mail-forbid-line", "Suppressions"],
-            ["#/bulkmail/settings", "ri-settings-3-line", "Settings"],
+            ["#/settings/mail", "ri-settings-3-line", "Settings"],
         ];
         return app.components.pageSidebar(
             { className: "bulkmail-sidebar" },
@@ -346,8 +343,8 @@
                         // content
                         t.div({ className: "col-lg-6" }, field("Name", text("name", { required: true }))),
                         t.div({ className: "col-lg-6" }, field("Subject", text("subject"), "Placeholders: {{record.field}}, {{campaign.name}}, vars.")),
-                        t.div({ className: "col-lg-6" }, field("From name", text("from_name"), "Defaults to Bulk mail settings, then Mail settings.")),
-                        t.div({ className: "col-lg-6" }, field("From address", text("from_address", { type: "email" }))),
+                        t.div({ className: "col-lg-6" }, field("From name", text("from_name", { placeholder: () => app.store.settings?.meta?.senderName || "" }), "Empty uses the sender in Settings > Mail.")),
+                        t.div({ className: "col-lg-6" }, field("From address", text("from_address", { type: "email", placeholder: () => app.store.settings?.meta?.senderAddress || "" }))),
                         t.div({ className: "col-lg-12" }, field("Body",
                             app.components.tinymce({
                                 value: () => c.html || "",
@@ -541,15 +538,29 @@
     });
 
     // ---------------------------------------------------------------------------------------------------------
-    // settings
+    // settings: a "Bulk mail" section under the form on Settings > Mail (the sender itself is the app's, above it)
 
     app.routes.superuserOnly("#/bulkmail/settings", () => {
-        app.store.title = "Bulk mail settings";
-        const data = store({ loading: true, saving: false, s: null, webhookSecret: "" });
+        setTimeout(() => window.location.replace("#/settings/mail"));
+        return t.div();
+    });
 
+    document.addEventListener("mount:mailSettingsForm", (e) => {
+        const form = e.detail;
+        form.parentElement?.querySelector(":scope > .bulkmail-settings")?.remove();
+        form.after(bulkmailSettings());
+    });
+
+    function bulkmailSettings() {
+        const data = store({ loading: true, saving: false, s: null, webhookSecret: "", initSerialized: "", showFeedback: false });
+
+        function snapshot() {
+            return JSON.stringify([data.s, data.webhookSecret]);
+        }
         async function load() {
             try {
                 data.s = await api("/settings", "GET");
+                data.initSerialized = snapshot();
             } catch (err) {
                 fail(err);
             }
@@ -560,59 +571,65 @@
             data.saving = true;
             try {
                 data.s = await api("/settings", "PATCH", {
-                    fromName: data.s.fromName, fromAddress: data.s.fromAddress, postalAddress: data.s.postalAddress,
+                    postalAddress: data.s.postalAddress,
                     unsubscribeMailto: data.s.unsubscribeMailto,
                     snsTopicArns: (data.s.snsTopicArns || []).filter(Boolean),
                     webhookSecret: data.webhookSecret,
                 });
                 data.webhookSecret = "";
+                data.initSerialized = snapshot();
                 app.toasts.success("Saved bulk mail settings.");
             } catch (err) {
                 fail(err);
             }
             data.saving = false;
         }
-        function input(key, label, attrs = {}, hint) {
-            return t.div({ className: "field" }, t.label({}, label),
-                t.input({ type: "text", ...attrs, value: () => data.s[key] || "", oninput: (e) => (data.s[key] = e.target.value) }),
-                hint ? t.div({ className: "field-help" }, hint) : null);
-        }
 
         load();
 
-        return layout(["Mail", "Settings"], () => {
+        return t.div({ className: "bulkmail-settings m-t-base" }, () => {
             if (data.loading || !data.s) {
-                return t.div({ className: "block txt-center" }, t.span({ className: "loader lg" }));
+                return t.div({ className: "block txt-center" }, t.span({ className: "loader" }));
             }
             const s = data.s;
             return t.form({ className: "grid", inert: () => data.saving, onsubmit: save },
+                t.div({ className: "col-lg-12" }, t.hr()),
                 t.div({ className: "col-lg-12" },
+                    t.h6({ className: "m-b-xs" }, "Bulk mail"),
                     s.allowed
-                        ? t.p({ className: "txt-hint" }, `This app may send ${s.rate} messages per second and ${s.daily} per day (${s.sentToday} sent today, UTC).`)
+                        ? t.p({ className: "txt-hint" }, `Campaigns send from the sender above. This app may send ${s.rate} messages per second and ${s.daily} per day (${s.sentToday} sent today, UTC).`)
                         : t.p({ className: "txt-danger" }, "Bulk mail isn't available for this app."),
                 ),
-                t.div({ className: "col-lg-6" }, input("fromName", "Default sender name")),
-                t.div({ className: "col-lg-6" }, input("fromAddress", "Default sender address", { type: "email" }, "Empty uses Mail settings.")),
                 t.div({ className: "col-lg-12" }, t.div({ className: "field" }, t.label({}, "Postal address"),
                     t.textarea({ rows: 3, value: () => s.postalAddress || "", oninput: (e) => (s.postalAddress = e.target.value) }),
                     t.div({ className: "field-help" }, "Shown in every campaign footer (anti-spam laws require one)."))),
-                t.div({ className: "col-lg-6" }, input("unsubscribeMailto", "Unsubscribe mailbox", { type: "email" }, "Optional mailto: alternative in the List-Unsubscribe header.")),
-                t.div({ className: "col-lg-12" }, t.h6({}, "Bounces and complaints")),
-                t.div({ className: "col-lg-12" }, t.div({ className: "field" }, t.label({}, "Amazon SES (SNS) endpoint"),
-                    t.input({ type: "text", readOnly: true, value: s.sesEndpoint }),
-                    t.div({ className: "field-help" }, "Subscribe this HTTPS URL to the SNS topic your SES identity sends bounce and complaint notifications to. Signatures are verified."))),
-                t.div({ className: "col-lg-12" }, t.div({ className: "field" }, t.label({}, "Allowed SNS topic ARNs"),
-                    t.input({ type: "text", placeholder: "arn:aws:sns:us-east-1:123456789012:ses-feedback", value: () => (s.snsTopicArns || []).join(", "),
-                        oninput: (e) => (s.snsTopicArns = e.target.value.split(",").map((v) => v.trim())) }),
-                    t.div({ className: "field-help" }, "Comma separated. Empty accepts any topic with a valid AWS signature."))),
-                t.div({ className: "col-lg-12" }, t.div({ className: "field" }, t.label({}, "Generic webhook"),
-                    t.input({ type: "text", readOnly: true, value: s.webhookEndpoint }),
-                    t.div({ className: "field-help" }, `POST {"type":"bounce|complaint|unsubscribe","email":"…"} with an X-Bulkmail-Secret header.`))),
-                t.div({ className: "col-lg-6" }, t.div({ className: "field" }, t.label({}, "Webhook secret"),
-                    t.input({ type: "password", autocomplete: "new-password", placeholder: s.hasWebhookSecret ? "•••••• (set; type to replace)" : "Not set: webhook disabled",
-                        value: () => data.webhookSecret, oninput: (e) => (data.webhookSecret = e.target.value) }))),
-                t.div({ className: "col-lg-12" }, t.button({ type: "submit", className: "btn" }, "Save changes")),
+                t.div({ className: "col-lg-6" }, t.div({ className: "field" }, t.label({}, "Unsubscribe mailbox"),
+                    t.input({ type: "email", value: () => s.unsubscribeMailto || "", oninput: (e) => (s.unsubscribeMailto = e.target.value) }),
+                    t.div({ className: "field-help" }, "Optional mailto: alternative in the List-Unsubscribe header."))),
+                t.div({ className: "col-lg-12" },
+                    t.button({ type: "button", className: "btn sm secondary", onclick: () => (data.showFeedback = !data.showFeedback) },
+                        t.span({ className: "txt" }, () => data.showFeedback ? "Hide bounces and complaints" : "Bounces and complaints"),
+                        t.i({ className: () => data.showFeedback ? "ri-arrow-up-s-line" : "ri-arrow-down-s-line", ariaHidden: true }))),
+                () => !data.showFeedback ? null : t.div({ className: "col-lg-12" }, t.div({ className: "grid" },
+                    t.div({ className: "col-lg-12" }, t.div({ className: "field" }, t.label({}, "Amazon SES (SNS) endpoint"),
+                        t.input({ type: "text", readOnly: true, value: s.sesEndpoint }),
+                        t.div({ className: "field-help" }, "Subscribe this HTTPS URL to the SNS topic your SES identity sends bounce and complaint notifications to. Signatures are verified."))),
+                    t.div({ className: "col-lg-12" }, t.div({ className: "field" }, t.label({}, "Allowed SNS topic ARNs"),
+                        t.input({ type: "text", placeholder: "arn:aws:sns:us-east-1:123456789012:ses-feedback", value: () => (s.snsTopicArns || []).join(", "),
+                            oninput: (e) => (s.snsTopicArns = e.target.value.split(",").map((v) => v.trim())) }),
+                        t.div({ className: "field-help" }, "Comma separated. Empty accepts any topic with a valid AWS signature."))),
+                    t.div({ className: "col-lg-12" }, t.div({ className: "field" }, t.label({}, "Generic webhook"),
+                        t.input({ type: "text", readOnly: true, value: s.webhookEndpoint }),
+                        t.div({ className: "field-help" }, `POST {"type":"bounce|complaint|unsubscribe","email":"…"} with an X-Bulkmail-Secret header.`))),
+                    t.div({ className: "col-lg-6" }, t.div({ className: "field" }, t.label({}, "Webhook secret"),
+                        t.input({ type: "password", autocomplete: "new-password", placeholder: s.hasWebhookSecret ? "•••••• (set; type to replace)" : "Not set: webhook disabled",
+                            value: () => data.webhookSecret, oninput: (e) => (data.webhookSecret = e.target.value) }))),
+                )),
+                t.div({ className: "col-lg-12 flex" },
+                    t.div({ className: "m-r-auto" }),
+                    t.button({ type: "submit", className: "btn expanded", disabled: () => data.initSerialized == snapshot() },
+                        t.span({ className: "txt" }, "Save bulk mail settings"))),
             );
         });
-    });
+    }
 })();

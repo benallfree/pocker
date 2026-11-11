@@ -58,8 +58,7 @@ type Config struct {
 
 // Settings are stored per app (a _params row, so they ride along in backups) and edited in Settings → Bulk mail.
 type Settings struct {
-	FromName      string `json:"fromName"`
-	FromAddress   string `json:"fromAddress"`
+	// The default sender is the app's (Settings > Mail); a campaign's from_name / from_address override it.
 	PostalAddress string `json:"postalAddress"`
 	// UnsubscribeMailto, when set, is added to List-Unsubscribe as a mailto: alternative.
 	UnsubscribeMailto string `json:"unsubscribeMailto"`
@@ -239,7 +238,6 @@ func (bm *BulkMail) SaveSettings(s Settings) error {
 	if s.WebhookSecret == "" {
 		s.WebhookSecret = cur.WebhookSecret
 	}
-	s.FromAddress = strings.TrimSpace(s.FromAddress)
 
 	bm.mu.Lock()
 	defer bm.mu.Unlock()

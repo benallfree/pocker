@@ -22,8 +22,9 @@ jsvm.MustRegister(app, jsvm.Config{OnInit: func(vm *goja.Runtime) { bulkmail.Bin
 go run ./example serve
 ```
 
-The dashboard gets a **Mail** page (campaigns, recipients, suppressions, settings) and a **Bulk mail** entry under
-Settings.
+The dashboard gets a **Mail** page (campaigns, recipients, suppressions) and a **Bulk mail** section on Settings >
+Mail (postal address, unsubscribe mailbox, bounce and complaint feedback). Campaigns send from the app's sender in
+Settings > Mail unless a campaign sets its own.
 
 ## What it does
 

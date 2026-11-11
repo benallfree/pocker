@@ -85,9 +85,6 @@ func (bm *BulkMail) handleSaveSettings(e *core.RequestEvent) error {
 	if err := json.NewDecoder(io.LimitReader(e.Request.Body, 1<<16)).Decode(&cur); err != nil {
 		return e.BadRequestError("Invalid settings.", err)
 	}
-	if cur.FromAddress != "" && NormalizeEmail(cur.FromAddress) == "" {
-		return e.BadRequestError("Invalid sender address.", nil)
-	}
 	if err := bm.SaveSettings(cur); err != nil {
 		return e.InternalServerError("", err)
 	}

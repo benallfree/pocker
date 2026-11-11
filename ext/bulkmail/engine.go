@@ -358,18 +358,9 @@ func (bm *BulkMail) campaign(id string) (*core.Record, error) {
 	return c, nil
 }
 
+// from is the campaign's sender, else the app's (Settings > Mail).
 func (bm *BulkMail) from(c *core.Record) (mail.Address, error) {
-	s, err := bm.Settings()
-	if err != nil {
-		return mail.Address{}, err
-	}
 	addr := mail.Address{Name: c.GetString("from_name"), Address: c.GetString("from_address")}
-	if addr.Address == "" {
-		addr.Address = s.FromAddress
-		if addr.Name == "" {
-			addr.Name = s.FromName
-		}
-	}
 	if addr.Address == "" {
 		addr.Address = bm.app.Settings().Meta.SenderAddress
 		if addr.Name == "" {
