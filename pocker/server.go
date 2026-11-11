@@ -33,6 +33,13 @@ type Server struct {
 
 	// Wrap, if set, wraps the instance handler (e.g. firewall or rate-limit middleware from a host application).
 	Wrap func(http.Handler) http.Handler
+
+	// Forward, if set, serves requests for instances another server runs (see [ManagerOptions.Forward]).
+	Forward func(w http.ResponseWriter, r *http.Request, inst Instance)
+
+	// OnStart, if set, receives the Manager once Run has created it, before any request is served: the safe way for
+	// host code running in other goroutines (scheduled jobs, maintenance) to get it.
+	OnStart func(m *Manager)
 }
 
 // Run serves until ctx is done, then shuts down in-flight requests and running apps.
@@ -83,7 +90,12 @@ func (s *Server) Run(ctx context.Context) error {
 		Firewall:      fw,
 		OnEvent:       s.onEvent(source, log),
 		Setup:         s.SetupApp,
+		Forward:       s.Forward,
 	})
+
+	if s.OnStart != nil {
+		s.OnStart(s.Manager)
+	}
 
 	var handler http.Handler = s.Manager
 	if s.Wrap != nil {
@@ -122,7 +134,7 @@ func (s *Server) Run(ctx context.Context) error {
 		WriteTimeout: 5 * time.Minute,
 		BaseContext:  func(net.Listener) context.Context { return runCtx },
 	}
-	serveErr := make(chan error, 1)
+	serveErr := make(chan error, 1+len(s.Config.PlainListen))
 	var redirect *http.Server
 	startRedirect := func(h http.Handler) {
 		if s.Config.TLS.HTTPListen == "" {
@@ -160,6 +172,29 @@ func (s *Server) Run(ctx context.Context) error {
 		go func() { serveErr <- srv.Serve(ln) }()
 	}
 	log.Info("pocker: listening", "addr", ln.Addr().String(), "pb_root", s.Config.PBRoot, "dev", s.Config.Dev)
+	var plain []*http.Server
+	for _, addr := range s.Config.PlainListen {
+		pln, err := net.Listen("tcp", addr)
+		if err != nil {
+			_ = srv.Close()
+			for _, p := range plain {
+				_ = p.Close()
+			}
+			s.Manager.Shutdown()
+			return fmt.Errorf("plain_listen %s: %w", addr, err)
+		}
+		p := &http.Server{
+			Handler: handler, ReadHeaderTimeout: time.Minute, ReadTimeout: 5 * time.Minute, WriteTimeout: 5 * time.Minute,
+			BaseContext: func(net.Listener) context.Context { return runCtx },
+		}
+		plain = append(plain, p)
+		go func() {
+			if err := p.Serve(pln); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				serveErr <- err
+			}
+		}()
+		log.Info("pocker: listening (plain HTTP)", "addr", pln.Addr().String())
+	}
 
 	select {
 	case <-ctx.Done():
@@ -184,6 +219,9 @@ func (s *Server) Run(ctx context.Context) error {
 	_ = srv.Shutdown(shutdownCtx)
 	if redirect != nil {
 		_ = redirect.Shutdown(shutdownCtx)
+	}
+	for _, p := range plain {
+		_ = p.Shutdown(shutdownCtx)
 	}
 	cancel() // ends long-lived requests such as realtime SSE
 	s.Manager.Shutdown()

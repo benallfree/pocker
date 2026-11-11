@@ -54,6 +54,7 @@ Optional `pocker.yaml` (every field has a default):
 
 ```yaml
 listen: ":8090"
+plain_listen: []          # extra plain-HTTP listeners (no TLS, no redirect), e.g. a private network other servers forward on
 pb_root: "./pb_root"
 dev: false
 instances_file: "./instances.yaml"
@@ -153,7 +154,7 @@ instances:
   for warn/error), rotated to `exec.log.1` at 10 MiB. A start failure (e.g. a broken hooks file) is written there too,
   and only that instance fails.
 
-When an instance's `secrets`, `encryption_key`, `access`, `limits`, `dev`, `dir`, `superusers` or `private` changes, its app restarts on the next request (the old one finishes
+When an instance's `secrets`, `encryption_key`, `access`, `limits`, `dev`, `dir`, `superusers`, `private` or `remote` changes, its app restarts on the next request (the old one finishes
 in-flight requests first), so a rotated secret takes effect immediately. Host changes apply without a restart.
 
 `GET /_pocker/health` on any host reports `{status, instances, running}`.
@@ -162,6 +163,14 @@ in-flight requests first), so a rotated secret takes effect immediately. Host ch
 the app, holds new requests for that instance, runs `fn(dir)`, then lets them through to a fresh app.
 `Manager.StartInstance(ctx, id)` starts it right away and returns the start error (for example to tell a deploy that
 a hook is broken), `Manager.Running(id)` says whether it is started, and `Manager.InstanceDir(id)` gives its folder.
+`Manager.LogInstance(id, stream, message)` appends to the instance's `logs/exec.log` (e.g. a scheduled job's result).
+Host code that runs in its own goroutines gets the Manager from `Server.OnStart`, before any request is served.
+
+**Several servers, one set of instances.** An instance with `remote: <url>` runs on another server: Pocker checks the
+peer and the instance's rate limits here, then forwards the request (a reverse proxy to the URL by default;
+`Server.Forward` replaces it, e.g. to hold requests while the other server restarts). Its app never starts here, and
+an app already running here stops when `remote` is set. `plain_listen` gives the other servers a plain-HTTP port on a
+private network, and `Manager.Firewall()` lets host routes in front of the Manager use the same peer check.
 
 ## Sandbox
 

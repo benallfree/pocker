@@ -20,6 +20,10 @@ type Config struct {
 	// Listen is the HTTP address (default ":8090").
 	Listen string `yaml:"listen"`
 
+	// PlainListen are extra plain-HTTP listeners for the same instances, without TLS or the HTTPS redirect, e.g. on
+	// a private network where other servers forward requests (see [Instance.Remote]).
+	PlainListen []string `yaml:"plain_listen"`
+
 	// PBRoot holds one PocketBase folder per instance: <pb_root>/<instance id> (default "./pb_root").
 	PBRoot string `yaml:"pb_root"`
 

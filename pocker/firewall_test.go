@@ -367,9 +367,10 @@ func selfSigned(t *testing.T, dir, name string) (string, string) {
 func TestTLSRedirectAndReload(t *testing.T) {
 	dir := t.TempDir()
 	certPath, keyPath := selfSigned(t, dir, "first.test")
-	addr, httpAddr := freeAddr(t), freeAddr(t)
+	addr, httpAddr, plainAddr := freeAddr(t), freeAddr(t), freeAddr(t)
 	cfg := DefaultConfig()
 	cfg.Listen, cfg.PBRoot, cfg.Dev = addr, filepath.Join(dir, "pb"), true
+	cfg.PlainListen = []string{plainAddr}
 	cfg.InstancesFile = filepath.Join(dir, "none.yaml")
 	cfg.MemorySoftLimit = -1
 	cfg.TLS = TLSConfig{Cert: certPath, Key: keyPath, HTTPListen: httpAddr}
@@ -404,6 +405,15 @@ func TestTLSRedirectAndReload(t *testing.T) {
 	res, err = insecure.Do(req)
 	if err != nil || res.StatusCode != http.StatusMovedPermanently || res.Header.Get("Location") != "https://blog.localhost/api/health?x=1" {
 		t.Fatalf("http redirect: %v %v", res, err)
+	}
+	res.Body.Close()
+
+	// the plain listener serves the same instances without redirecting
+	req, _ = http.NewRequest(http.MethodGet, "http://"+plainAddr+"/api/health", nil)
+	req.Host = "blog.localhost"
+	res, err = insecure.Do(req)
+	if err != nil || res.StatusCode != http.StatusOK {
+		t.Fatalf("plain listener: %v %v", res, err)
 	}
 	res.Body.Close()
 

@@ -7,6 +7,8 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"reflect"
 	"regexp"
 	"strings"
@@ -39,6 +41,7 @@ type Manager struct {
 	defaults Limits
 	onEvent  func(Event)
 	fw       *Firewall
+	forward  func(w http.ResponseWriter, r *http.Request, inst Instance)
 
 	held map[string]chan struct{} // by ID: instances under maintenance; requests wait for the channel to close
 
@@ -75,6 +78,9 @@ type ManagerOptions struct {
 	Firewall *Firewall
 	// Setup runs host Go code for each app after migrations and before it serves (see [Server.SetupApp]).
 	Setup func(inst Instance, app core.App) error
+	// Forward serves requests for instances with [Instance.Remote] set, after the firewall checks. Nil = a plain
+	// reverse proxy to Remote.
+	Forward func(w http.ResponseWriter, r *http.Request, inst Instance)
 	// Logger defaults to slog.Default().
 	Logger *slog.Logger
 }
@@ -91,6 +97,7 @@ func NewManager(source InstanceSource, opts ManagerOptions) *Manager {
 		defaults:  defaults,
 		onEvent:   opts.OnEvent,
 		fw:        opts.Firewall,
+		forward:   opts.Forward,
 		qstate:    map[string]*quarantineState{},
 		paused:    map[string]time.Time{},
 		held:      map[string]chan struct{}{},
@@ -334,6 +341,11 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if inst.Remote != "" {
+		m.serveRemote(w, r, inst)
+		return
+	}
+
 	if err := m.waitHeld(r.Context(), inst.ID); err != nil {
 		w.Header().Set("Retry-After", "5")
 		http.Error(w, "this instance is being updated; retry shortly", http.StatusServiceUnavailable)
@@ -360,6 +372,52 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	app.handler.ServeHTTP(w, r)
+}
+
+// serveRemote forwards a request for an instance another server runs, after the rate limits.
+func (m *Manager) serveRemote(w http.ResponseWriter, r *http.Request, inst Instance) {
+	if m.fw != nil {
+		release, ok := m.fw.rateCheck(w, r, inst, inst.Limits.over(m.defaults))
+		if !ok {
+			return
+		}
+		defer release()
+	}
+	if m.forward != nil {
+		m.forward(w, r, inst)
+		return
+	}
+	target, err := url.Parse(inst.Remote)
+	if err != nil || target.Host == "" {
+		http.Error(w, "bad remote for "+inst.ID, http.StatusBadGateway)
+		return
+	}
+	proxy := httputil.NewSingleHostReverseProxy(target)
+	proxy.Transport = forwardTransport
+	proxy.ErrorLog = slog.NewLogLogger(m.log.Handler(), slog.LevelWarn)
+	proxy.ServeHTTP(w, r)
+}
+
+// forwardTransport is the default forwarder's own transport: http.DefaultTransport carries the JS egress policy,
+// which blocks private addresses, where other servers usually are.
+var forwardTransport = &http.Transport{
+	DialContext:         (&net.Dialer{Timeout: 5 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
+	MaxIdleConnsPerHost: 64,
+	IdleConnTimeout:     90 * time.Second,
+}
+
+// Firewall returns the manager's firewall (nil if none), so host code in front of the manager (e.g. its own routes)
+// can apply the same peer check and client IP.
+func (m *Manager) Firewall() *Firewall { return m.fw }
+
+// LogInstance appends a line to the instance's log (<instance folder>/logs/exec.log, the same file its app writes),
+// e.g. for a scheduled job's result. Unknown instances are ignored.
+func (m *Manager) LogInstance(id, stream, message string) {
+	dir, ok := m.InstanceDir(id)
+	if !ok {
+		return
+	}
+	openInstanceLog(dir).Write(stream, message)
 }
 
 func (m *Manager) serveHealth(w http.ResponseWriter) {
@@ -443,7 +501,7 @@ type quarantineState struct {
 
 // sameRuntime reports whether two versions of an instance can share a running app.
 func sameRuntime(a, b Instance) bool {
-	return a.Dir == b.Dir && a.Dev == b.Dev && reflect.DeepEqual(a.Secrets, b.Secrets) && a.EncryptionKey == b.EncryptionKey &&
+	return a.Remote == b.Remote && a.Dir == b.Dir && a.Dev == b.Dev && reflect.DeepEqual(a.Secrets, b.Secrets) && a.EncryptionKey == b.EncryptionKey &&
 		reflect.DeepEqual(a.Access, b.Access) && reflect.DeepEqual(a.Limits, b.Limits) &&
 		reflect.DeepEqual(a.Superusers, b.Superusers) && reflect.DeepEqual(a.Private, b.Private)
 }

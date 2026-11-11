@@ -46,6 +46,11 @@ type Instance struct {
 	// Blocked, when set, answers every request for this instance with the given status and message instead of
 	// serving it (e.g. suspended, unpaid). A running app is left running.
 	Blocked *Blocked `yaml:"blocked,omitempty"`
+
+	// Remote, when set, means another server runs this instance (e.g. "http://10.0.0.2:8080"). Pocker applies its
+	// firewall (peer check, rate limits) and then forwards the request there instead of starting the app here (see
+	// [ManagerOptions.Forward]). An app already running here is stopped.
+	Remote string `yaml:"remote,omitempty"`
 }
 
 // Access is what the instance's owner controls about who may call it.
