@@ -1,0 +1,14 @@
+<% slot('title', () => { %>Server-sent events<% }) %>
+<h1>Server-sent events</h1>
+<p><code>clock/stream/+api.js</code> calls <code>ctx.res.sse()</code> and sends ten ticks, one a second.</p>
+<button onclick="start()">Start</button>
+<pre id="ticks">(press start)</pre>
+<script>
+  function start() {
+    const out = document.getElementById('ticks')
+    out.textContent = ''
+    const es = new EventSource('/clock/stream')
+    es.addEventListener('tick', (e) => { out.textContent += e.data + '\n' })
+    es.addEventListener('done', () => { out.textContent += 'done\n'; es.close() })
+  }
+</script>

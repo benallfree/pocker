@@ -1,0 +1,12 @@
+<% slot('title', () => { %>Sign in<% }) %>
+<h1>Sign in</h1>
+<% if (data.error) { %><p class="error"><%= data.error %></p><% } %>
+<form method="post" class="stack">
+  <input name="email" type="email" value="<%= data.email %>" placeholder="Email" required>
+  <input name="password" type="password" placeholder="Password (demo12345)" required>
+  <div style="display:flex;gap:.5rem">
+    <button name="mode" value="login">Sign in</button>
+    <button name="mode" value="register" style="background:var(--muted)">Create account</button>
+  </div>
+</form>
+<p class="muted">Sessions are an HttpOnly <code>pb_auth</code> cookie set by the built-in <code>auth</code> plugin (<code>ctx.session</code>).</p>

@@ -282,6 +282,7 @@ export default function Product({ data, slot }: any) {
 - Text and attribute values are escaped. `dangerouslySetInnerHTML={{ __html }}` inserts raw HTML. `class` and
   `className` both work, as do `for` and `htmlFor`. `style` takes a string or an object (`{ marginTop: 4 }` →
   `margin-top:4`). `true` renders a bare attribute; `false`, `null` and `undefined` leave it out.
+- `<html>` renders with `<!doctype html>` in front of it (JSX can't write a doctype).
 - In a layout, `children` is the inner content. `slot(name)` reads a named slot, `slot(name, content)` sets one
   (content is JSX or a string), `slot()` is the same as `children`.
 - `include(name, locals)` returns the partial's HTML, ready to put in JSX. EJS can `include` a `.jsx`/`.tsx` partial:

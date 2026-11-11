@@ -37,7 +37,7 @@ func TestJSXPages(t *testing.T) {
 		t.Fatalf("%d %s", code, body)
 	}
 	for _, want := range []string{
-		`<html><head><title>Home &amp; more</title></head><body><main>`,
+		`<!doctype html><html><head><title>Home &amp; more</title></head><body><main>`,
 		`<div class="card"><h2>HI!</h2><ul><li class="it">a&lt;</li><li class="it">b</li></ul></div>`,
 		`<p data-x="&#34;q&#34;" disabled style="margin-top:4">&lt;b&gt;esc&lt;/b&gt;</p>`,
 		`<div><i>raw</i></div>`,

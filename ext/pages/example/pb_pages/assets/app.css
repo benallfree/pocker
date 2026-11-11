@@ -1,0 +1,28 @@
+:root { --fg: #1d1d1f; --muted: #6e6e73; --bg: #fafafa; --card: #fff; --line: #e5e5ea; --accent: #0a66c2; }
+@media (prefers-color-scheme: dark) {
+  :root { --fg: #f2f2f7; --muted: #a1a1a6; --bg: #121214; --card: #1c1c1f; --line: #2c2c31; --accent: #5aa2ff; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; font: 16px/1.55 system-ui, sans-serif; color: var(--fg); background: var(--bg); }
+header { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; padding: .75rem 1rem; border-bottom: 1px solid var(--line); }
+header nav { display: flex; gap: .75rem; flex-wrap: wrap; flex: 1; }
+header a { color: var(--fg); text-decoration: none; }
+header nav a.on, header nav a:hover { color: var(--accent); }
+.brand { font-weight: 700; }
+.who form { margin: 0; display: flex; gap: .5rem; align-items: center; color: var(--muted); }
+main { max-width: 760px; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+footer { text-align: center; color: var(--muted); font-size: .85rem; padding: 2rem 1rem; border-top: 1px solid var(--line); }
+a { color: var(--accent); }
+code { font-size: .9em; }
+pre { background: var(--card); border: 1px solid var(--line); padding: .75rem; overflow: auto; border-radius: 8px; }
+.flash { max-width: 760px; margin: 1rem auto 0; padding: .6rem 1rem; background: #e6f4ea; color: #1e4620; border-radius: 8px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: .75rem; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 1rem; }
+.card h2, .card h3 { margin: 0 0 .35rem; font-size: 1.05rem; }
+.badge { display: inline-block; font-size: .75rem; padding: .05rem .5rem; border-radius: 99px; background: var(--line); color: var(--muted); }
+form.stack { display: grid; gap: .6rem; max-width: 420px; }
+input, textarea, button { font: inherit; padding: .5rem .65rem; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--fg); }
+button { cursor: pointer; background: var(--accent); color: #fff; border: 0; }
+.muted { color: var(--muted); }
+.error { color: #c62828; }
+#ticks { font-family: ui-monospace, monospace; }

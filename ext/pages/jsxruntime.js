@@ -75,7 +75,9 @@
     }
     if (VOID[tag]) return raw('<' + tag + attrs + '>')
     if (inner === null) inner = toHTML(children.length ? children : props && props.children)
-    return raw('<' + tag + attrs + '>' + inner + '</' + tag + '>')
+    // JSX can't spell a doctype, so <html> brings its own
+    var doctype = tag === 'html' ? '<!doctype html>' : ''
+    return raw(doctype + '<' + tag + attrs + '>' + inner + '</' + tag + '>')
   }
 
   return { h: h, Fragment: Fragment, raw: raw, toHTML: toHTML }
