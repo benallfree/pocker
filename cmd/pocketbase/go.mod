@@ -54,3 +54,9 @@ replace (
 	ganigeorgiev.com/pocketbase/pocketbase => ../..
 	github.com/pockethost/pocketbase/ext/pages => ../../ext/pages
 )
+
+replace github.com/pockethost/pocketbase/ext/pocker => ../../ext/pocker
+
+replace github.com/pockethost/pocketbase/ext/sandbox => ../../ext/sandbox
+
+replace github.com/pockethost/pocketbase/ext/devusers => ../../ext/devusers
