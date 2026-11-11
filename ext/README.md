@@ -13,7 +13,7 @@ Each folder here will be one plugin, with its own Go module (`github.com/pocketh
 | [`mailrelay`](mailrelay/README.md) | Outgoing mail for instances without their own SMTP: sent through the operator's relay as `<instance>@<domain>` with per-instance limits, instead of the host's `sendmail`. In dev mode it relays into PocketBase CE's built-in dev mail trap. | pocker |
 | [`pages`](pages/README.md) | Server-rendered multi-page apps from a `pb_pages` folder, PocketPages-compatible, with routing and templates in Go. | Single app, or many under pocker |
 | [`storage`](storage/README.md) | A default storage and backups backend per app (for example an operator bucket) when the app's own S3 is off. Credentials never reach the app. | Single app, or many under pocker |
-| [`s3redirect`](s3redirect/README.md) | File downloads as short-lived signed redirects, after PocketBase's own access check. | Single app, or many under pocker |
+| [`s3redirect`](s3redirect/README.md) | File downloads as short-lived signed redirects, after PocketBase's own access check. On by default in the standard binary. | Single app, or many under pocker |
 | [`mothership`](mothership/README.md) | A mothership and its edges: the control plane (instances, edges, regions, admin screens) and the edge side that follows it, each edge owning its own instances. | Requires [pocker](../pocker/README.md) |
 | [`tenants`](tenants/README.md) | Accounts that own instances: quotas, owner logins, tokens, the API for your own tenant dashboard (level 4). | Requires mothership and sandbox |
 | [`tenant-billing-ls`](tenant-billing-ls/README.md) | Lemon Squeezy billing for tenants: checkout, webhooks, quotas, reconcile. | Requires tenants |

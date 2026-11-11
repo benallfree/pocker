@@ -11,10 +11,8 @@
 //	app := pocketbase.New()
 //	s3redirect.MustRegister(app, s3redirect.Config{TTL: 5 * time.Minute})
 //
-// Many apps in one process: add it to a pocker server's plugins; settings come from the config file's top-level
-// `s3redirect:` key and each instance's `plugins.s3redirect`:
-//
-//	srv.Plugins = append(srv.Plugins, s3redirect.New(s3redirect.Config{}))
+// The standard CE binary (cmd/pocketbase) registers it by default. Many apps in one process: see the pockerplugin
+// subpackage.
 package s3redirect
 
 import (

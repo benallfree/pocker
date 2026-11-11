@@ -34,7 +34,13 @@ bucket allowing `GET` from your origin. Plain `<img>`, `<video>` and links need 
 **Inline vs attachment:** PocketBase decides this from the stored content type; the plugin goes by the file extension
 (it doesn't HEAD the object, so a redirect costs no extra round trip). They agree for every file PocketBase names.
 
-## Single app
+## In the standard CE binary
+
+`cmd/pocketbase` (the PocketBase CE release binary) registers it **on by default**: turn on S3 in Settings → Files
+storage and downloads redirect. Flags: `--s3Redirect=false` streams as before, `--s3RedirectTTL 2m` changes how long
+each URL is valid.
+
+## Single app (your own build)
 
 ```go
 app := pocketbase.New()
@@ -47,8 +53,12 @@ Then turn on S3 in Settings → Files storage.
 ## Many apps (pocker)
 
 ```go
-srv.Plugins = append(srv.Plugins, s3redirect.New(s3redirect.Config{}))
+import "github.com/pockethost/pocketbase/ext/s3redirect/pockerplugin"
+
+srv.Plugins = append(srv.Plugins, pockerplugin.New(s3redirect.Config{}))
 ```
+
+The pocker part is its own package, so single-app builds (like the standard binary) don't link pocker.
 
 ```yaml
 s3redirect:            # server defaults

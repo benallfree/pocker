@@ -1,5 +1,5 @@
 // Command pocketbase is the standard PocketBase CE binary: PocketBase's examples/base plus the CE plugins that ship
-// by default (ext/pages). It's its own module so core's go.mod stays upstream's.
+// by default (ext/pages, ext/s3redirect). It's its own module so core's go.mod stays upstream's.
 package main
 
 import (
@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"ganigeorgiev.com/pocketbase/pocketbase"
 	"ganigeorgiev.com/pocketbase/pocketbase/apis"
@@ -17,6 +18,7 @@ import (
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/hook"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/osutils"
 	"github.com/pockethost/pocketbase/ext/pages"
+	"github.com/pockethost/pocketbase/ext/s3redirect"
 )
 
 func main() {
@@ -90,6 +92,22 @@ func main() {
 		"the directory with the PocketPages app (default pb_pages next to pb_data); served when it exists",
 	)
 
+	var s3Redirect bool
+	app.RootCmd.PersistentFlags().BoolVar(
+		&s3Redirect,
+		"s3Redirect",
+		true,
+		"answer file downloads with a short-lived signed redirect to the bucket when S3 file storage is on",
+	)
+
+	var s3RedirectTTL time.Duration
+	app.RootCmd.PersistentFlags().DurationVar(
+		&s3RedirectTTL,
+		"s3RedirectTTL",
+		s3redirect.DefaultTTL,
+		"how long each signed file download URL stays valid",
+	)
+
 	app.RootCmd.ParseFlags(os.Args[1:])
 
 	// ---------------------------------------------------------------
@@ -106,6 +124,9 @@ func main() {
 
 	// PocketPages: serves pb_pages when the folder exists (page code runs in the jsvm above)
 	pages.MustRegister(app, pages.Config{Dir: pagesDir})
+
+	// S3 redirects: with S3 file storage on, downloads redirect to a signed bucket URL after the access check
+	s3redirect.MustRegister(app, s3redirect.Config{Enabled: &s3Redirect, TTL: s3RedirectTTL})
 
 	// migrate command (with js templates)
 	migratecmd.MustRegister(app, app.RootCmd, migratecmd.Config{

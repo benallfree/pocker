@@ -5,6 +5,7 @@ go 1.27
 require (
 	ganigeorgiev.com/pocketbase/pocketbase v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketbase/ext/pages v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketbase/ext/s3redirect v0.0.0-00010101000000-000000000000
 )
 
 require (
@@ -53,6 +54,7 @@ require (
 replace (
 	ganigeorgiev.com/pocketbase/pocketbase => ../..
 	github.com/pockethost/pocketbase/ext/pages => ../../ext/pages
+	github.com/pockethost/pocketbase/ext/s3redirect => ../../ext/s3redirect
 )
 
 replace github.com/pockethost/pocketbase/ext/pocker => ../../ext/pocker
