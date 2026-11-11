@@ -1,5 +1,6 @@
 /// <reference path="../pb_data/types.d.ts" />
-// Demo data: a public "notes" collection (anyone reads, signed-in users write their own) and a demo user.
+// Demo data: a public "notes" collection (anyone reads, signed-in users write their own) with three notes by
+// user@example.com, the local test user that ext/devusers keeps at password "password".
 migrate(
   (app) => {
     const users = app.findCollectionByNameOrId('users')
@@ -19,15 +20,20 @@ migrate(
     })
     app.save(notes)
 
-    const demo = new Record(users)
-    demo.setEmail('demo@example.com')
-    demo.setPassword('demo12345')
-    demo.setVerified(true)
-    demo.set('name', 'Demo User')
+    let demo
+    try {
+      demo = app.findAuthRecordByEmail('users', 'user@example.com')
+    } catch (_) {
+      demo = new Record(users)
+      demo.setEmail('user@example.com')
+      demo.setPassword('password')
+      demo.setVerified(true)
+    }
+    demo.set('name', 'Example User')
     app.save(demo)
 
     for (const [title, body] of [
-      ['Welcome to PocketPages', 'This note came from a migration. Sign in as demo@example.com / demo12345 to add your own.'],
+      ['Welcome to PocketPages', 'This note came from a migration. Sign in as user@example.com / password to add your own.'],
       ['Pages are files', 'Every .ejs, .md, .jsx and .tsx file in pb_pages is a route.'],
       ['Data is PocketBase', 'This list is read with ctx.pb(), as the visitor, so the collection API rules apply.'],
     ]) {
@@ -40,8 +46,5 @@ migrate(
   },
   (app) => {
     app.delete(app.findCollectionByNameOrId('notes'))
-    try {
-      app.delete(app.findAuthRecordByEmail('users', 'demo@example.com'))
-    } catch (_) {}
   },
 )

@@ -19,13 +19,13 @@ export default function Notes({ ctx, data, slot }: any) {
         </form>
       ) : (
         <p>
-          <a href="/auth/login">Sign in</a> to post (demo@example.com / demo12345).
+          <a href="/auth/login">Sign in</a> to post (user@example.com / password).
         </p>
       )}
 
       <div class="grid">
         {notes.map((n) => (
-          <a class="card" href={`/notes/${n.id}`} style="text-decoration:none;color:inherit">
+          <a class="card" href={`/notes/${n.id}`}>
             <h3>{n.title}</h3>
             <div class="muted">{n.body}</div>
             <div class="badge" style={{ marginTop: '.5rem' }}>

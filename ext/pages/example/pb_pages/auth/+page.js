@@ -1,7 +1,7 @@
 module.exports = {
   load(ctx) {
     if (ctx.auth) return ctx.res.redirect('/', { flash: 'Already signed in.' })
-    return { error: '', email: 'demo@example.com' }
+    return { error: '', email: 'user@example.com' }
   },
   post(ctx) {
     const { mode, email, password } = ctx.req.body()

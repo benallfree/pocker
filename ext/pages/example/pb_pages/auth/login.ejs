@@ -3,7 +3,7 @@
 <% if (data.error) { %><p class="error"><%= data.error %></p><% } %>
 <form method="post" class="stack">
   <input name="email" type="email" value="<%= data.email %>" placeholder="Email" required>
-  <input name="password" type="password" placeholder="Password (demo12345)" required>
+  <input name="password" type="password" placeholder="Password (password)" required>
   <div style="display:flex;gap:.5rem">
     <button name="mode" value="login">Sign in</button>
     <button name="mode" value="register" style="background:var(--muted)">Create account</button>

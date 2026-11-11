@@ -6,6 +6,7 @@ require (
 	ganigeorgiev.com/pocketbase/pocketbase v0.0.0-00010101000000-000000000000
 	github.com/dop251/goja v0.0.0-20261023121931-6ace4dde0b29
 	github.com/evanw/esbuild v0.28.2
+	github.com/pockethost/pocketbase/ext/devusers v0.0.0-00010101000000-000000000000
 	github.com/yuin/goldmark v1.8.7
 	golang.org/x/oauth2 v0.37.0
 	gopkg.in/yaml.v3 v3.0.1
@@ -50,3 +51,5 @@ require (
 )
 
 replace ganigeorgiev.com/pocketbase/pocketbase => ../..
+
+replace github.com/pockethost/pocketbase/ext/devusers => ../devusers
