@@ -37,8 +37,8 @@ var (
 	ErrInvalidToken = errors.New("invalid token")
 )
 
-// Authenticator signs MCP requests in. ext/oauth-server provides the real one; [PocketBaseTokenAuth] is the
-// interim one.
+// Authenticator signs MCP requests in: [OAuth] (ext/oauth-server + ext/tokens), or [PocketBaseTokenAuth] when the
+// app has no OAuth server.
 type Authenticator interface {
 	// Authenticate checks the request's credentials for resource (the endpoint's canonical URL, which an OAuth token
 	// must have been issued for). Return [ErrNoCredentials] or [ErrInvalidToken] (possibly wrapped) to send a 401.
@@ -52,8 +52,8 @@ type Authenticator interface {
 // PocketBaseTokenAuth accepts ordinary PocketBase auth tokens (Authorization: Bearer <token>, e.g. one minted with
 // the impersonate API) for records of the listed collections (default: superusers only), with full scope.
 //
-// Interim: it exists so the endpoint works before ext/oauth-server does, and for tests. Tokens aren't
-// audience-bound or scoped, and clients can't sign in by themselves with it.
+// It's the fallback for apps without ext/oauth-server, and handy in tests. Tokens aren't audience-bound or scoped,
+// and clients can't sign in by themselves with it.
 type PocketBaseTokenAuth struct {
 	Collections []string
 }

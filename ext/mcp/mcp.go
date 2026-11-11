@@ -7,9 +7,10 @@
 // It comes with the built-in pb_* tools (collections, records, settings, logs, backups). Other plugins add tools with
 // [Server.AddTool] on [For](app); an app's pb_hooks add them with $mcp.addTool (see [BindJS]).
 //
-// Sign-in is an [Authenticator]. The intended one is ext/oauth-server + ext/tokens (OAuth 2.1 the way Claude
-// connectors expect: protected resource metadata, PKCE, CIMD/DCR, audience-bound tokens). Until that lands,
-// [PocketBaseTokenAuth] accepts ordinary PocketBase auth tokens, which is fine for local use and tests.
+// Sign-in is an [Authenticator]. With ext/oauth-server + ext/tokens on the app it's [OAuth]: OAuth 2.1 the way Claude
+// connectors expect (protected resource metadata, PKCE, CIMD or dynamic registration, audience-bound tokens), so a
+// user adds https://<host>/mcp to Claude and signs in in a browser. Without them it falls back to
+// [PocketBaseTokenAuth] (pasted superuser tokens).
 package mcp
 
 import (
@@ -61,7 +62,8 @@ type Config struct {
 	// (default: Settings → Application URL, else derived from the request).
 	PublicURL string
 
-	// Auth signs requests in (default [PocketBaseTokenAuth] with superusers only).
+	// Auth signs requests in. Default: [OAuth] when ext/oauth-server and ext/tokens are registered on the app (decided
+	// on serve, so registration order doesn't matter), else [PocketBaseTokenAuth] with superusers only.
 	Auth Authenticator
 
 	// NoBuiltins leaves out the pb_* tools. BuiltinGroups limits them to some groups (see [BuiltinGroups]).
@@ -189,9 +191,6 @@ func Register(app core.App, cfg Config) (*Server, error) {
 	if cfg.Version == "" {
 		cfg.Version = "dev"
 	}
-	if cfg.Auth == nil {
-		cfg.Auth = PocketBaseTokenAuth{}
-	}
 	s := &Server{app: app, cfg: cfg, tools: map[string]*Tool{}}
 	if !cfg.NoBuiltins {
 		for _, t := range builtinTools(cfg.BuiltinGroups, cfg.ReadOnlyBuiltins) {
@@ -203,6 +202,7 @@ func Register(app core.App, cfg Config) (*Server, error) {
 	app.Store().Set(storeKey, s)
 
 	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
+		s.setupOAuth()
 		s.bindRoutes(se)
 		return se.Next()
 	})

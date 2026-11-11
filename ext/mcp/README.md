@@ -5,7 +5,7 @@ A [Model Context Protocol](https://modelcontextprotocol.io) endpoint for a Pocke
 - Built-in `pb_*` tools for collections, records, settings, logs and backups.
 - Other plugins add tools from Go. An app's `pb_hooks` adds them with `$mcp.addTool`.
 - MCP Streamable HTTP, stateless: each POST carries one JSON-RPC message and gets JSON back. Protocol versions `2025-11-25`, `2025-06-18` and `2025-03-26`. Tools only for now.
-- OAuth discovery the way Claude connectors expect it: a `401` with `WWW-Authenticate: Bearer resource_metadata=…`, plus protected resource metadata (RFC 9728) at `/.well-known/oauth-protected-resource[/mcp]`.
+- Sign-in with OAuth through `ext/oauth-server`, the way Claude connectors and Claude Code expect it: add `https://<host>/mcp` to Claude and sign in in a browser.
 
 A Go port of [pbjsmcp](https://github.com/benallfree/pbjsmcp), with the same tool names and safety rules.
 
@@ -28,18 +28,27 @@ A plugin registered on the same app reaches the server with `mcp.For(app)`.
 
 ## Sign-in
 
-The endpoint signs requests in through an `Authenticator`.
+With `ext/tokens` and `ext/oauth-server` on the app (both are in the standard CE binary), `/mcp` uses OAuth the way Claude connectors and Claude Code expect it:
 
-- **The target:** `ext/oauth-server` + `ext/tokens`. A user pastes `https://<host>/mcp` into Claude's "Add custom connector" (or runs `claude mcp add --transport http <name> https://<host>/mcp`) and signs in to the app in a browser. Tokens are audience-bound to the endpoint and carry the `mcp:read` / `mcp:write` scopes.
-- **Until then:** `PocketBaseTokenAuth` accepts ordinary PocketBase auth tokens. By default only superusers can use it, with full scope. A long-lived token for an agent comes from the impersonate API:
+1. A request without a token gets `401` with `WWW-Authenticate: Bearer resource_metadata="https://<host>/.well-known/oauth-protected-resource/mcp", scope="mcp:read mcp:write"`.
+2. The protected resource metadata names the app as its authorization server. oauth-server publishes the authorization server metadata, with PKCE S256, CIMD and dynamic registration.
+3. The client registers itself, either with Claude's published identity (CIMD from `claude.ai` / `claude.com`) or automatically (dynamic registration, which `ext/mcp` turns on). The user signs in in a browser and approves the scopes.
+4. The access token is an API token bound to `https://<host>/mcp` (RFC 8707). The `tokens` middleware won't accept it anywhere else, and `/mcp` accepts only tokens bound to itself. Deploy tokens and pasted PocketBase tokens are refused, unless you set `OAuth{AllowUnbound: true}`.
+
+So connecting is: paste `https://<host>/mcp` into Claude's "Add custom connector", or
 
 ```bash
-curl -X POST http://127.0.0.1:8090/api/collections/_superusers/impersonate/<SUPERUSER_ID> \
-  -H "Authorization: <your superuser token>" -H "content-type: application/json" -d '{"duration": 31536000}'
-claude mcp add --transport http my-app http://127.0.0.1:8090/mcp --header "Authorization: Bearer <token>"
+claude mcp add --transport http my-app https://<host>/mcp
+claude mcp login my-app        # or /mcp in a session
 ```
 
-Scopes: a grant with only `mcp:read` sees only tools marked `readOnlyHint`. Calling any other tool gets `403` with `error="insufficient_scope", scope="mcp:write"`, so the client can ask for more.
+Scopes: `ext/mcp` registers `mcp:read` and `mcp:write` with `ext/tokens`, and the consent page lists them. A grant with only `mcp:read` sees only tools marked `readOnlyHint`. Calling any other tool gets `403` with `error="insufficient_scope", scope="mcp:write"`. A client that asks only for `offline_access` gets the account's full rights, still limited to `/mcp`.
+
+Who may sign in comes from `oauthserver.Config.Collections` (and `tokens.Config.Collections`), which default to superusers.
+
+`OAuth.Issuer`: set it to the same value as `oauthserver.Config.Issuer` if you set that. By default both use the request's scheme and host.
+
+Without oauth-server, `/mcp` falls back to `PocketBaseTokenAuth`: pasted superuser PocketBase tokens with full scope, and a warning in the log. The authenticator is chosen on serve, so plugin registration order doesn't matter. `Config.Auth` overrides the choice.
 
 ## Tools
 
@@ -113,7 +122,7 @@ Safety:
 | `Name`, `Version`, `Description`, `Icons` | app name slug, `dev` | `serverInfo` (its title is Settings → Application name) |
 | `Instructions` | generated | first paragraph of `instructions` |
 | `PublicURL` | the request's host | origin used for the OAuth resource URL. The resource must match the URL clients use, so set it when a proxy rewrites the host. |
-| `Auth` | `PocketBaseTokenAuth{}` | the `Authenticator` |
+| `Auth` | `OAuth{}` with oauth-server, else `PocketBaseTokenAuth{}` | the `Authenticator` |
 | `AllowedOrigins` | none | extra browser origins. Requests with any other `Origin` header get 403. Clients that send no `Origin`, such as Claude's servers and Claude Code, pass. |
 
 ## Example
@@ -125,4 +134,4 @@ go build -o pbmcp .
 ./pbmcp serve --dir=pb_data
 ```
 
-The example registers `ext/devusers`, so the logins are `admin@example.com` / `password` (superuser) and `user@example.com` / `password` (user). It adds a Go tool (`whoami`) and a JS tool (`recent_users`, in `pb_hooks/mcp.pb.js`).
+The example registers `ext/devusers`, so the logins are `admin@example.com` / `password` (superuser) and `user@example.com` / `password` (user). It also registers `ext/tokens` and `ext/oauth-server` for OAuth sign-in, and adds a Go tool (`whoami`) and a JS tool (`recent_users`, in `pb_hooks/mcp.pb.js`). Then: `claude mcp add --transport http pb-example http://127.0.0.1:8090/mcp` and `claude mcp login pb-example`.
