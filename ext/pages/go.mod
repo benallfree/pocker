@@ -7,6 +7,7 @@ require (
 	github.com/dop251/goja v0.0.0-20261023121931-6ace4dde0b29
 	github.com/evanw/esbuild v0.28.2
 	github.com/pockethost/pocketbase/ext/devusers v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketbase/ext/pocker v0.0.0-00010101000000-000000000000
 	github.com/yuin/goldmark v1.8.7
 	golang.org/x/oauth2 v0.37.0
 	gopkg.in/yaml.v3 v3.0.1
@@ -17,6 +18,7 @@ require (
 	ganigeorgiev.com/pocketbase/dbx v1.13.0 // indirect
 	ganigeorgiev.com/pocketbase/ozzo-validation/v4 v4.4.1 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
+	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/disintegration/imaging v1.6.2 // indirect
 	github.com/dlclark/regexp2/v2 v2.9.1 // indirect
 	github.com/domodwyer/mailyak/v3 v3.6.2 // indirect
@@ -34,6 +36,7 @@ require (
 	github.com/mattn/go-colorable v0.1.16 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/ncruces/go-strftime v1.1.0 // indirect
+	github.com/pockethost/pocketbase/ext/sandbox v0.0.0-00010101000000-000000000000 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/spf13/cast v1.10.0 // indirect
 	github.com/spf13/cobra v1.10.2 // indirect
@@ -53,3 +56,7 @@ require (
 replace ganigeorgiev.com/pocketbase/pocketbase => ../..
 
 replace github.com/pockethost/pocketbase/ext/devusers => ../devusers
+
+replace github.com/pockethost/pocketbase/ext/pocker => ../pocker
+
+replace github.com/pockethost/pocketbase/ext/sandbox => ../sandbox

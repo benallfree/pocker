@@ -10,8 +10,10 @@ in Go and page code in the app's JS VM.
 > `+error.ejs`, `+404.ejs`, Markdown images through `asset()`), JS plugins, `ctx.res.sse()`, the built-in `realtime` and `auth` plugins (password, OTP, anonymous,
 > register, OAuth2, email flows, cookie sessions), `ctx.pb()` (the bundled JS SDK, in-process, as the visitor) and the
 > Datastar add-on. Every starter kit and the site render. Not yet:
-> MFA in `ctx.session`, JS plugins' `handles()`, `pages create`, and runs under pocker + the sandbox.
+> MFA in `ctx.session`, JS plugins' `handles()` and `pages create`.
 
+- Under pocker: [pockerplugin](pockerplugin/pockerplugin.go), with an [example](pockerplugin/example/main.go) that
+  serves many sites from one process.
 - The contract: [SPEC.md](SPEC.md).
 - Test fixtures: [fixtures/](fixtures) (`go test ./...` runs every request case).
 - Starter kits: [starters/](starters). Add-ons: [addons/](addons). The PocketPages site: [site/](site).
@@ -63,6 +65,30 @@ app.Start()
 
 Module `github.com/pockethost/pocketbase/ext/pages`. See [example/main.go](example/main.go) and
 [Create your own plugin](../../docs/plugins.md).
+
+## Under pocker
+
+`pockerplugin.New(pages.Config{})` serves every instance's `<instance dir>/pb_pages`:
+
+```go
+srv := &pocker.Server{Config: cfg, Plugins: []pocker.Plugin{pockerplugin.New(pages.Config{})}}
+```
+
+- Each start of an instance's app gets its own route table, compiled templates and caches. An instance that sleeps
+  drops them; nothing is shared between instances.
+- Page code runs in the instance's own sandboxed JS runtimes, under its limits (execution time, single allocations,
+  call stack). `include`, `require`, `ctx.resolve`, `ctx.res.file` and `asset` never reach outside the instance's
+  `pb_pages`; `$os` file access stays inside the instance folder. Tests: [pockerplugin_test.go](pockerplugin/pockerplugin_test.go).
+- An instance turns pages off with `plugins: { pages: { enabled: false } }`.
+- It's its own package, so single-app builds (like the standard CE binary) don't link pocker.
+
+Measured (same machine as above, docs kit): each awake instance adds about **2.3 MB** (50 instances: 41 MB idle to
+155 MB). One instance under pocker serves about **4,000 requests/s** (p50 5.6 ms, p99 80 ms at 50 concurrent): less
+than a single app because pocker keeps 2 prewarmed JS runtimes per instance (`hooks_pool_size`; a single app has 15)
+and every call goes through the sandbox.
+
+To try it: copy sites into `pockerplugin/example/pb_root/<name>.localhost/pb_pages`, run
+`go run ./pockerplugin/example`, and open `http://<name>.localhost:8791`.
 
 ## License
 
