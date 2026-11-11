@@ -12,7 +12,7 @@ endorsed by the PocketBase project.
 | [pocker](ext/pocker/README.md) | 🟩🟩🟩 | Multitenant: run hundreds of untrusted PocketBase instances in one Go process ([how is this safe?](ext/pocker/README.md#how-is-this-safe)) |
 | [sandbox](ext/sandbox/README.md) | 🟩🟩🟩 | Confine untrusted JS hooks, SQL and outbound network |
 | [pitr](ext/pitr/README.md) | 🟧🟧⬜ | Point-in-time restore (Litestream) |
-| [bulkmail](ext/bulkmail/README.md) | 🟥⬜⬜ | Bulk mail campaigns to your app's own users |
+| [bulkmail](ext/bulkmail/README.md) | 🟧🟧⬜ | Bulk mail campaigns to your app's own users |
 | [pages](ext/pages/README.md) | 🟥⬜⬜ | Server-rendered multi-page applications (PocketPages) |
 | [storage](ext/storage/README.md) | 🟥⬜⬜ | A default storage backend when an app's own S3 is off |
 | [s3redirect](ext/s3redirect/README.md) | 🟥⬜⬜ | File downloads as signed S3 redirects |
