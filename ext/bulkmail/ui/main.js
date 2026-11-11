@@ -268,7 +268,6 @@
             try {
                 init(await app.pb.collection(C).update(id, {
                     name: data.c.name, subject: data.c.subject, html: data.c.html, text: data.c.text,
-                    from_name: data.c.from_name, from_address: data.c.from_address,
                     test_to: data.c.test_to, rate_per_sec: data.c.rate_per_sec || 0,
                     scheduled_at: data.c.scheduled_at || "",
                     audience: a, vars,
@@ -372,8 +371,6 @@
                         // content
                         t.div({ className: "col-lg-6" }, field("Name", text("name", { required: true }))),
                         t.div({ className: "col-lg-6" }, field("Subject", text("subject"), "Placeholders: {{record.field}}, {{campaign.name}}, vars.")),
-                        t.div({ className: "col-lg-6" }, field("From name", text("from_name", { placeholder: () => app.store.settings?.meta?.senderName || "" }), "Empty uses the sender in Settings > Mail.")),
-                        t.div({ className: "col-lg-6" }, field("From address", text("from_address", { type: "email", placeholder: () => app.store.settings?.meta?.senderAddress || "" }))),
                         t.div({ className: "col-lg-12" }, field("Body",
                             app.components.tinymce({
                                 value: () => c.html || "",

@@ -24,7 +24,8 @@ go run ./example serve
 
 The dashboard gets a **Mail** page (campaigns, recipients, suppressions) and a **Bulk mail** section on Settings >
 Mail (postal address, unsubscribe mailbox, bounce and complaint feedback). Campaigns send from the app's sender in
-Settings > Mail unless a campaign sets its own.
+Settings > Mail. A campaign's `from_name` / `from_address` fields override it, but only through the records API, JS
+or Go (the dashboard doesn't show them): the app's SMTP account can usually send only as identities it has verified.
 
 ## What it does
 
