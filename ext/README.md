@@ -6,7 +6,7 @@ Each folder here will be one plugin, with its own Go module (`github.com/pocketh
 
 | Plugin | What it will do | Runs on |
 |---|---|---|
-| [`pocker`](pocker/README.md) | The multitenant engine: many PocketBase apps in one process, routed by hostname, each started on its first request. Instances come from a YAML file or any provider. | the multitenant host; the other host-level plugins register on it |
+| [`pocker`](pocker/README.md) | Many instances in one process (level 2), the engine: many PocketBase apps in one process, routed by hostname, each started on its first request. Instances come from a YAML file or any provider. | the multi-instance host; the other host-level plugins register on it |
 | [`sandbox`](sandbox/README.md) | The JS sandbox for untrusted instances: file access confined to the instance folder, host primitives removed, CPU and memory caps, SQLite authorizer, public-only outbound network. | Any app; required by pocker for untrusted tenants |
 | [`pitr`](pitr/README.md) | Point-in-time restore: Litestream replication of each app's database (local or a bucket) and in-place restore from the Backups screen. | Single app, or many under pocker |
 | [`bulkmail`](bulkmail/README.md) | Bulk mail: campaigns to an app's own users with one-click unsubscribe, bounce and complaint handling, and a dashboard page. | Single app, or many under pocker |
@@ -14,6 +14,8 @@ Each folder here will be one plugin, with its own Go module (`github.com/pocketh
 | [`storage`](storage/README.md) | A default storage and backups backend per app (for example an operator bucket) when the app's own S3 is off. Credentials never reach the app. | Single app, or many under pocker |
 | [`s3redirect`](s3redirect/README.md) | File downloads as short-lived signed redirects, after PocketBase's own access check. | Single app, or many under pocker |
 | [`mothership`](mothership/README.md) | A mothership and its edges: the control plane (instances, edges, regions, admin screens) and the edge side that follows it, each edge owning its own instances. | Requires [pocker](../pocker/README.md) |
+| [`tenants`](tenants/README.md) | Accounts that own instances: quotas, owner logins, tokens, the API for your own tenant dashboard (level 4). | Requires mothership and sandbox |
+| [`tenant-billing-ls`](tenant-billing-ls/README.md) | Lemon Squeezy billing for tenants: checkout, webhooks, quotas, reconcile. | Requires tenants |
 | [`vacuum`](vacuum/README.md) | Scheduled database compaction: online VACUUM for a single app; under pocker, one stopped instance at a time. | Single app, or many under pocker |
 | [`deploy`](deploy/README.md) | A deploy API: upload code sets (hooks, migrations, public files), swap them in safely, stream logs. Pluggable auth. | Single app, or many under pocker |
 | [`firewall`](firewall/README.md) | Peer allow-lists, trusted proxies and per-IP rate limits; under pocker, per-instance and cross-instance limits too. | Single app, or many under pocker |

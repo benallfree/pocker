@@ -5,28 +5,49 @@ upstream and aims to keep its own changes to the core small: just the hooks that
 PocketBase. Everything else is a plugin. Maintained by [PocketHost](https://pockethost.io); not affiliated with or
 endorsed by the PocketBase project.
 
+## Four ways to run it
+
+Each level adds plugins on top of the one before; dependencies only point down.
+
+1. **PocketBase CE.** One app. No plugins: it behaves exactly like stock PocketBase.
+2. **Many instances, one process** ([pocker](ext/pocker/README.md)). One operator runs hundreds of PocketBase
+   instances in a single Go process, routed by hostname.
+3. **Many edges and regions** ([mothership](ext/mothership/README.md)). Still one operator: a control plane and edges in
+   several regions, each edge running its own instances.
+4. **Many owners** ([tenants](ext/tenants/README.md)). Instances belong to separate accounts, with quotas, owner logins
+   and tokens; you run your own dashboard for them (as [PocketHost](https://pockethost.io) does). Billing is a plugin
+   too, e.g. [tenant-billing-ls](ext/tenant-billing-ls/README.md) for Lemon Squeezy.
+
+Running code you don't control (other people's hooks) needs the [sandbox](ext/sandbox/README.md)
+([how is this safe?](ext/sandbox/README.md#how-is-this-safe)): optional at levels 2 and 3, required at level 4.
+Feature plugins work at any level.
+
 ## Plugins
 
-| Plugin | Status | What it does |
-|---|---|---|
-| [pocker](ext/pocker/README.md) | 🟩🟩🟩 | Multitenant: run hundreds of untrusted PocketBase instances in one Go process ([how is this safe?](ext/pocker/README.md#how-is-this-safe)) |
-| [sandbox](ext/sandbox/README.md) | 🟩🟩🟩 | Confine untrusted JS hooks, SQL and outbound network |
-| [pitr](ext/pitr/README.md) | 🟧🟧⬜ | Point-in-time restore (Litestream) |
-| [bulkmail](ext/bulkmail/README.md) | 🟧🟧⬜ | Bulk mail campaigns to your app's own users |
-| [pages](ext/pages/README.md) | 🟥⬜⬜ | Server-rendered multi-page applications (PocketPages) |
-| [storage](ext/storage/README.md) | 🟥⬜⬜ | A default storage backend when an app's own S3 is off |
-| [s3redirect](ext/s3redirect/README.md) | 🟥⬜⬜ | File downloads as signed S3 redirects |
-| [mothership](ext/mothership/README.md) | 🟥⬜⬜ | A control plane and its edges for multi-server hosting |
-| [vacuum](ext/vacuum/README.md) | 🟧🟧⬜ | Scheduled SQLite VACUUM |
-| [deploy](ext/deploy/README.md) | 🟧🟧⬜ | Deploy API: push hooks, migrations and public files |
-| [firewall](ext/firewall/README.md) | 🟩🟩🟩 | Peer allow-lists, trusted proxies and rate limits |
-| [autotls](ext/autotls/README.md) | 🟩🟩🟩 | Automatic TLS: on-demand certificates and wildcards |
-| [servertiming](ext/servertiming/README.md) | 🟩🟩🟩 | Server-Timing headers |
-| [schedules](ext/schedules/README.md) | 🟧🟧⬜ | Scheduled webhooks that wake sleeping instances |
+| Plugin | Level | Status | What it does |
+|---|---|---|---|
+| [pocker](ext/pocker/README.md) | 2 | 🟩🟩🟩 | Many PocketBase instances in one Go process, routed by hostname |
+| [mothership](ext/mothership/README.md) | 3 | 🟥⬜⬜ | A control plane and its edges, across regions |
+| [tenants](ext/tenants/README.md) | 4 | 🟥⬜⬜ | Accounts that own instances: quotas, owner logins, tokens, the API for your dashboard |
+| [tenant-billing-ls](ext/tenant-billing-ls/README.md) | 4 | 🟥⬜⬜ | Billing tenants with Lemon Squeezy |
+| [sandbox](ext/sandbox/README.md) | any | 🟩🟩🟩 | Confine untrusted JS hooks, SQL and outbound network ([how is this safe?](ext/sandbox/README.md#how-is-this-safe)) |
+| [firewall](ext/firewall/README.md) | any | 🟩🟩🟩 | Peer allow-lists, trusted proxies and rate limits |
+| [autotls](ext/autotls/README.md) | any | 🟩🟩🟩 | Automatic TLS: on-demand certificates and wildcards |
+| [servertiming](ext/servertiming/README.md) | any | 🟩🟩🟩 | Server-Timing headers |
+| [pitr](ext/pitr/README.md) | any | 🟧🟧⬜ | Point-in-time restore (Litestream) |
+| [bulkmail](ext/bulkmail/README.md) | any | 🟧🟧⬜ | Bulk mail campaigns to your app's own users |
+| [pages](ext/pages/README.md) | any | 🟥⬜⬜ | Server-rendered multi-page applications (PocketPages) |
+| [storage](ext/storage/README.md) | any | 🟥⬜⬜ | A default storage backend when an app's own S3 is off |
+| [s3redirect](ext/s3redirect/README.md) | any | 🟥⬜⬜ | File downloads as signed S3 redirects |
+| [vacuum](ext/vacuum/README.md) | any | 🟧🟧⬜ | Scheduled SQLite VACUUM |
+| [deploy](ext/deploy/README.md) | any | 🟧🟧⬜ | Deploy API: push hooks, migrations and public files |
+| [schedules](ext/schedules/README.md) | 2+ | 🟧🟧⬜ | Scheduled webhooks that wake sleeping instances |
 
 🟥⬜⬜ not started · 🟧🟧⬜ in progress (working code exists, not yet a plugin here) · 🟩🟩🟩 done
 
-Plugins live in [`ext/`](ext), each as its own Go module.
+Plugins live in [`ext/`](ext), each as its own Go module. Higher levels pass settings down to the plugins below through
+each instance's `plugins:` block (e.g. tenants sets an owner's trusted IPs for the firewall), so plugins don't call each
+other.
 
 ## Contribute a plugin
 
