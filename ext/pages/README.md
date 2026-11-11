@@ -51,6 +51,13 @@ bench/run.sh v1-docs 8804 /docs/overview "$(which pocketbase)" /tmp/v1-docs
 
 The demo in [`example/`](example) has a live speed check at `/speed`, which loads its own pages from your browser.
 
+## For Go plugins
+
+`pages.For(app).RenderTemplate(e, "oauth/signin", status, data)` renders `pb_pages/_private/oauth/signin.ejs` (or
+`.md`, `.jsx`, `.tsx`) as the whole response, with `data` as `ctx.data` and no middleware, layouts or `+page.js`, for
+any method; it returns `handled=false` when the project has no such template. [oauth-server](../oauth-server/README.md)
+uses it for `pocketbase oauth eject`.
+
 ## Use it
 
 Start an app from a starter kit (`pocketbase pages starters` lists them):

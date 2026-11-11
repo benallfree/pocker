@@ -89,6 +89,9 @@ type request struct {
 	tokenFor string
 	flashed  bool
 	errorCtx map[string]any
+
+	data   map[string]any // RenderTemplate: initial ctx.data
+	direct bool           // RenderTemplate: render route.File, skip handlers and method checks
 }
 
 // render runs a page or API route in one call into the app's JS VM.
@@ -98,6 +101,10 @@ func (p *Pages) render(e *core.RequestEvent, root *os.Root, route *Route, params
 
 // renderStatus is render with a default response status (0 = 200), e.g. 404 for +404.ejs.
 func (p *Pages) renderStatus(e *core.RequestEvent, root *os.Root, route *Route, params map[string]string, status int) error {
+	return p.renderWith(e, root, route, params, status, nil, false)
+}
+
+func (p *Pages) renderWith(e *core.RequestEvent, root *os.Root, route *Route, params map[string]string, status int, data map[string]any, direct bool) error {
 	t := p.Table()
 	dev := p.dev()
 	if ct := pageContentType(route); ct != "" {
@@ -109,6 +116,7 @@ func (p *Pages) renderStatus(e *core.RequestEvent, root *os.Root, route *Route, 
 		r := &request{
 			p: p, e: e, root: root, route: route, params: params, vm: vm,
 			status: status, layouts: true, slots: map[string]string{}, meta: map[string]any{}, dev: dev,
+			data: data, direct: direct,
 		}
 		r.cache = perVMCache(vm)
 		runErr = r.run(t)
@@ -696,6 +704,10 @@ func (r *request) rtObject() *goja.Object {
 		params[k] = v
 	}
 	set("params", params)
+	if r.direct {
+		set("direct", true)
+		set("data", r.data)
+	}
 	set("method", e.Request.Method)
 	u := e.Request.URL
 	scheme := "http"

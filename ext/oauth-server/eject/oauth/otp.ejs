@@ -1,0 +1,8 @@
+<%- include('/oauth/head') %>
+<h1>Check your email</h1><p class="sub">We sent a code to <%= data.email %></p>
+<% if (data.error) { %><p class="err"><%= data.error %></p><% } %>
+<form method="post" action="<%= data.action %>"><%- include('/oauth/hidden') %>
+<input type="hidden" name="collection" value="<%= data.collection %>"><input type="hidden" name="email" value="<%= data.email %>"><input type="hidden" name="otp_id" value="<%= data.otpId %>">
+<label for="code">Code</label><input id="code" type="text" name="code" inputmode="numeric" autocomplete="one-time-code" required autofocus>
+<button class="btn" name="step" value="otp">Continue</button></form>
+<%- include('/oauth/foot') %>

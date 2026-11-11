@@ -1,0 +1,28 @@
+<%# Shared top of every OAuth page: document head, styles, logo. Ejected by `pocketbase oauth eject`; edit freely. %>
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex"><title><%= data.appName %></title>
+<style>
+:root{--accent:<%= data.accent %>;--bg:#f4f4f6;--card:#fff;--fg:#16161a;--muted:#6b6b76;--line:#e3e3e8;--err:#c62828}
+@media (prefers-color-scheme:dark){:root{--bg:#121214;--card:#1c1c20;--fg:#ececf1;--muted:#9a9aa6;--line:#2c2c33}}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
+background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:16px}
+.card{width:100%;max-width:400px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:28px}
+.logo{display:block;max-height:48px;max-width:160px;margin:0 auto 12px}
+h1{font-size:20px;margin:0 0 4px;text-align:center}.sub{color:var(--muted);text-align:center;margin:0 0 20px}
+label{display:block;font-size:13px;color:var(--muted);margin:12px 0 4px}
+input[type=email],input[type=password],input[type=text],select{width:100%;padding:10px 12px;border:1px solid var(--line);
+border-radius:8px;background:transparent;color:inherit;font:inherit}
+input:focus,select:focus{outline:2px solid var(--accent);outline-offset:1px}
+.btn{display:block;width:100%;margin-top:18px;padding:11px;border:0;border-radius:8px;background:var(--accent);color:#fff;
+font:inherit;font-weight:600;cursor:pointer}.btn.secondary{background:transparent;color:var(--fg);border:1px solid var(--line);margin-top:10px}
+.link{background:none;border:0;color:var(--muted);font:inherit;text-decoration:underline;cursor:pointer;padding:0;margin-top:14px;display:block;width:100%}
+.err{background:color-mix(in srgb,var(--err) 12%,transparent);color:var(--err);border-radius:8px;padding:10px 12px;margin:0 0 12px}
+.msg{color:var(--muted);text-align:center}
+ul.scopes{list-style:none;padding:0;margin:12px 0;border:1px solid var(--line);border-radius:8px}
+ul.scopes li{padding:10px 12px;border-top:1px solid var(--line)}ul.scopes li:first-child{border-top:0}
+ul.scopes b{display:block}ul.scopes span{color:var(--muted);font-size:13px}
+.code{font:600 22px ui-monospace,Menlo,monospace;letter-spacing:3px;text-align:center;text-transform:uppercase}
+.foot{color:var(--muted);font-size:12px;text-align:center;margin-top:18px}
+</style></head><body><main class="card">
+<% if (data.logoUrl) { %><img class="logo" src="<%= data.logoUrl %>" alt=""><% } %>

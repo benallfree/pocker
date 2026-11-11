@@ -1,0 +1,12 @@
+<%- include('/oauth/head') %>
+<h1><%= data.clientName %></h1><p class="sub">wants to access <%= data.appName %> as <b><%= data.email %></b></p>
+<ul class="scopes">
+<% if (data.fullAccess) { %><li><b>Full access</b><span>Everything this account can do.</span></li>
+<% } else { for (const s of data.scopes) { %><li><b><%= s.name %></b><span><%= s.description %></span></li><% } } %>
+</ul>
+<% if (data.clientHost) { %><p class="msg">You'll be sent back to <%= data.clientHost %>.</p><% } %>
+<form method="post" action="<%= data.action %>"><%- include('/oauth/hidden') %>
+<button class="btn" name="step" value="allow">Allow</button>
+<button class="btn secondary" name="step" value="deny">Deny</button>
+<button class="link" name="step" value="switch">Not <%= data.email %>? Use another account</button></form>
+<%- include('/oauth/foot') %>

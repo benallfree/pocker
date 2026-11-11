@@ -1,0 +1,3 @@
+<%- include('/oauth/head') %>
+<h1><%= data.error ? 'Not connected' : 'All set' %></h1><p class="msg"><%= data.error || data.message %></p>
+<%- include('/oauth/foot') %>

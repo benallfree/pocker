@@ -4,8 +4,12 @@ go 1.27
 
 require (
 	ganigeorgiev.com/pocketbase/pocketbase v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketbase/ext/deploy v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketbase/ext/oauth-server v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketbase/ext/pages v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketbase/ext/remotes v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketbase/ext/s3redirect v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketbase/ext/tokens v0.0.0-00010101000000-000000000000
 )
 
 require (
@@ -32,6 +36,8 @@ require (
 	github.com/mattn/go-colorable v0.1.16 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/ncruces/go-strftime v1.1.0 // indirect
+	github.com/pockethost/pocketbase/ext/pocker v0.0.0-00010101000000-000000000000 // indirect
+	github.com/pockethost/pocketbase/ext/sandbox v0.0.0-00010101000000-000000000000 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/spf13/cast v1.10.0 // indirect
 	github.com/spf13/cobra v1.10.2 // indirect
@@ -43,6 +49,7 @@ require (
 	golang.org/x/oauth2 v0.37.0 // indirect
 	golang.org/x/sync v0.24.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect
+	golang.org/x/term v0.47.0 // indirect
 	golang.org/x/text v0.43.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	modernc.org/libc v1.77.1 // indirect
@@ -62,3 +69,10 @@ replace github.com/pockethost/pocketbase/ext/pocker => ../../ext/pocker
 replace github.com/pockethost/pocketbase/ext/sandbox => ../../ext/sandbox
 
 replace github.com/pockethost/pocketbase/ext/devusers => ../../ext/devusers
+
+replace (
+	github.com/pockethost/pocketbase/ext/deploy => ../../ext/deploy
+	github.com/pockethost/pocketbase/ext/oauth-server => ../../ext/oauth-server
+	github.com/pockethost/pocketbase/ext/remotes => ../../ext/remotes
+	github.com/pockethost/pocketbase/ext/tokens => ../../ext/tokens
+)

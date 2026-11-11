@@ -1,5 +1,6 @@
 // Command pocketbase is the standard PocketBase CE binary: PocketBase's examples/base plus the CE plugins that ship
-// by default (ext/pages, ext/s3redirect). It's its own module so core's go.mod stays upstream's.
+// by default (ext/pages, ext/s3redirect, ext/tokens, ext/remotes, ext/oauth-server, ext/deploy). It's its own module
+// so core's go.mod stays upstream's.
 package main
 
 import (
@@ -17,8 +18,12 @@ import (
 	"ganigeorgiev.com/pocketbase/pocketbase/plugins/update"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/hook"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/osutils"
+	"github.com/pockethost/pocketbase/ext/deploy"
+	oauthserver "github.com/pockethost/pocketbase/ext/oauth-server"
 	"github.com/pockethost/pocketbase/ext/pages"
 	"github.com/pockethost/pocketbase/ext/s3redirect"
+	"github.com/pockethost/pocketbase/ext/remotes"
+	"github.com/pockethost/pocketbase/ext/tokens"
 )
 
 func main() {
@@ -128,6 +133,18 @@ func main() {
 
 	// S3 redirects: with S3 file storage on, downloads redirect to a signed bucket URL after the access check
 	s3redirect.MustRegister(app, s3redirect.Config{Enabled: &s3Redirect, TTL: s3RedirectTTL})
+
+	// API tokens (pbt_...), Settings → API tokens, the token command
+	tokens.MustRegister(app, tokens.Config{})
+
+	// remotes: remote/login/logout/link commands and GET /_pocker/whoami
+	remotes.MustRegister(app, remotes.Config{})
+
+	// OAuth server: browser sign-in for `pocketbase login` (superusers) and OAuth clients
+	oauthserver.MustRegister(app, oauthserver.Config{})
+
+	// deploys: deploy/dev/pull/logs commands and the deploy API (/_pocker/deploy/v1, superusers)
+	deploy.MustRegister(app, deploy.Config{})
 
 	// migrate command (with js templates)
 	migratecmd.MustRegister(app, app.RootCmd, migratecmd.Config{
