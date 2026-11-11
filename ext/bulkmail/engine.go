@@ -21,6 +21,9 @@ const (
 	brakeMinSends    = 100
 	brakeFailureRate = 0.05
 	idleTick         = 15 * time.Second
+	// idleWait is how long a sender with nothing to send sleeps; starting, resuming or editing a campaign wakes it
+	// sooner. Under pocker every running instance has a sender, so idle ones must cost next to nothing.
+	idleWait = 5 * time.Minute
 )
 
 // Start queues a campaign's audience and starts (or schedules) sending. Starting a finished campaign again queues
@@ -525,7 +528,16 @@ func (bm *BulkMail) Step() (time.Duration, error) {
 		return 0, err
 	}
 	if len(sending) == 0 {
-		return idleTick, nil
+		next, err := bm.app.FindRecordsByFilter(CampaignsId, "status = 'scheduled'", "scheduled_at", 1, 0)
+		if err != nil {
+			return 0, err
+		}
+		if len(next) > 0 {
+			if until := next[0].GetDateTime("scheduled_at").Time().Sub(now); until < idleWait {
+				return max(until, time.Second), nil
+			}
+		}
+		return idleWait, nil
 	}
 
 	if bm.cfg.Daily == NoBulkMail {

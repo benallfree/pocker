@@ -172,6 +172,12 @@ func Register(app core.App, cfg Config) (*BulkMail, error) {
 		return se.Next()
 	})
 
+	// a campaign changed (dashboard, records API, JS): let an idle sender look again now
+	app.OnRecordAfterUpdateSuccess(CampaignsCollection).BindFunc(func(e *core.RecordEvent) error {
+		bm.poke()
+		return e.Next()
+	})
+
 	app.OnTerminate().BindFunc(func(e *core.TerminateEvent) error {
 		bm.StopSender()
 		return e.Next()
