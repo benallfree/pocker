@@ -97,6 +97,9 @@ func LoadConfig(path string) (Config, error) {
 	if fromFile.Listen != "" {
 		cfg.Listen = fromFile.Listen
 	}
+	if fromFile.PlainListen != nil {
+		cfg.PlainListen = fromFile.PlainListen
+	}
 	if fromFile.PBRoot != "" {
 		cfg.PBRoot = fromFile.PBRoot
 	}
