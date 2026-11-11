@@ -2,6 +2,11 @@
 > For the most recent versions, please refer to [CHANGELOG.md](./CHANGELOG.md)
 ---
 
+## v0.22.59
+
+- (_Backported from v0.42.0_) Bumped `golang.org/x/*` dependencies and use Go 1.27.4 to generate the prebuilt binaries since it has some [minor security fixes](https://groups.google.com/g/golang-announce/c/iY8TY0wWgbM) _(none of them are critical for PocketBase but nevertheless it is advised to update)_.
+
+
 ## v0.22.58
 
 - (_Backported from v0.41.1_) Bumped `golang.org/x/net` since it has some [minor security fixes](https://groups.google.com/g/golang-announce/c/sqrs2vTx_Xs).
