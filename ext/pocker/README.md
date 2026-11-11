@@ -1,6 +1,6 @@
 # pocker
 
-Many PocketBase instances in one process (like Docker, but for PocketBase; level 2 of [four](../../README.md#four-ways-to-run-it)), routed by hostname, each started on its first request. Instances come from a YAML file or any provider.
+Many PocketBase instances in one process (like Docker, but for PocketBase), routed by hostname, each started on its first request. Instances come from a YAML file or any provider.
 
 **Runs on:** it is the multi-instance host; [mothership](../mothership/README.md) and other host-level plugins
 register on it.

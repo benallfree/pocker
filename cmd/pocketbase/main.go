@@ -1,5 +1,6 @@
 // Command pocketbase is the standard PocketBase CE binary: PocketBase's examples/base plus the CE plugins that ship
-// by default (ext/pages, ext/s3redirect, ext/bulkmail, ext/tokens, ext/remotes, ext/oauth-server, ext/deploy). It's its
+// by default (ext/pages, ext/s3redirect, ext/bulkmail, ext/tokens, ext/remotes, ext/oauth-server, ext/deploy, ext/mcp,
+// ext/pitr). It's its
 // own module so core's go.mod stays upstream's.
 package main
 
@@ -22,8 +23,10 @@ import (
 	"github.com/dop251/goja"
 	"github.com/pockethost/pocketbase/ext/bulkmail"
 	"github.com/pockethost/pocketbase/ext/deploy"
+	"github.com/pockethost/pocketbase/ext/mcp"
 	oauthserver "github.com/pockethost/pocketbase/ext/oauth-server"
 	"github.com/pockethost/pocketbase/ext/pages"
+	"github.com/pockethost/pocketbase/ext/pitr"
 	"github.com/pockethost/pocketbase/ext/remotes"
 	"github.com/pockethost/pocketbase/ext/s3redirect"
 	"github.com/pockethost/pocketbase/ext/tokens"
@@ -123,6 +126,22 @@ func main() {
 		"how long each signed file download URL stays valid",
 	)
 
+	var pitrEnabled bool
+	app.RootCmd.PersistentFlags().BoolVar(
+		&pitrEnabled,
+		"pitr",
+		true,
+		"point-in-time restore: replicate data.db into pb_data/litestream/ while serving",
+	)
+
+	var pitrRetention time.Duration
+	app.RootCmd.PersistentFlags().DurationVar(
+		&pitrRetention,
+		"pitrRetention",
+		72*time.Hour,
+		"how far back a point-in-time restore can go",
+	)
+
 	app.RootCmd.ParseFlags(os.Args[1:])
 
 	// ---------------------------------------------------------------
@@ -137,6 +156,7 @@ func main() {
 		HooksPoolSize: hooksPool,
 		OnInit: func(vm *goja.Runtime) {
 			ceplugin.BindJS(app, vm, cePlugins...) // e.g. $bulkmail in pb_hooks
+			mcp.BindJS(vm, app)                    // $mcp.addTool in pb_hooks
 		},
 	})
 
@@ -158,6 +178,13 @@ func main() {
 
 	// deploys: deploy/dev/pull/logs commands and the deploy API (/_pocker/deploy/v1, superusers)
 	deploy.MustRegister(app, deploy.Config{})
+
+	// MCP endpoint at /mcp (built-in pb_* tools plus $mcp tools from pb_hooks); OAuth sign-in through oauth-server
+	mcp.MustRegister(app, mcp.Config{})
+
+	// point-in-time restore: on by default (--pitr=false turns it off); history in pb_data/litestream/, restore from
+	// Settings → Backups or `pocketbase pitr restore`
+	pitr.MustRegister(app, pitr.Config{Enabled: &pitrEnabled, Retention: pitrRetention})
 	ceplugin.MustRegister(app, cePlugins...)
 
 	// migrate command (with js templates)

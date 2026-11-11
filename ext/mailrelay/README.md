@@ -70,7 +70,7 @@ plugins:
 
 ## Try it: `example/` with the dev mail trap
 
-PocketBase CE has a dev mail trap built in ([core features](../../README.md#core-features)): an in-process mail
+PocketBase CE has a dev mail trap built in (`serve --dev`, see the [README](../../README.md#install)): an in-process mail
 catcher, like MailDev or Mailpit, with an SMTP port and a web inbox. The example points the relay's upstream at its
 SMTP port, so relayed mail goes through the real SMTP path and lands in the inbox:
 
