@@ -9,15 +9,14 @@
 // `plugins.storage` (only `enabled`). Without a bucket the plugin does nothing: files stay on local disk.
 //
 // Each instance gets its own folder in the bucket, <prefix>instances/<id>/storage/ and .../backups/, and can't reach
-// anything outside it. Files already on local disk stay readable: the bucket is tried first, then the local folder,
-// and a file read from the local folder is moved up in the background (lazy move, no cutover). When the instance
-// turns on its own S3, PocketBase's normal code takes over with the instance's credentials.
+// anything outside it. When the instance turns on its own S3, PocketBase's normal code takes over with the instance's
+// credentials. Files already on an instance's local disk are not read or moved: the plugin is for instances created
+// with it on (legacy instances are migrated separately).
 package storage
 
 import (
 	"fmt"
 	"log/slog"
-	"path/filepath"
 	"sync"
 
 	"gopkg.in/yaml.v3"
@@ -67,9 +66,8 @@ type Plugin struct {
 	cfg Config
 	log *slog.Logger
 
-	mu     sync.Mutex
-	moving map[string]bool // "<dir>|<key>" being moved up
-	moves  sync.WaitGroup
+	mu        sync.Mutex
+	instances map[core.App]string // apps using the default bucket -> instance id
 }
 
 var (
@@ -84,7 +82,7 @@ func New(cfg Config) *Plugin {
 	if log == nil {
 		log = slog.Default()
 	}
-	return &Plugin{cfg: cfg, log: log.With("plugin", Name), moving: map[string]bool{}}
+	return &Plugin{cfg: cfg, log: log.With("plugin", Name), instances: map[core.App]string{}}
 }
 
 // Name implements pocker.Plugin.
@@ -147,24 +145,30 @@ func (p *Plugin) InitApp(inst pocker.Instance, app core.App) error {
 		return nil
 	}
 	root := p.cfg.Bucket.Prefix + "instances/" + inst.ID + "/"
+	p.mu.Lock()
+	p.instances[app] = inst.ID
+	p.mu.Unlock()
+	app.OnTerminate().BindFunc(func(e *core.TerminateEvent) error {
+		p.mu.Lock()
+		delete(p.instances, e.App)
+		p.mu.Unlock()
+		return e.Next()
+	})
 	app.OnFilesystemCreate().BindFunc(func(e *core.FilesystemCreateEvent) error {
 		s := e.App.Settings()
-		var localDir string
 		switch e.Kind {
 		case core.FilesystemKindStorage:
 			if !on(p.cfg.Uploads) || s.S3.Enabled {
 				return e.Next()
 			}
-			localDir = filepath.Join(e.App.DataDir(), core.LocalStorageDirName)
 		case core.FilesystemKindBackups:
 			if !on(p.cfg.Backups) || s.Backups.S3.Enabled {
 				return e.Next()
 			}
-			localDir = filepath.Join(e.App.DataDir(), core.LocalBackupsDirName)
 		default:
 			return e.Next()
 		}
-		fsys, err := p.open(root+e.Kind+"/", localDir)
+		fsys, err := p.open(root + e.Kind + "/")
 		if err != nil {
 			return err
 		}
@@ -174,62 +178,28 @@ func (p *Plugin) InitApp(inst pocker.Instance, app core.App) error {
 	return nil
 }
 
-// open returns the fenced bucket with the local folder as fallback.
-func (p *Plugin) open(prefix, localDir string) (*filesystem.System, error) {
-	primary, local, err := p.drivers(prefix, localDir)
-	if err != nil {
-		return nil, err
-	}
-	return filesystem.New(&fallbackDriver{primary: primary, local: local, onLocalHit: func(key string) {
-		p.moveUp(prefix, localDir, key)
-	}}), nil
-}
-
-func (p *Plugin) drivers(prefix, localDir string) (primary, local blobDriver, err error) {
+// open returns the bucket fenced to prefix.
+func (p *Plugin) open(prefix string) (*filesystem.System, error) {
 	b := p.cfg.Bucket
 	s3, err := filesystem.NewS3(b.Bucket, b.Region, b.Endpoint, b.AccessKey, b.Secret, b.ForcePathStyle)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	l, err := filesystem.NewLocal(localDir)
-	if err != nil {
-		s3.Close()
-		return nil, nil, err
-	}
-	return prefixDriver{Driver: s3.Driver(), prefix: prefix}, l.Driver(), nil
+	return filesystem.New(prefixDriver{Driver: s3.Driver(), prefix: prefix}), nil
 }
 
-// moveUp copies a local file into the bucket and removes the local copy, in the background and once per key.
-func (p *Plugin) moveUp(prefix, localDir, key string) {
-	id := localDir + "|" + key
+// Target is where an instance's uploads live in the bucket, for code that talks to the bucket directly (e.g.
+// ext/s3redirect's Config.Target, to sign downloads). ok is false when the instance's uploads aren't in the default
+// bucket (no bucket, plugin or uploads off, or the instance uses its own S3).
+func (p *Plugin) Target(app core.App) (b Bucket, prefix string, ok bool) {
+	if p.cfg.Bucket == nil || !on(p.cfg.Uploads) || app.Settings().S3.Enabled {
+		return Bucket{}, "", false
+	}
 	p.mu.Lock()
-	if p.moving[id] {
-		p.mu.Unlock()
-		return
-	}
-	p.moving[id] = true
-	p.moves.Add(1)
+	id, enabled := p.instances[app], p.instances[app] != ""
 	p.mu.Unlock()
-	go func() {
-		defer func() {
-			p.mu.Lock()
-			delete(p.moving, id)
-			p.mu.Unlock()
-			p.moves.Done()
-		}()
-		primary, local, err := p.drivers(prefix, localDir)
-		if err != nil {
-			p.log.Warn("storage: lazy move", "key", key, "error", err)
-			return
-		}
-		defer primary.Close()
-		defer local.Close()
-		if err := moveFile(local, primary, key); err != nil {
-			p.log.Warn("storage: moving a file to the bucket failed; it stays local", "dir", localDir, "key", key, "error", err)
-		}
-	}()
+	if !enabled {
+		return Bucket{}, "", false
+	}
+	return *p.cfg.Bucket, p.cfg.Bucket.Prefix + "instances/" + id + "/" + core.FilesystemKindStorage + "/", true
 }
-
-// Wait blocks until background moves finish (tests, shutdown).
-func (p *Plugin) Wait() { p.moves.Wait() }
-

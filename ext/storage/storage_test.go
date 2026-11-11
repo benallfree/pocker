@@ -119,7 +119,7 @@ func TestDefaultBucketUnderPocker(t *testing.T) {
 	shared := raw(t, b, "shared")
 	pbRoot := t.TempDir()
 
-	// a file instance a uploaded before the plugin (local disk)
+	// a file on instance a's local disk from before the plugin
 	oldLocal := filepath.Join(pbRoot, "a", "pb_data", "storage", "x", "old.txt")
 	if err := os.MkdirAll(filepath.Dir(oldLocal), 0o755); err != nil {
 		t.Fatal(err)
@@ -138,7 +138,12 @@ func TestDefaultBucketUnderPocker(t *testing.T) {
 	apps := map[string]core.App{}
 	m := pocker.NewManager(insts, pocker.ManagerOptions{
 		PBRoot: pbRoot, Logger: quiet, Init: p.InitApp,
-		Setup: func(inst pocker.Instance, app core.App) error { mu.Lock(); apps[inst.ID] = app; mu.Unlock(); return nil },
+		Setup: func(inst pocker.Instance, app core.App) error {
+			mu.Lock()
+			apps[inst.ID] = app
+			mu.Unlock()
+			return nil
+		},
 	})
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -171,22 +176,20 @@ func TestDefaultBucketUnderPocker(t *testing.T) {
 		t.Fatal("upload also written to local disk")
 	}
 
-	// a local file is still readable, then moved up and removed locally
-	r, err := fsA.GetReader("x/old.txt")
-	if err != nil {
-		t.Fatal(err)
+	// a file left on local disk is not served or moved: the plugin is for fresh instances
+	if ok, _ := fsA.Exists("x/old.txt"); ok {
+		t.Fatal("local file visible through the default bucket")
 	}
-	got, _ := io.ReadAll(r)
-	r.Close()
-	if string(got) != "from before" {
-		t.Fatalf("old file: %q", got)
+	if _, err := os.Stat(oldLocal); err != nil {
+		t.Fatal("local file touched")
 	}
-	p.Wait()
-	if !exists(t, shared, "eu/instances/a/storage/x/old.txt") {
-		t.Fatal("old file not moved to the bucket")
+
+	// Target: where a's uploads live, for s3redirect
+	if tb, prefix, ok := p.Target(appA); !ok || tb.Bucket != "shared" || prefix != "eu/instances/a/storage/" {
+		t.Fatalf("Target(a) = %v %q %v", tb.Bucket, prefix, ok)
 	}
-	if _, err := os.Stat(oldLocal); !os.IsNotExist(err) {
-		t.Fatal("old file still on local disk after the move")
+	if _, _, ok := p.Target(appC); ok {
+		t.Fatal("Target for an opted-out instance")
 	}
 
 	// fenced: b sees none of a's files and can't reach them by key
@@ -201,8 +204,8 @@ func TestDefaultBucketUnderPocker(t *testing.T) {
 	if exists(t, fsB, "../a/storage/c1/r1/new.txt") || exists(t, fsB, "c1/r1/new.txt") {
 		t.Fatal("b reached a's file")
 	}
-	if l, err := fsA.List(""); err != nil || len(l) != 2 {
-		t.Fatalf("a lists %d objects (%v), want 2", len(l), err)
+	if l, err := fsA.List(""); err != nil || len(l) != 1 {
+		t.Fatalf("a lists %d objects (%v), want 1", len(l), err)
 	}
 
 	// deletes go through to the bucket
@@ -299,5 +302,8 @@ func TestDefaultBucketUnderPocker(t *testing.T) {
 	}
 	if !exists(t, raw(t, b, "own"), "mine.txt") || exists(t, shared, "eu/instances/b/storage/mine.txt") {
 		t.Fatal("with its own S3 on, the upload didn't go to the instance's bucket")
+	}
+	if _, _, ok := p.Target(appB); ok {
+		t.Fatal("Target for an instance on its own S3")
 	}
 }

@@ -6,8 +6,10 @@ Credentials never reach the instance.
 **Runs on:** many apps under [pocker](../pocker/README.md). (A single app has no use for it: its owner sets S3 in
 Settings.)
 
-> **Spike.** Works and is tested against MinIO; not yet deployed. Lazy move of existing files is on read only; the
-> background sweep that moves the rest is still to do.
+> **Spike.** Works and is tested against MinIO; not yet deployed.
+
+For instances created with the plugin on. Files already on an instance's local disk are not read or moved (legacy
+instances are migrated separately).
 
 ## Setup
 
@@ -45,9 +47,8 @@ No bucket: the plugin does nothing; files stay on local disk as in PocketBase.
   its folder.
 - To the instance nothing is configured: Settings show S3 off, uploads, thumbs, `$app.newFilesystem()` and the
   Backups screen work as before. Downloads stream through the server.
-- Files already on local disk stay readable: the bucket is tried first, then `pb_data/storage` (or
-  `pb_data/backups`). A file read from local disk is copied to the bucket and removed locally in the background
-  (lazy move, no cutover). Deletes remove both copies; listings merge both.
+- `Plugin.Target(app)` returns the bucket and prefix of an instance's uploads, e.g. for `ext/s3redirect`'s
+  `Config.Target` so downloads become signed redirects to the bucket.
 - When the instance turns on its own S3, PocketBase's normal code takes over with the instance's credentials. Files
   in the default bucket stay there (PocketBase's own S3 switch doesn't move files either).
 
