@@ -1,4 +1,4 @@
-## v0.42.1 (WIP)
+## v0.42.1
 
 - Fixed superuser UI regression as a result of the extra `Authorization` checks in v0.42.0 ([#8368](https://ganigeorgiev.com/pocketbase/discussions/8368)).
 
