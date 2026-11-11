@@ -26,7 +26,7 @@ func TestPockerRestoreRestartsOnlyThatInstance(t *testing.T) {
 	if raceEnabled {
 		t.Skip("PocketBase's notify watcher races with ResetBootstrapState on app restart (upstream, see race_test.go); run without -race")
 	}
-	p := New(Config{Enabled: true, Logger: quiet})
+	p := New(Config{Logger: quiet}) // on by default
 	defer p.Close(context.Background())
 
 	var mu sync.Mutex
@@ -149,7 +149,7 @@ func TestPockerRestoreRestartsOnlyThatInstance(t *testing.T) {
 
 func TestConfigureAndInstanceConfig(t *testing.T) {
 	var doc yaml.Node
-	if err := yaml.Unmarshal([]byte("pitr:\n  enabled: true\n  retention: 48h\n  bucket:\n    bucket: x\n    label: EU\n"), &doc); err != nil {
+	if err := yaml.Unmarshal([]byte("pitr:\n  enabled: false\n  retention: 48h\n  bucket:\n    bucket: x\n    label: EU\n"), &doc); err != nil {
 		t.Fatal(err)
 	}
 	p := New(Config{SnapshotInterval: time.Hour, Logger: quiet})
@@ -157,7 +157,7 @@ func TestConfigureAndInstanceConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := p.Config()
-	if !c.Enabled || c.Retention != 48*time.Hour || c.SnapshotInterval != time.Hour || c.Bucket == nil || c.Bucket.Label != "EU" {
+	if c.Enabled == nil || *c.Enabled || c.Retention != 48*time.Hour || c.SnapshotInterval != time.Hour || c.Bucket == nil || c.Bucket.Label != "EU" {
 		t.Fatalf("configured: %+v", c)
 	}
 	// Go-set values win over the file

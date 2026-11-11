@@ -5,7 +5,7 @@
 // Single app:
 //
 //	app := pocketbase.New()
-//	pitr.MustRegister(app, pitr.Config{Enabled: true})
+//	pitr.MustRegister(app, pitr.Config{})
 //
 // Many apps in one process: add it to a pocker server's plugins; settings come from the config file's top-level
 // `pitr:` key and each instance's `plugins.pitr`:
@@ -44,8 +44,9 @@ const (
 
 // Config is the process-wide configuration.
 type Config struct {
-	// Enabled is the default for every app; an app's [AppConfig.Enabled] overrides it. There is no admin switch.
-	Enabled bool `yaml:"enabled"`
+	// Enabled is the default for every app: on unless set to false (including the plugin is the opt-in). An app's
+	// [AppConfig.Enabled] overrides it, e.g. off for a hosting plan without PITR. There is no admin switch.
+	Enabled *bool `yaml:"enabled"`
 
 	// Retention is how far back a restore can go (default 72h). An app's [AppConfig.Retention] overrides it.
 	Retention time.Duration `yaml:"retention"`
@@ -186,7 +187,7 @@ func (p *Plugin) Close(ctx context.Context) error {
 
 // resolve merges an app's config over the process config.
 func (p *Plugin) resolve(ac AppConfig) (enabled bool, retention time.Duration) {
-	enabled = p.cfg.Enabled
+	enabled = p.cfg.Enabled == nil || *p.cfg.Enabled
 	if ac.Enabled != nil {
 		enabled = *ac.Enabled
 	}

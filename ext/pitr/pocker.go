@@ -36,7 +36,7 @@ func (p *Plugin) Configure(doc *yaml.Node, _ pocker.Config) error {
 	if err := n.Decode(&c); err != nil {
 		return fmt.Errorf("pitr: %w", err)
 	}
-	if !p.cfg.Enabled {
+	if p.cfg.Enabled == nil {
 		p.cfg.Enabled = c.Enabled
 	}
 	if !p.retentionSet && c.Retention > 0 {

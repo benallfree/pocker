@@ -18,8 +18,7 @@ func main() {
 	app := pocketbase.New()
 
 	pitr.MustRegister(app, pitr.Config{
-		Enabled:   true,
-		Retention: 72 * time.Hour,
+		Retention: 72 * time.Hour, // on by default; Enabled: false turns it off
 		// Bucket: &pitr.Bucket{Endpoint: "...", Bucket: "...", Region: "auto", AccessKey: "...", Secret: "...", Label: "EU"},
 	})
 

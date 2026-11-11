@@ -146,7 +146,7 @@ func do(t *testing.T, h http.Handler, method, path, token, body string) *httptes
 
 func TestSingleAppLifecycleAndStagedRestore(t *testing.T) {
 	dir := t.TempDir()
-	p := New(Config{Enabled: true, Logger: quiet})
+	p := New(Config{Logger: quiet})
 	defer p.Close(context.Background())
 
 	ta := startTestApp(t, p, dir)
@@ -229,7 +229,7 @@ func TestSingleAppLifecycleAndStagedRestore(t *testing.T) {
 
 func TestBackupZipLeavesHistoryOut(t *testing.T) {
 	dir := t.TempDir()
-	p := New(Config{Enabled: true, Logger: quiet})
+	p := New(Config{Logger: quiet})
 	defer p.Close(context.Background())
 	ta := startTestApp(t, p, dir)
 	defer ta.stop()
@@ -255,7 +255,8 @@ func TestBackupZipLeavesHistoryOut(t *testing.T) {
 
 func TestDisabledAddsNothing(t *testing.T) {
 	dir := t.TempDir()
-	p := New(Config{Enabled: false, Logger: quiet})
+	off := false
+	p := New(Config{Enabled: &off, Logger: quiet})
 	defer p.Close(context.Background())
 	ta := startTestApp(t, p, dir)
 	defer ta.stop()
@@ -320,7 +321,7 @@ func startMinio(t *testing.T) *Bucket {
 
 func TestBucketDestination(t *testing.T) {
 	b := startMinio(t)
-	p := New(Config{Enabled: true, Bucket: b, Logger: quiet})
+	p := New(Config{Bucket: b, Logger: quiet})
 	defer p.Close(context.Background())
 
 	// two apps with their own keys, as under a multitenant host

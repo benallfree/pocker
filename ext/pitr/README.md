@@ -9,6 +9,10 @@ Point-in-time restore: Litestream replication of each app's database (local or a
 
 ## What it does
 
+On by default: including the plugin is the opt-in. `enabled: false` turns it off for the server or for one
+instance.
+
+
 - Litestream continuously copies the app's `data.db` (records, collections, settings, superusers) to
   `pb_data/litestream/`, or to an S3-compatible bucket.
 - **Settings → Backups** gets a "Point-in-time restore" section: the restorable window, a time picker, **Restore**,
@@ -23,7 +27,7 @@ Point-in-time restore: Litestream replication of each app's database (local or a
 
 ```go
 app := pocketbase.New()
-pitr.MustRegister(app, pitr.Config{Enabled: true, Retention: 72 * time.Hour})
+pitr.MustRegister(app, pitr.Config{Retention: 72 * time.Hour})
 app.Start()
 ```
 
@@ -48,12 +52,11 @@ srv := &pocker.Server{Config: cfg, Plugins: []pocker.Plugin{pitr.New(pitr.Config
 ```yaml
 # pocker.yaml (fields set in Go win)
 pitr:
-  enabled: true
-  retention: 72h
+  retention: 72h          # on by default; enabled: false turns it off for every instance
   snapshot_interval: 24h
   bucket: { endpoint: ..., bucket: ..., region: auto, access_key: ..., secret: ..., label: EU }
 
-# instances.yaml (or a provider): only enabled and retention per instance
+# instances.yaml (or a provider): only enabled and retention per instance (e.g. enabled: false for a plan without PITR)
 instances:
   - id: abc
     hosts: [abc.example.com]
