@@ -58,12 +58,15 @@ The built-in pages (sign-in, one-time code, consent, device code, done, error) u
 `Branding` (logo, accent color, footer). They follow the system's light or dark mode and work on phones.
 
 To replace them:
-- `Config.Render(e, page, data)` renders any page itself (return `handled=false` to fall back), with `PageData`: the
-  page name, branding, the form `Action`, `Hidden` fields and `CSRF` token every form must post back, the client, the
-  scopes, the account, errors.
-- With [pages](../pages/README.md): when the pages service offers `RenderTemplate(e, name, data map[string]any)
-  (handled bool, err error)`, the server asks it for `oauth/<page>` first, so a project can theme the pages in
-  PocketPages. The data keys are `PageData`'s in camelCase (`action`, `hidden`, `csrf`, `clientName`, `scopes`, …).
+- **Eject (with [pages](../pages/README.md)):** `pocketbase oauth eject` writes the pages as PocketPages templates to
+  `pb_pages/_private/oauth/` (`signin.ejs`, `otp.ejs`, `consent.ejs`, `device.ejs`, `done.ejs`, `error.ejs`, and the
+  shared `head.ejs` / `foot.ejs` / `hidden.ejs` with the CSS). It prints each file, refuses to overwrite existing ones
+  unless `--force`, and from then on the server renders those templates (missing ones fall back to the built-in
+  page; delete them to go back). `_private` keeps them from being served as routes. The data is `ctx.data`
+  (`data.appName`, `data.action`, `data.hidden`, `data.csrf`, `data.clientName`, `data.scopes`, `data.error`, …,
+  `PageData` in camelCase); every POST form must include `include('/oauth/hidden')` and a `step` button.
+- **`Config.Render(e, page, data)`** renders any page itself (return `handled=false` to fall back), with
+  `PageData`. It wins over ejected templates.
 
 ## License
 

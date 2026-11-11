@@ -72,6 +72,33 @@ func NewCommand(s *Server) *cobra.Command {
 	}
 
 	clients.AddCommand(list, add, rm)
-	cmd.AddCommand(clients)
+
+	var force bool
+	eject := &cobra.Command{
+		Use:   "eject",
+		Short: "Writes the built-in OAuth pages into pb_pages as PocketPages templates you can edit",
+		Long: "Writes the sign-in, one-time code, consent, device code, done and error pages, and their shared " +
+			"head/foot partials, to <pb_pages>/" + EjectSubdir + ". From then on the server renders those templates " +
+			"(through ext/pages); delete them to go back to the built-in pages.",
+		SilenceUsage: true,
+		RunE: func(c *cobra.Command, args []string) error {
+			dir, ok := s.PagesDir()
+			if !ok {
+				return errNoPages
+			}
+			written, err := Eject(dir, force)
+			if err != nil {
+				return err
+			}
+			for _, p := range written {
+				fmt.Fprintln(c.OutOrStdout(), "wrote "+p)
+			}
+			fmt.Fprintf(c.OutOrStdout(), "Ejected %d file(s). The OAuth pages now render from them.\n", len(written))
+			return nil
+		},
+	}
+	eject.Flags().BoolVar(&force, "force", false, "overwrite existing files")
+
+	cmd.AddCommand(clients, eject)
 	return cmd
 }

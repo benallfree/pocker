@@ -1,0 +1,7 @@
+<%- include('/oauth/head') %>
+<h1>Connect a device</h1><p class="sub">Enter the code shown on your other device.</p>
+<% if (data.error) { %><p class="err"><%= data.error %></p><% } %>
+<form method="get" action="<%= data.action %>">
+<label for="user_code">Code</label><input id="user_code" class="code" type="text" name="user_code" value="<%= data.userCode %>" placeholder="XXXX-XXXX" autocomplete="off" required autofocus>
+<button class="btn">Continue</button></form>
+<%- include('/oauth/foot') %>

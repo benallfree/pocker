@@ -52,10 +52,11 @@ type PageData struct {
 	Message  string
 }
 
-// pagesRenderer is what ext/pages offers (duck-typed, so this module doesn't depend on it): render a template
-// from the project's pages with data, or report it has none.
+// pagesRenderer is what ext/pages offers (duck-typed, so this module doesn't depend on it): render
+// pb_pages/_private/<name> with data as ctx.data, or report there's no such template. `pocketbase oauth eject`
+// writes the built-in pages there.
 type pagesRenderer interface {
-	RenderTemplate(e *core.RequestEvent, name string, data map[string]any) (handled bool, err error)
+	RenderTemplate(e *core.RequestEvent, name string, status int, data map[string]any) (handled bool, err error)
 }
 
 func (s *Server) render(e *core.RequestEvent, status int, d PageData) error {
@@ -81,7 +82,7 @@ func (s *Server) render(e *core.RequestEvent, status int, d PageData) error {
 		}
 	}
 	if pr, ok := s.app.Store().Get("extPages").(pagesRenderer); ok {
-		if handled, err := pr.RenderTemplate(e, "oauth/"+d.Page, pageMap(d)); handled || err != nil {
+		if handled, err := pr.RenderTemplate(e, "oauth/"+d.Page, status, pageMap(d)); handled || err != nil {
 			return err
 		}
 	}
@@ -93,6 +94,12 @@ func (s *Server) render(e *core.RequestEvent, status int, d PageData) error {
 }
 
 func pageMap(d PageData) map[string]any {
+	if d.Hidden == nil {
+		d.Hidden = map[string]string{}
+	}
+	if d.Collections == nil {
+		d.Collections = []string{}
+	}
 	scopes := make([]map[string]string, 0, len(d.Scopes))
 	for _, s := range d.Scopes {
 		scopes = append(scopes, map[string]string{"name": s.Name, "description": s.Description})

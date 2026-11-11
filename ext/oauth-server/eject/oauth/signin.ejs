@@ -1,0 +1,18 @@
+<%- include('/oauth/head') %>
+<h1>Sign in to <%= data.appName %></h1>
+<p class="sub">to continue<% if (data.clientName) { %> to <%= data.clientName %><% } %></p>
+<% if (data.error) { %><p class="err"><%= data.error %></p><% } %>
+<form method="post" action="<%= data.action %>"><%- include('/oauth/hidden') %>
+<% if (data.collections.length > 1) { %>
+<label for="collection">Account type</label><select id="collection" name="collection">
+<% for (const c of data.collections) { %><option value="<%= c %>"<%= c === data.collection ? ' selected' : '' %>><%= c %></option><% } %>
+</select>
+<% } else { %><input type="hidden" name="collection" value="<%= data.collection %>"><% } %>
+<label for="email">Email</label><input id="email" type="email" name="email" value="<%= data.email %>" autocomplete="username" required autofocus>
+<% if (data.passwordEnabled) { %>
+<label for="password">Password</label><input id="password" type="password" name="password" autocomplete="current-password">
+<button class="btn" name="step" value="password">Sign in</button>
+<% } %>
+<% if (data.otpEnabled) { %><button class="<%= data.passwordEnabled ? 'link' : 'btn' %>" name="step" value="request_otp" formnovalidate>Email me a sign-in code</button><% } %>
+</form>
+<%- include('/oauth/foot') %>

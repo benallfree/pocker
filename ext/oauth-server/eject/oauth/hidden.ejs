@@ -1,0 +1,3 @@
+<%# Every POST form must send these back: the OAuth request and the CSRF token. %>
+<% for (const k in data.hidden) { %><input type="hidden" name="<%= k %>" value="<%= data.hidden[k] %>"><% } %>
+<input type="hidden" name="csrf" value="<%= data.csrf %>">
