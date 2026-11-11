@@ -5,6 +5,22 @@ upstream and aims to keep its own changes to the core small: just the hooks that
 PocketBase. Everything else is a plugin. Maintained by [PocketHost](https://pockethost.io); not affiliated with or
 endorsed by the PocketBase project.
 
+## Install
+
+```bash
+brew install pockethost/tap/pocketbase
+```
+
+That's [Homebrew](https://brew.sh) on macOS or Linux (the formula lives in
+[pockethost/homebrew-tap](https://github.com/pockethost/homebrew-tap)). Or download the zip for your platform from
+[Releases](https://github.com/pockethost/pocketbase/releases). Then:
+
+```bash
+pocketbase serve
+```
+
+Start a site from a starter kit with `pocketbase pages create myapp` ([pages](ext/pages/README.md)).
+
 ## Core features
 
 What PocketBase CE adds to PocketBase itself, with no plugin. Each change is small and marked `// POCKER:` in the code,
