@@ -52,6 +52,11 @@ func NewBucket(drv Driver) *Bucket {
 	return &Bucket{drv: drv}
 }
 
+// Driver returns the bucket's driver (e.g. to wrap it: a key prefix, a fallback).
+func (b *Bucket) Driver() Driver {
+	return b.drv
+}
+
 // ListOptions sets options for listing blobs via Bucket.List.
 type ListOptions struct {
 	// Prefix indicates that only blobs with a key starting with this prefix

@@ -209,6 +209,27 @@ type FilesystemNewWriterEvent struct {
 	App App
 }
 
+// Filesystem kinds, see [FilesystemCreateEvent].
+const (
+	FilesystemKindStorage = "storage" // app.NewFilesystem(): record uploads
+	FilesystemKindBackups = "backups" // app.NewBackupsFilesystem(): backup zips
+)
+
+// FilesystemCreateEvent is triggered by app.NewFilesystem() and app.NewBackupsFilesystem().
+// A handler may set Filesystem (e.g. a default bucket when the app's own S3 is off);
+// otherwise the default one from the app settings (S3 or local) is created.
+type FilesystemCreateEvent struct {
+	hook.Event
+
+	App App
+
+	// Kind is [FilesystemKindStorage] or [FilesystemKindBackups].
+	Kind string
+
+	// Filesystem is the result. Left nil, the default one is created after the handlers.
+	Filesystem *filesystem.System
+}
+
 type FilesystemDeleteEvent struct {
 	hook.Event
 	*filesystem.DeleteEvent

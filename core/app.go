@@ -1276,8 +1276,14 @@ type App interface {
 
 	// ---------------------------------------------------------------
 	// Filesystem event hooks
-	// (not publicly exposed until file_field refactoring)
 	// ---------------------------------------------------------------
+
+	// OnFilesystemCreate hook is triggered every time app.NewFilesystem() or
+	// app.NewBackupsFilesystem() creates a filesystem, before the default one from
+	// the app settings. A handler may supply its own (see [FilesystemCreateEvent]).
+	OnFilesystemCreate() *hook.Hook[*FilesystemCreateEvent]
+
+	// (the hooks below are not publicly exposed until file_field refactoring)
 
 	// onFilesystemNewWriter is an internal hook for app.NewFilesystem()
 	// instances that is triggered on every storage filesystem writer initialization

@@ -92,6 +92,19 @@ func NewS3(
 	return &System{ctx: ctx, bucket: blob.NewBucket(drv)}, nil
 }
 
+// New initializes a filesystem over any blob driver (e.g. one that wraps another
+// filesystem's driver, see [System.Driver]).
+//
+// NB! Make sure to call `Close()` after you are done working with it.
+func New(drv blob.Driver) *System {
+	return &System{ctx: context.Background(), bucket: blob.NewBucket(drv)}
+}
+
+// Driver returns the filesystem's blob driver, e.g. to wrap it and pass it to [New].
+func (s *System) Driver() blob.Driver {
+	return s.bucket.Driver()
+}
+
 // NewLocal initializes a new local filesystem instance.
 //
 // NB! Make sure to call `Close()` after you are done working with it.
