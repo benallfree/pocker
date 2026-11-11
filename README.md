@@ -58,25 +58,27 @@ Feature plugins work at any level.
 
 ## Plugins
 
-| Plugin | Level | Status | What it does |
-|---|---|---|---|
-| [pocker](ext/pocker/README.md) | 2 | 🟩🟩🟩 | Many PocketBase instances in one Go process, routed by hostname |
-| [mothership](ext/mothership/README.md) | 3 | 🟥⬜⬜ | A control plane and its edges, across regions |
-| [tenants](ext/tenants/README.md) | 4 | 🟥⬜⬜ | Accounts that own instances: quotas, owner logins, tokens, the API for your dashboard |
-| [tenant-billing-ls](ext/tenant-billing-ls/README.md) | 4 | 🟥⬜⬜ | Billing tenants with Lemon Squeezy |
-| [sandbox](ext/sandbox/README.md) | any | 🟩🟩🟩 | Confine untrusted JS hooks, SQL and outbound network ([how is this safe?](ext/sandbox/README.md#how-is-this-safe)) |
-| [firewall](ext/firewall/README.md) | any | 🟩🟩🟩 | Peer allow-lists, trusted proxies and rate limits |
-| [autotls](ext/autotls/README.md) | any | 🟩🟩🟩 | Automatic TLS: on-demand certificates and wildcards |
-| [servertiming](ext/servertiming/README.md) | any | 🟩🟩🟩 | Server-Timing headers |
-| [pitr](ext/pitr/README.md) | any | 🟧🟧⬜ | Point-in-time restore (Litestream) |
-| [bulkmail](ext/bulkmail/README.md) | any | 🟧🟧⬜ | Bulk mail campaigns to your app's own users |
-| [mailrelay](ext/mailrelay/README.md) | 2 | 🟧🟧⬜ | Outgoing mail for instances without SMTP, through the operator's relay as `<instance>@<domain>`, with limits |
-| [pages](ext/pages/README.md) | any | 🟥⬜⬜ | Server-rendered multi-page applications (PocketPages) |
-| [storage](ext/storage/README.md) | any | 🟥⬜⬜ | A default storage backend when an app's own S3 is off |
-| [s3redirect](ext/s3redirect/README.md) | any | 🟥⬜⬜ | File downloads as signed S3 redirects |
-| [vacuum](ext/vacuum/README.md) | any | 🟧🟧⬜ | Scheduled SQLite VACUUM |
-| [deploy](ext/deploy/README.md) | any | 🟧🟧⬜ | Deploy API: push hooks, migrations and public files |
-| [schedules](ext/schedules/README.md) | 2+ | 🟧🟧⬜ | Scheduled webhooks that wake sleeping instances |
+| Plugin | Core | Pocker | Mothership | Multitenant | Status | What it does |
+|---|:-:|:-:|:-:|:-:|---|---|
+| [pocker](ext/pocker/README.md) | · | ✓ | ✓ | ✓ | 🟩🟩🟩 | Many PocketBase instances in one Go process, routed by hostname |
+| [mothership](ext/mothership/README.md) | · | · | ✓ | ✓ | 🟥⬜⬜ | A control plane and its edges, across regions |
+| [tenants](ext/tenants/README.md) | · | · | · | ✓ | 🟥⬜⬜ | Accounts that own instances: quotas, owner logins, tokens, the API for your dashboard |
+| [tenant-billing-ls](ext/tenant-billing-ls/README.md) | · | · | · | ✓ | 🟥⬜⬜ | Billing tenants with Lemon Squeezy |
+| [sandbox](ext/sandbox/README.md) | ✓ | ✓ | ✓ | ✓ | 🟩🟩🟩 | Confine untrusted JS hooks, SQL and outbound network ([how is this safe?](ext/sandbox/README.md#how-is-this-safe)) |
+| [firewall](ext/firewall/README.md) | ✓ | ✓ | ✓ | ✓ | 🟩🟩🟩 | Peer allow-lists, trusted proxies and rate limits |
+| [autotls](ext/autotls/README.md) | ✓ | ✓ | ✓ | ✓ | 🟩🟩🟩 | Automatic TLS: on-demand certificates and wildcards |
+| [servertiming](ext/servertiming/README.md) | ✓ | ✓ | ✓ | ✓ | 🟩🟩🟩 | Server-Timing headers |
+| [pitr](ext/pitr/README.md) | ✓ | ✓ | ✓ | ✓ | 🟧🟧⬜ | Point-in-time restore (Litestream) |
+| [bulkmail](ext/bulkmail/README.md) | ✓ | ✓ | ✓ | ✓ | 🟩🟩🟩 | Bulk mail campaigns to your app's own users; audiences from a collection, a view or SQL. In the standard binary |
+| [mailrelay](ext/mailrelay/README.md) | · | ✓ | ✓ | ✓ | 🟧🟧⬜ | Outgoing mail for instances without SMTP, through the operator's relay as `<instance>@<domain>`, with limits |
+| [pages](ext/pages/README.md) | ✓ | ✓ | ✓ | ✓ | 🟥⬜⬜ | Server-rendered multi-page applications (PocketPages) |
+| [storage](ext/storage/README.md) | ✓ | ✓ | ✓ | ✓ | 🟥⬜⬜ | A default storage backend when an app's own S3 is off |
+| [s3redirect](ext/s3redirect/README.md) | ✓ | ✓ | ✓ | ✓ | 🟥⬜⬜ | File downloads as signed S3 redirects |
+| [vacuum](ext/vacuum/README.md) | ✓ | ✓ | ✓ | ✓ | 🟧🟧⬜ | Scheduled SQLite VACUUM |
+| [deploy](ext/deploy/README.md) | ✓ | ✓ | ✓ | ✓ | 🟧🟧⬜ | Deploy API: push hooks, migrations and public files |
+| [schedules](ext/schedules/README.md) | · | ✓ | ✓ | ✓ | 🟧🟧⬜ | Scheduled webhooks that wake sleeping instances |
+
+Columns are the [four ways to run it](#four-ways-to-run-it): **Core** is one app (level 1), **Pocker** many instances in one process (level 2), **Mothership** many edges and regions (level 3), **Multitenant** many owners (level 4). ✓ works there, · not available.
 
 🟥⬜⬜ not started · 🟧🟧⬜ in progress (working code exists, not yet a plugin here) · 🟩🟩🟩 done
 
@@ -87,7 +89,8 @@ other.
 ## Contribute a plugin
 
 Plugins are welcome. Read [Create your own plugin](docs/plugins.md), then open a pull request that adds
-`ext/<your-plugin>/`. Keep changes to PocketBase's own code to the minimum hook your plugin needs, and include a small
+`ext/<your-plugin>/`. Write it against the plugin contract ([`ceplugin`](ceplugin/ceplugin.go)) and the same plugin works at
+every level: on a single app and on every instance under pocker. Keep changes to PocketBase's own code to the minimum hook your plugin needs, and include a small
 `example/main.go` that builds and shows the feature.
 
 MIT, like PocketBase.
@@ -134,7 +137,7 @@ You could also check the recommendations in https://pocketbase.io/docs/how-to-us
 You could download the prebuilt executable for your platform from the [Releases page](https://ganigeorgiev.com/pocketbase/pocketbase/releases).
 Once downloaded, extract the archive and run `./pocketbase serve` in the extracted directory.
 
-The prebuilt executables are built from [`cmd/pocketbase`](cmd/pocketbase/main.go): PocketBase's `examples/base` plus the CE plugins that ship by default. They come with the JS VM plugin enabled, which lets you extend PocketBase with JavaScript (_see [Extend with JavaScript](https://pocketbase.io/docs/js-overview/)_), and with [pages](ext/pages/README.md), which serves a `pb_pages` folder next to `pb_data` whenever it exists.
+The prebuilt executables are built from [`cmd/pocketbase`](cmd/pocketbase/main.go): PocketBase's `examples/base` plus the CE plugins that ship by default. They come with the JS VM plugin enabled, which lets you extend PocketBase with JavaScript (_see [Extend with JavaScript](https://pocketbase.io/docs/js-overview/)_), with [pages](ext/pages/README.md), which serves a `pb_pages` folder next to `pb_data` whenever it exists, and with [bulkmail](ext/bulkmail/README.md), which adds Mail to the dashboard for campaigns to the app's own users.
 
 ### Use as a Go framework/toolkit
 

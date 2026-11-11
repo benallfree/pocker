@@ -1,6 +1,6 @@
 // Command pocketbase is the standard PocketBase CE binary: PocketBase's examples/base plus the CE plugins that ship
-// by default (ext/pages, ext/s3redirect, ext/tokens, ext/remotes, ext/oauth-server, ext/deploy). It's its own module
-// so core's go.mod stays upstream's.
+// by default (ext/pages, ext/s3redirect, ext/bulkmail, ext/tokens, ext/remotes, ext/oauth-server, ext/deploy). It's its
+// own module so core's go.mod stays upstream's.
 package main
 
 import (
@@ -12,22 +12,32 @@ import (
 
 	"ganigeorgiev.com/pocketbase/pocketbase"
 	"ganigeorgiev.com/pocketbase/pocketbase/apis"
+	"ganigeorgiev.com/pocketbase/pocketbase/ceplugin"
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"ganigeorgiev.com/pocketbase/pocketbase/plugins/jsvm"
 	"ganigeorgiev.com/pocketbase/pocketbase/plugins/migratecmd"
 	"ganigeorgiev.com/pocketbase/pocketbase/plugins/update"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/hook"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/osutils"
+	"github.com/dop251/goja"
+	"github.com/pockethost/pocketbase/ext/bulkmail"
 	"github.com/pockethost/pocketbase/ext/deploy"
 	oauthserver "github.com/pockethost/pocketbase/ext/oauth-server"
 	"github.com/pockethost/pocketbase/ext/pages"
-	"github.com/pockethost/pocketbase/ext/s3redirect"
 	"github.com/pockethost/pocketbase/ext/remotes"
+	"github.com/pockethost/pocketbase/ext/s3redirect"
 	"github.com/pockethost/pocketbase/ext/tokens"
 )
 
 func main() {
 	app := pocketbase.New()
+
+	// PocketBase CE plugins that ship in the standard binary and follow the plugin contract (ceplugin): Register
+	// here, and BindJS in the jsvm below. Bulk mail: campaigns to the app's own users (Mail in the dashboard, Bulk
+	// mail on Settings > Mail); nothing happens until someone starts a campaign. Defaults: 5/s, 5,000/day.
+	cePlugins := []ceplugin.Plugin{
+		bulkmail.New(bulkmail.Config{}),
+	}
 
 	// ---------------------------------------------------------------
 	// Optional plugin flags:
@@ -125,6 +135,9 @@ func main() {
 		HooksDir:      hooksDir,
 		HooksWatch:    hooksWatch,
 		HooksPoolSize: hooksPool,
+		OnInit: func(vm *goja.Runtime) {
+			ceplugin.BindJS(app, vm, cePlugins...) // e.g. $bulkmail in pb_hooks
+		},
 	})
 
 	// PocketPages: serves pb_pages when the folder exists (page code runs in the jsvm above)
@@ -145,6 +158,7 @@ func main() {
 
 	// deploys: deploy/dev/pull/logs commands and the deploy API (/_pocker/deploy/v1, superusers)
 	deploy.MustRegister(app, deploy.Config{})
+	ceplugin.MustRegister(app, cePlugins...)
 
 	// migrate command (with js templates)
 	migratecmd.MustRegister(app, app.RootCmd, migratecmd.Config{

@@ -18,12 +18,12 @@ import (
 	"testing"
 	"time"
 
+	"ganigeorgiev.com/pocketbase/pocketbase/ceplugin"
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"ganigeorgiev.com/pocketbase/pocketbase/tests"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/mailer"
+	"ganigeorgiev.com/pocketbase/pocketbase/tools/types"
 	"github.com/dop251/goja"
-	"github.com/pockethost/pocketbase/ext/pocker"
-	"gopkg.in/yaml.v3"
 )
 
 const superuserToken = "eyJhbGciOiJIUzI1NiJ9.eyJpZCI6InN5d2JoZWNuaDQ2cmhtMCIsInR5cGUiOiJhdXRoIiwiY29sbGVjdGlvbklkIjoicGJjXzMxNDI2MzU4MjMiLCJleHAiOjI1MjQ2MDQ0NjEsInJlZnJlc2hhYmxlIjp0cnVlfQ.UXgO3j-0BumcugrFjbd7j0M4MQvbrLggLlcu_YNGjoY"
@@ -238,47 +238,6 @@ func TestCampaignSendsOncePerAddressAndHonorsSuppressions(t *testing.T) {
 	drain(t, bm)
 	if n := app.TestMailer.TotalSend(); n != want {
 		t.Fatalf("re-run mailed again: %d", n)
-	}
-}
-
-func TestPockerPlugin(t *testing.T) {
-	p := New(Config{Rate: 3})
-	var doc yaml.Node
-	if err := yaml.Unmarshal([]byte("bulkmail:\n  rate: 9\n  daily: 100\n"), &doc); err != nil {
-		t.Fatal(err)
-	}
-	if err := p.Configure(&doc, pocker.Config{}); err != nil {
-		t.Fatal(err)
-	}
-	if p.cfg.Rate != 3 || p.cfg.Daily != 100 {
-		t.Fatalf("Go fields win, file fills the rest: %+v", p.cfg)
-	}
-
-	app, err := tests.NewTestApp()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer app.Cleanup()
-	if err := p.InitApp(pocker.Instance{ID: "i1", Plugins: map[string]any{Name: map[string]any{"daily": 0}}}, app); err != nil {
-		t.Fatal(err)
-	}
-	bm := For(app)
-	if bm == nil || bm.cfg.Daily != NoBulkMail {
-		t.Fatalf("instance daily: 0 means no bulk mail: %+v", bm)
-	}
-	vm := goja.New()
-	p.InitJS(pocker.Instance{ID: "i1"}, app, vm)
-	if v, err := vm.RunString("typeof $bulkmail.start"); err != nil || v.String() != "function" {
-		t.Fatalf("$bulkmail: %v %v", v, err)
-	}
-
-	off, _ := tests.NewTestApp()
-	defer off.Cleanup()
-	if err := p.InitApp(pocker.Instance{ID: "i2", Plugins: map[string]any{Name: map[string]any{"enabled": false}}}, off); err != nil {
-		t.Fatal(err)
-	}
-	if For(off) != nil {
-		t.Fatal("enabled: false still registered")
 	}
 }
 
@@ -646,5 +605,115 @@ func TestPreviewAndTestSend(t *testing.T) {
 	_ = app.DB().Select("COUNT(*)").From(SendsCollection).Row(&n)
 	if n != 0 {
 		t.Fatal("test send wrote ledger rows")
+	}
+}
+
+func TestSuppressionRecordsAreNormalized(t *testing.T) {
+	app, bm := newApp(t, Config{})
+	col, err := app.FindCollectionByNameOrId(SuppressionsCollection)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// a record saved like the dashboard's record form does it
+	rec := core.NewRecord(col)
+	rec.Set("email", "  Mixed@Example.COM ")
+	if err := app.Save(rec); err != nil {
+		t.Fatal(err)
+	}
+	if got := rec.GetString("email"); got != "mixed@example.com" {
+		t.Fatalf("email = %q", got)
+	}
+	if got := rec.GetString("reason"); got != ReasonManual {
+		t.Fatalf("reason = %q", got)
+	}
+	if ok, _ := bm.IsSuppressed("mixed@example.com"); !ok {
+		t.Fatal("not suppressed")
+	}
+
+	bad := core.NewRecord(col)
+	bad.Set("email", "not an address")
+	if err := app.Save(bad); err == nil {
+		t.Fatal("saved an invalid address")
+	}
+}
+
+func TestViewAudience(t *testing.T) {
+	app, bm := newApp(t, Config{})
+	view := core.NewViewCollection("mail_audience")
+	view.ViewQuery = "SELECT id, email, lower(email) AS email_lc, name FROM users WHERE verified = TRUE"
+	if err := app.Save(view); err != nil {
+		t.Fatal(err)
+	}
+	want := len(verifiedUsers(t, app))
+
+	for _, field := range []string{"email", "email_lc"} {
+		n, _, _, err := bm.CountAudience(Audience{Collection: "mail_audience", EmailField: field}, 5)
+		if err != nil {
+			t.Fatalf("%s: %v", field, err)
+		}
+		if n != want {
+			t.Fatalf("%s: count = %d, want %d", field, n, want)
+		}
+	}
+	if _, _, _, err := bm.CountAudience(Audience{Collection: "mail_audience", EmailField: "id"}, 5); err == nil {
+		t.Fatal("id accepted as the email field")
+	}
+
+	// a view audience sends like a collection one, with the view's columns in templates
+	c := newCampaign(t, app, map[string]any{
+		"audience": map[string]any{"collection": "mail_audience", "email_field": "email_lc"},
+	})
+	if _, err := bm.Start(c.Id); err != nil {
+		t.Fatal(err)
+	}
+	drain(t, bm)
+	if n := app.TestMailer.TotalSend(); n != want {
+		t.Fatalf("sent %d, want %d", n, want)
+	}
+
+	// expression columns are json fields: templates show the value, not its JSON
+	if got := toString(types.JSONRaw(`"a@b.test"`)); got != "a@b.test" {
+		t.Fatalf("json string renders as %q", got)
+	}
+	if got := toString(types.JSONRaw(`3`)); got != "3" {
+		t.Fatalf("json number renders as %q", got)
+	}
+}
+
+func TestCEPlugin(t *testing.T) {
+	p := New(Config{Rate: 3})
+	if p.Name() != Name {
+		t.Fatal(p.Name())
+	}
+
+	app, err := tests.NewTestApp()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer app.Cleanup()
+	// process settings, then the app's own: daily 0 means no bulk mail
+	if err := p.Register(app, ceplugin.Config{{"rate": 9, "daily": 100}, {"daily": 0}}); err != nil {
+		t.Fatal(err)
+	}
+	bm := For(app)
+	if bm == nil {
+		t.Fatal("not registered")
+	}
+	if rate, daily, _, _ := bm.Limits(); rate != 9 || daily != NoBulkMail {
+		t.Fatalf("rate %v daily %d", rate, daily)
+	}
+	vm := goja.New()
+	p.BindJS(app, vm)
+	if v, err := vm.RunString("typeof $bulkmail.start"); err != nil || v.String() != "function" {
+		t.Fatalf("$bulkmail: %v %v", v, err)
+	}
+
+	// a single app with no settings keeps the defaults given to New
+	plain, _ := tests.NewTestApp()
+	defer plain.Cleanup()
+	ceplugin.MustRegister(plain, p)
+	if rate, daily, _, _ := For(plain).Limits(); rate != 3 || daily != 0 && daily != 5000 {
+		t.Fatalf("defaults: rate %v daily %d", rate, daily)
 	}
 }

@@ -10,6 +10,7 @@ import (
 
 	"ganigeorgiev.com/pocketbase/dbx"
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
+	"ganigeorgiev.com/pocketbase/pocketbase/tools/types"
 )
 
 // Audience picks a campaign's recipients from the app's own data, at queue time.
@@ -86,21 +87,23 @@ func (bm *BulkMail) EachRecipient(a Audience, fn func(Recipient) error) error {
 	if err != nil {
 		return fmt.Errorf("audience collection %q not found", a.Collection)
 	}
-	if col.IsView() {
-		// views have no stable id column to page by; use the SQL audience for them
-		return fmt.Errorf("audience collection %q is a view; use a SQL audience", col.Name)
-	}
-	if col.Fields.GetByName(a.EmailField) == nil {
-		return fmt.Errorf("collection %q has no field %q", col.Name, a.EmailField)
+	if !IsEmailFieldCandidate(col, col.Fields.GetByName(a.EmailField)) {
+		return fmt.Errorf("collection %q has no usable email field %q", col.Name, a.EmailField)
 	}
 
-	lastId := ""
+	// Collections page by id (keyset). A view's id isn't guaranteed unique or stable, so views page by offset; the
+	// ledger's one-row-per-address rule absorbs duplicates if the view changes mid-walk.
+	lastId, offset := "", 0
 	for {
-		filter := "id > {:lastId}"
-		if strings.TrimSpace(a.Filter) != "" {
-			filter = "(" + a.Filter + ") && id > {:lastId}"
+		filter := strings.TrimSpace(a.Filter)
+		if !col.IsView() {
+			if filter == "" {
+				filter = "id > {:lastId}"
+			} else {
+				filter = "(" + filter + ") && id > {:lastId}"
+			}
 		}
-		records, err := bm.app.FindRecordsByFilter(col, filter, "id", audiencePage, 0, dbx.Params{"lastId": lastId})
+		records, err := bm.app.FindRecordsByFilter(col, filter, "id", audiencePage, offset, dbx.Params{"lastId": lastId})
 		if err != nil {
 			return err
 		}
@@ -113,15 +116,34 @@ func (bm *BulkMail) EachRecipient(a Audience, fn func(Recipient) error) error {
 				}
 				data[f.GetName()] = r.Get(f.GetName())
 			}
-			if err := fn(Recipient{Email: r.GetString(a.EmailField), RecordRef: col.Name + ":" + r.Id, Data: data}); err != nil {
+			if err := fn(Recipient{Email: recordEmail(r, a.EmailField), RecordRef: col.Name + ":" + r.Id, Data: data}); err != nil {
 				return err
 			}
 		}
 		if len(records) < audiencePage {
 			return nil
 		}
-		lastId = records[len(records)-1].Id
+		if col.IsView() {
+			offset += len(records)
+		} else {
+			lastId = records[len(records)-1].Id
+		}
 	}
+}
+
+// IsEmailFieldCandidate reports whether f can hold a recipient's address: an email or text field, or on a view also
+// a json field (SQLite expressions such as lower(email) come out as json columns).
+func IsEmailFieldCandidate(col *core.Collection, f core.Field) bool {
+	if f == nil || f.GetName() == core.FieldNameId || f.GetName() == core.FieldNameTokenKey {
+		return false
+	}
+	switch f.Type() {
+	case core.FieldTypeEmail, core.FieldTypeText:
+		return true
+	case core.FieldTypeJSON:
+		return col.IsView()
+	}
+	return false
 }
 
 var sqlStartRe = regexp.MustCompile(`(?is)^\s*(select|with)\b`)
@@ -273,4 +295,16 @@ func (bm *BulkMail) forgetVars(campaignId string) {
 	bm.mu.Lock()
 	delete(bm.vars, campaignId)
 	bm.mu.Unlock()
+}
+
+// recordEmail reads the address from a record field; a view's json column holds a JSON string.
+func recordEmail(r *core.Record, field string) string {
+	if raw, ok := r.Get(field).(types.JSONRaw); ok {
+		var v string
+		if json.Unmarshal(raw, &v) == nil {
+			return v
+		}
+		return ""
+	}
+	return r.GetString(field)
 }

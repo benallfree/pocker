@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	validation "ganigeorgiev.com/pocketbase/ozzo-validation/v4"
 	"io/fs"
 	"net/http"
 	"strings"
@@ -58,8 +59,7 @@ type Config struct {
 
 // Settings are stored per app (a _params row, so they ride along in backups) and edited in Settings → Bulk mail.
 type Settings struct {
-	FromName      string `json:"fromName"`
-	FromAddress   string `json:"fromAddress"`
+	// The default sender is the app's (Settings > Mail); a campaign's from_name / from_address override it.
 	PostalAddress string `json:"postalAddress"`
 	// UnsubscribeMailto, when set, is added to List-Unsubscribe as a mailto: alternative.
 	UnsubscribeMailto string `json:"unsubscribeMailto"`
@@ -70,6 +70,9 @@ type Settings struct {
 	// WebhookSecret enables the generic feedback webhook. Never returned by the API.
 	WebhookSecret string `json:"webhookSecret"`
 }
+
+// Name is the plugin's name: its key in a pocker config file and under an instance's `plugins:` (see pockerplugin).
+const Name = "bulkmail"
 
 // BulkMail is the bulk mail service of one app. Get it with [For].
 type BulkMail struct {
@@ -178,6 +181,20 @@ func Register(app core.App, cfg Config) (*BulkMail, error) {
 		return e.Next()
 	})
 
+	// suppressions added or edited anywhere (dashboard record form, records API, JS) store the normalized address,
+	// the same one IsSuppressed looks up; a manual entry without a reason is "manual"
+	app.OnRecordValidate(SuppressionsCollection).BindFunc(func(e *core.RecordEvent) error {
+		email := NormalizeEmail(e.Record.GetString("email"))
+		if email == "" {
+			return validation.Errors{"email": validation.NewError("validation_invalid_email", "Must be a valid email address.")}
+		}
+		e.Record.Set("email", email)
+		if e.Record.GetString("reason") == "" {
+			e.Record.Set("reason", ReasonManual)
+		}
+		return e.Next()
+	})
+
 	app.OnTerminate().BindFunc(func(e *core.TerminateEvent) error {
 		bm.StopSender()
 		return e.Next()
@@ -239,7 +256,6 @@ func (bm *BulkMail) SaveSettings(s Settings) error {
 	if s.WebhookSecret == "" {
 		s.WebhookSecret = cur.WebhookSecret
 	}
-	s.FromAddress = strings.TrimSpace(s.FromAddress)
 
 	bm.mu.Lock()
 	defer bm.mu.Unlock()

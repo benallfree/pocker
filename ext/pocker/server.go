@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"ganigeorgiev.com/pocketbase/pocketbase/ceplugin"
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/mailer"
 )
@@ -92,6 +93,17 @@ func (s *Server) Run(ctx context.Context) error {
 		if c, ok := p.(Configurer); ok {
 			if err := c.Configure(s.Config.Doc(), s.Config); err != nil {
 				return fmt.Errorf("plugin %s: %w", p.Name(), err)
+			}
+		}
+		if cp, ok := p.(ceplugin.Plugin); ok {
+			// a PocketBase CE plugin: register it on every instance, with that instance's settings
+			if _, own := p.(AppIniter); !own {
+				h, err := hostCEPlugin(cp, s.Config.Doc())
+				if err != nil {
+					return fmt.Errorf("plugin %s: %w", p.Name(), err)
+				}
+				initers = append(initers, h)
+				jsIniters = append(jsIniters, h)
 			}
 		}
 		if g, ok := p.(Gate); ok {

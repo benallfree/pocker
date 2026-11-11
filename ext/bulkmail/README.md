@@ -2,33 +2,44 @@
 
 Bulk mail: campaigns to an app's own users with one-click unsubscribe, bounce and complaint handling, and a dashboard page.
 
-**Runs on:** Single app, or many under [pocker](../pocker/README.md).
-
-> **Status.** Working on a single app: Go module `github.com/pockethost/pocketbase/ext/bulkmail`, tests, and
-> [`example/main.go`](example/main.go). Not built yet: the pocker extras (per-instance limits from instance config,
-> waking instances that have a campaign to send) and the packaged plugin API wrapper (`bulkmail.New()`).
+**Runs on:** every level. It's in the standard `pocketbase` binary, and the same plugin value runs on every
+instance under [pocker](../pocker/README.md) (so the mothership and multitenant levels get it too). It follows the
+PocketBase CE plugin contract ([`ceplugin`](../../ceplugin/ceplugin.go)).
 
 ## Use it
 
 ```go
-app := pocketbase.New()
-bulkmail.MustRegister(app, bulkmail.Config{Rate: 5, Daily: 5000})
+mail := bulkmail.New(bulkmail.Config{Rate: 5, Daily: 5000})
 
-// optional: $bulkmail in JS hooks
-jsvm.MustRegister(app, jsvm.Config{OnInit: func(vm *goja.Runtime) { bulkmail.BindJS(vm, app) }})
+// a single app
+app := pocketbase.New()
+ceplugin.MustRegister(app, mail)
+jsvm.MustRegister(app, jsvm.Config{OnInit: func(vm *goja.Runtime) { ceplugin.BindJS(app, vm, mail) }}) // $bulkmail
+
+// or every pocker instance
+srv.Plugins = append(srv.Plugins, mail)
 ```
+
+Under pocker, settings come from the config file's top-level `bulkmail:` key, then each instance's
+`plugins: {bulkmail: {enabled, rate, daily}}`, over the Config given to `New`; `daily: 0` means the instance may
+not send bulk mail, `enabled: false` turns it off.
 
 ```sh
-go run ./example serve
+go run ./example serve --dev  # test mail shows in the dev mail trap at http://127.0.0.1:8025
 ```
 
-The dashboard gets a **Mail** page (campaigns, recipients, suppressions, settings) and a **Bulk mail** entry under
-Settings.
+The dashboard gets a **Mail** page (campaigns, recipients, suppressions) and a **Bulk mail** section on Settings >
+Mail (postal address, unsubscribe mailbox, bounce and complaint feedback). Campaigns send from the app's sender in
+Settings > Mail. A campaign's `from_name` / `from_address` fields override it, but only through the records API, JS
+or Go (the dashboard doesn't show them): the app's SMTP account can usually send only as identities it has verified.
 
 ## What it does
 
-- **Audience** from the app's own data, resolved when sending starts: a collection plus a filter (the same syntax as
-  API rules), or a read-only SQL `SELECT` that returns an `email` column. SQL runs with SQLite's `query_only` on,
+- **Audience** from the app's own data, resolved when sending starts: a collection or view plus a filter (the same
+  syntax as API rules) and the field that holds the address (email or text, or a view's computed json column), or a
+  read-only SQL `SELECT` that returns an `email` column. A view is the easy way to build a dynamic audience: it
+  picks who gets mail and computes the columns templates use (`{{record.column}}`); the example creates one
+  (`newsletter_audience`). SQL runs with SQLite's `query_only` on,
   inside a transaction that is always rolled back.
 - **Templates:** `{{record.field}}` per recipient, `{{campaign.name}}`, `{{unsubscribe_url}}`, campaign vars (fixed
   values or `{"sql": "SELECT … AS value"}` computed once), and `{{if path}}…{{else}}…{{end}}` blocks. Values are

@@ -1,11 +1,14 @@
 package bulkmail
 
 import (
+	"encoding/json"
 	"fmt"
 	"html"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"ganigeorgiev.com/pocketbase/pocketbase/tools/types"
 )
 
 // Templates are deliberately small: {{path}} placeholders and {{if path}}…{{else}}…{{end}} blocks (with
@@ -179,6 +182,12 @@ func toString(v any) string {
 		return strconv.FormatFloat(x, 'f', -1, 64)
 	case []string:
 		return strings.Join(x, ", ")
+	case types.JSONRaw: // json fields, and a view's expression columns: show the value, not its JSON
+		var decoded any
+		if len(x) == 0 || json.Unmarshal(x, &decoded) != nil {
+			return x.String()
+		}
+		return toString(decoded)
 	case fmt.Stringer:
 		return x.String()
 	}
