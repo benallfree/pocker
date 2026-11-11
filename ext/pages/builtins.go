@@ -442,11 +442,11 @@ func (r *request) sessionObject() *goja.Object {
 		return vm.ToValue(rec)
 	})
 
-	set("requestOAuth2", func(string, map[string]any) goja.Value {
-		panic(vm.NewGoError(errors.New("ctx.session.requestOAuth2 isn't available yet")))
+	set("requestOAuth2", func(provider string, opts map[string]any) string {
+		return r.requestOAuth2(provider, opts)
 	})
-	set("signInWithOAuth2", func(string, string) goja.Value {
-		panic(vm.NewGoError(errors.New("ctx.session.signInWithOAuth2 isn't available yet")))
+	set("signInWithOAuth2", func(state, code string, opts map[string]any) map[string]any {
+		return r.signInWithOAuth2(state, code, opts)
 	})
 	return o
 }

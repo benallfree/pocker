@@ -30,7 +30,7 @@ It reads the `pb_auth` cookie, validates the token and sets `ctx.auth` to the au
 | `signInWithOTP(otpId, code, { collection }?)` | Sign in with a one-time password. |
 | `signInAnonymously({ collection }?)` | Sign in as a new anonymous user. |
 | `requestOAuth2(provider, { collection, redirectPath = '/auth/oauth/confirm' }?)` | Store state in a cookie and redirect to the provider. |
-| `signInWithOAuth2(state, code)` | Complete an OAuth2 sign-in on the redirect path. |
+| `signInWithOAuth2(state, code, { createData }?)` | Complete an OAuth2 sign-in on the redirect path. Returns `{ token, record, meta }`; `meta.isNew` is `true` for a new account. |
 | `signIn(record)` | Set the cookie for a record you authenticated yourself. |
 | `signOut()` | Sign out. |
 

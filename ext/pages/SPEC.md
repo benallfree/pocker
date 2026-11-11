@@ -389,9 +389,15 @@ Turned on by name in `+config.js`.
 - `ctx.session.signInAnonymously({ collection })`
 - `ctx.session.requestOAuth2(provider, { collection, redirectPath = '/auth/oauth/confirm', redirect = true })`:
   stores state in a cookie and returns the provider's URL; with `redirect` it also sends the redirect
-  (`ctx.res.sent`).
-- `ctx.session.signInWithOAuth2(state, code)`: completes it on the redirect path (the state cookie carries the
-  provider and collection).
+  (`ctx.res.sent`). `redirectPath` must be a path on this site. PKCE is used when the provider supports it.
+- `ctx.session.signInWithOAuth2(state, code, { createData }?)`: completes it on the redirect path (the state cookie
+  carries the provider, collection and PKCE verifier; it lasts 10 minutes and works once). The sign-in runs through
+  PocketBase's own `auth-with-oauth2` endpoint in-process, so sign-up, account linking (to the signed-in account,
+  if any), the anti-hijacking checks and `onRecordAuthWithOAuth2Request` hooks behave as in PocketBase. `createData`
+  is extra data for a new record. Returns `{ token, record, meta }` (`meta` is PocketBase's OAuth2 meta, with
+  `isNew`). Accounts that need MFA throw an error: pages doesn't do MFA yet.
+- Apple answers with a POST, so read `state` and `code` from `ctx.req.body()` there. On HTTPS the state cookie is
+  `SameSite=None` so it survives that cross-site POST.
 - `ctx.session.signIn(record)`: set the cookie for a record you authenticated yourself.
 - `ctx.session.signOut()`
 - Email flows, with PocketBase's own checks and mail templates: `requestVerification(email, { collection })`,
