@@ -1,12 +1,21 @@
 // Package ghupdate implements a new command to selfupdate the current
 // PocketBase executable with the latest GitHub release.
 //
-// This is kept only for backward-compatibility and it is replaced by
-// the equivalent `update` BugStage plugin.
+// PocketBase CE registers it in the standard binary, so `pocketbase update`
+// checks the PocketBase CE releases (github.com/pockethost/pocketbase)
+// rather than upstream PocketBase. Upstream replaced it with the BugStage
+// `update` plugin, which CE keeps for builds that publish there.
 //
 // Example usage:
 //
 //	ghupdate.MustRegister(app, app.RootCmd, ghupdate.Config{})
+//
+// Custom builds that publish their own releases set Owner/Repo/BaseURL in
+// [Config], or change the defaults at link time without touching code:
+//
+//	go build -ldflags "\
+//	  -X ganigeorgiev.com/pocketbase/pocketbase/plugins/ghupdate.DefaultOwner=acme \
+//	  -X ganigeorgiev.com/pocketbase/pocketbase/plugins/ghupdate.DefaultRepo=acme-pocketbase"
 package ghupdate
 
 import (
@@ -35,24 +44,40 @@ type HttpClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
+// Defaults for the empty [Config] fields. They are variables so a custom
+// build can point `update` at its own releases with -ldflags "-X ...".
+var (
+	// DefaultOwner is the GitHub account that publishes the releases.
+	DefaultOwner = "pockethost"
+
+	// DefaultRepo is the repository that publishes the releases.
+	DefaultRepo = "pocketbase"
+
+	// DefaultArchiveExecutable is the executable name inside the release archive.
+	DefaultArchiveExecutable = "pocketbase"
+
+	// DefaultBaseURL is the GitHub API (or a compatible API) base URL.
+	DefaultBaseURL = "https://api.github.com"
+)
+
 // Config defines the config options of the ghupdate plugin.
 //
 // NB! This plugin is considered experimental and its config options may change in the future.
 type Config struct {
-	// Owner specifies the account owner of the repository (default to "pocketbase").
+	// Owner specifies the account owner of the repository (default to [DefaultOwner], "pockethost").
 	Owner string
 
-	// Repo specifies the name of the repository (default to "pocketbase").
+	// Repo specifies the name of the repository (default to [DefaultRepo], "pocketbase").
 	Repo string
 
 	// ArchiveExecutable specifies the name of the executable file in the release archive
-	// (default to "pocketbase"; an additional ".exe" check is also performed as a fallback).
+	// (default to [DefaultArchiveExecutable], "pocketbase"; an additional ".exe" check is also performed as a fallback).
 	ArchiveExecutable string
 
 	// BaseURL is the base URL of the GitHub API (or similar compatible)
 	// used to fetch the latest releases information.
 	//
-	// Defaults to "https://api.github.com".
+	// Defaults to [DefaultBaseURL], "https://api.github.com".
 	BaseURL string
 
 	// Optional context to use when fetching and downloading the latest release.
@@ -80,22 +105,21 @@ func Register(app core.App, rootCmd *cobra.Command, config Config) error {
 	}
 
 	if p.config.Owner == "" {
-		p.config.Owner = "pocketbase"
+		p.config.Owner = DefaultOwner
 	}
 
 	if p.config.Repo == "" {
-		p.config.Repo = "pocketbase"
+		p.config.Repo = DefaultRepo
 	}
 
 	if p.config.ArchiveExecutable == "" {
-		p.config.ArchiveExecutable = "pocketbase"
+		p.config.ArchiveExecutable = DefaultArchiveExecutable
 	}
 
 	if p.config.BaseURL == "" {
-		p.config.BaseURL = "https://api.github.com"
-	} else {
-		p.config.BaseURL = strings.TrimRight(p.config.BaseURL, "/")
+		p.config.BaseURL = DefaultBaseURL
 	}
+	p.config.BaseURL = strings.TrimRight(p.config.BaseURL, "/")
 
 	if p.config.HttpClient == nil {
 		p.config.HttpClient = http.DefaultClient
