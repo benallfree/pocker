@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mail trap</title>
+<style>
+  :root { --bg:#fff; --fg:#1d1d1f; --muted:#6b6b70; --line:#e4e4e7; --sel:#eef2ff; --accent:#4f46e5; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#16161a; --fg:#ececf1; --muted:#9a9aa3; --line:#2c2c33; --sel:#25253a; --accent:#8b8bff; } }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.4 system-ui, sans-serif; background:var(--bg); color:var(--fg); display:flex; flex-direction:column; height:100vh; }
+  header { display:flex; align-items:center; gap:12px; padding:10px 16px; border-bottom:1px solid var(--line); }
+  header h1 { font-size:16px; margin:0; }
+  header .hint { color:var(--muted); flex:1; }
+  select, button { font:inherit; color:inherit; background:transparent; border:1px solid var(--line); border-radius:6px; padding:4px 10px; }
+  button { cursor:pointer; }
+  main { flex:1; display:flex; min-height:0; }
+  #list { width:42%; min-width:300px; overflow:auto; border-right:1px solid var(--line); }
+  .row { padding:8px 16px; border-bottom:1px solid var(--line); cursor:pointer; }
+  .row.sel { background:var(--sel); }
+  .row .top { display:flex; justify-content:space-between; gap:8px; color:var(--muted); font-size:12px; }
+  .row .subj { font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .tag { display:inline-block; padding:0 6px; border-radius:4px; background:var(--accent); color:#fff; font-size:11px; }
+  #detail { flex:1; display:flex; flex-direction:column; min-width:0; }
+  #meta { padding:12px 16px; border-bottom:1px solid var(--line); }
+  #meta div { margin:2px 0; } #meta b { display:inline-block; width:90px; color:var(--muted); font-weight:normal; }
+  #tabs { padding:6px 16px; border-bottom:1px solid var(--line); display:flex; gap:6px; }
+  #tabs button.on { border-color:var(--accent); color:var(--accent); }
+  #body { flex:1; min-height:0; }
+  iframe { width:100%; height:100%; border:0; background:#fff; }
+  pre { margin:0; padding:16px; white-space:pre-wrap; word-break:break-word; overflow:auto; height:100%; }
+  .empty { padding:24px 16px; color:var(--muted); }
+  @media (max-width: 700px) { main { flex-direction:column; } #list { width:100%; min-width:0; max-height:40vh; border-right:0; border-bottom:1px solid var(--line); } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Mail trap</h1>
+  <span class="hint">Development only. Nothing here was delivered.</span>
+  <select id="filter"><option value="">All instances</option></select>
+  <button id="clear">Clear</button>
+</header>
+<main>
+  <div id="list"><div class="empty">No mail yet. Trigger a password reset on any instance.</div></div>
+  <div id="detail"><div class="empty">Pick a message.</div></div>
+</main>
+<script>
+const $ = (s) => document.querySelector(s);
+let messages = [], selected = null, view = "html", lastSig = "";
+
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]));
+
+async function refresh() {
+  try { messages = await (await fetch("api/messages")).json(); } catch { return; }
+  const f = $("#filter"), cur = f.value;
+  const sig = messages.map((m) => m.id).join(",") + "|" + cur + "|" + selected;
+  if (sig === lastSig) return; // nothing new: leave the DOM alone
+  lastSig = sig;
+  const instances = [...new Set(messages.map((m) => m.instance).filter(Boolean))].sort();
+  f.innerHTML = `<option value="">All instances (${messages.length})</option>` +
+    instances.map((i) => `<option value="${esc(i)}">${esc(i)} (${messages.filter((m) => m.instance === i).length})</option>`).join("");
+  f.value = instances.includes(cur) ? cur : "";
+  const shown = messages.filter((m) => !f.value || m.instance === f.value);
+  $("#list").innerHTML = shown.length ? shown.map((m) => `
+    <div class="row${m.id === selected ? " sel" : ""}" data-id="${m.id}">
+      <div class="top"><span>${m.instance ? `<span class="tag">${esc(m.instance)}</span> ` : ""}${esc(m.from)}</span><span>${new Date(m.received).toLocaleTimeString()}</span></div>
+      <div class="subj">${esc(m.subject) || "(no subject)"}</div>
+      <div class="top"><span>to ${esc(m.rcptTo.join(", "))}</span></div>
+    </div>`).join("") : `<div class="empty">No mail yet. Trigger a password reset on any instance.</div>`;
+}
+
+async function show(id) {
+  selected = id;
+  document.querySelectorAll(".row").forEach((r) => r.classList.toggle("sel", +r.dataset.id === id));
+  const m = await (await fetch(`api/messages/${id}`)).json();
+  if (!m.html) view = "text";
+  $("#detail").innerHTML = `
+    <div id="meta">
+      <div><b>Subject</b>${esc(m.subject)}</div>
+      <div><b>From</b>${esc(m.from)}</div>
+      <div><b>To</b>${esc(m.to)}${m.cc ? `, cc ${esc(m.cc)}` : ""}</div>
+      ${m.replyTo ? `<div><b>Reply-To</b>${esc(m.replyTo)}</div>` : ""}
+      <div><b>Envelope</b>${esc(m.mailFrom)} → ${esc(m.rcptTo.join(", "))}</div>
+      <div><b>Instance</b>${esc(m.instance || "–")} · ${m.size} bytes · ${new Date(m.received).toLocaleString()}</div>
+    </div>
+    <div id="tabs">
+      ${m.html ? `<button data-v="html">HTML</button>` : ""}<button data-v="text">Text</button><button data-v="raw">Raw</button>
+    </div>
+    <div id="body"></div>`;
+  const render = async () => {
+    document.querySelectorAll("#tabs button").forEach((b) => b.classList.toggle("on", b.dataset.v === view));
+    const body = $("#body");
+    if (view === "html") {
+      body.innerHTML = `<iframe sandbox=""></iframe>`;
+      body.firstChild.srcdoc = m.html;
+    } else if (view === "raw") {
+      body.innerHTML = `<pre>${esc(await (await fetch(`api/messages/${id}/raw`)).text())}</pre>`;
+    } else {
+      body.innerHTML = `<pre>${esc(m.text || "(no text part)")}</pre>`;
+    }
+  };
+  $("#tabs").onclick = (e) => { if (e.target.dataset.v) { view = e.target.dataset.v; render(); } };
+  render();
+}
+
+$("#list").onclick = (e) => { const r = e.target.closest(".row"); if (r) show(+r.dataset.id); };
+$("#filter").onchange = refresh;
+$("#clear").onclick = async () => { await fetch("api/messages", { method: "DELETE" }); selected = null; lastSig = ""; $("#detail").innerHTML = `<div class="empty">Pick a message.</div>`; refresh(); };
+refresh();
+setInterval(refresh, 2000);
+</script>
+</body>
+</html>
