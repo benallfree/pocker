@@ -2,7 +2,7 @@
 
 Bulk mail: campaigns to an app's own users with one-click unsubscribe, bounce and complaint handling, and a dashboard page.
 
-**Runs on:** Single app or multitenant.
+**Runs on:** Single app, or many under [pocker](../pocker/README.md).
 
 > **Planned.** Nothing is published here yet. This folder will hold the plugin's Go module
 > (`github.com/pockerbase/pocketbase/ext/bulkmail`), its tests and a minimal `example/main.go` that builds and shows the

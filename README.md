@@ -1,13 +1,14 @@
-# PockerBase
+# PocketBase Community Edition
 
-PockerBase is an open fork of PocketBase. It tracks upstream and aims to keep its own changes to the core small: just the
-hooks that let plugins extend and override PocketBase. Everything else is a plugin.
+PocketBase Community Edition (PocketBase CE) is a community fork of [PocketBase](https://pocketbase.io). It tracks
+upstream and aims to keep its own changes to the core small: just the hooks that let plugins extend and override
+PocketBase. Everything else is a plugin. It is not affiliated with or endorsed by the PocketBase project.
 
 ## Plugins
 
 | Plugin | What it does |
 |---|---|
-| [multitenant](ext/multitenant/README.md) | Run hundreds of untrusted PocketBase instances in one Go process ([how is this safe?](docs/multitenant.md)) |
+| [pocker](ext/pocker/README.md) | Multitenant: run hundreds of untrusted PocketBase instances in one Go process ([how is this safe?](docs/multitenant.md)) |
 | [sandbox](ext/sandbox/README.md) | Confine untrusted JS hooks, SQL and outbound network |
 | [pitr](ext/pitr/README.md) | Point-in-time restore (Litestream) |
 | [bulkmail](ext/bulkmail/README.md) | Bulk mail campaigns to your app's own users |

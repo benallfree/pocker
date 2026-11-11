@@ -1,6 +1,6 @@
 # Create your own plugin
 
-A PockerBase plugin is Go code compiled into your build. It can add, to every instance:
+A PocketBase CE plugin is Go code compiled into your build. It can add, to every instance:
 - Go routes;
 - PocketBase hooks;
 - collections;
@@ -26,7 +26,7 @@ A build is a small `main.go` that starts a `pocker.Server` with your code.
 
 ## Your module
 
-PockerBase keeps PocketBase's module path, so upstream merges stay clean. Point it at PockerBase in your `go.mod`:
+PocketBase CE keeps PocketBase's module path, so upstream merges stay clean. Point it at PocketBase CE in your `go.mod`:
 
 ```
 require ganigeorgiev.com/pocketbase/pocketbase v0.41.1
@@ -145,7 +145,7 @@ Plugins are welcome, from us and from you. Open a pull request that adds `ext/<y
 
 ### Change PocketBase's core as little as possible
 
-PockerBase stays close to upstream so every PocketBase release merges cleanly. If your plugin needs something the
+PocketBase CE stays close to upstream so every PocketBase release merges cleanly. If your plugin needs something the
 core doesn't offer yet:
 - **Add the smallest hook that makes it possible:** an extension point or an override, not your plugin's logic. A
   nil-checked function field, a list callers can append to, or an event, with upstream behavior unchanged when nothing
@@ -163,7 +163,7 @@ core doesn't offer yet:
 ```
 ext/<name>/
   go.mod            module github.com/pockerbase/pocketbase/ext/<name>
-  README.md         what it does, runs on (single app, multitenant or both), config
+  README.md         what it does, runs on (single app, pocker or both), config
   <name>.go         the plugin
   <name>_test.go
   example/main.go   a minimal program that builds cleanly and shows the feature
@@ -175,7 +175,7 @@ ext/<name>/
   [`examples/pocker-extension`](../examples/pocker-extension) is the size to aim for.
 - **Dependencies stay in your module.** Heavy libraries go in your plugin's `go.mod`, never in core's.
 - **Single app first.** Where it makes sense, a plugin should work on one PocketBase app, and add more under the
-  multitenant host.
+  pocker (multitenant) host.
 - **MIT**, like PocketBase and the rest of this repo.
 
 ## Planned plugins
