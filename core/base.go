@@ -469,6 +469,11 @@ func (app *BaseApp) Bootstrap() error {
 		app.Logger().Warn("OnBootstrap hook didn't fail but the app is still not bootstrapped - maybe missing e.Next()?")
 	}
 
+	// POCKER: in dev mode with no SMTP, start the dev mail trap now so its notice shows at startup
+	if err == nil && app.IsBootstrapped() && app.IsDev() && !app.Settings().SMTP.Enabled {
+		_, _ = mailer.DevTrap("No SMTP configured")
+	}
+
 	return err
 }
 
@@ -691,6 +696,10 @@ func (app *BaseApp) NewMailClient() mailer.Mailer {
 			AuthMethod: app.Settings().SMTP.AuthMethod,
 			LocalName:  app.Settings().SMTP.LocalName,
 		}
+	} else if app.IsDev() {
+		// POCKER: dev mode never runs the host's sendmail; mail is caught by the dev mail trap (see tools/mailer/trap.go)
+		t, _ := mailer.DevTrap("No SMTP configured")
+		client = &mailer.TrapClient{Trap: t, Label: app.Settings().Meta.AppName}
 	} else {
 		client = &mailer.Sendmail{}
 	}
