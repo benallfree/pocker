@@ -1,3 +1,8 @@
+## v0.42.2
+
+- Fixed another UI regression causing wrong redirect page on OAuth2 success ([bugstage#14](https://ganigeorgiev.com/bugstage/discussions/14)).
+
+
 ## v0.42.1
 
 - Fixed superuser UI regression as a result of the extra `Authorization` checks in v0.42.0 ([#8368](https://ganigeorgiev.com/pocketbase/discussions/8368)).

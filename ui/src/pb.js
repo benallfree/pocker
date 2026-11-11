@@ -14,20 +14,10 @@ window.app.pb = new PocketBase(
 );
 
 // add UI specific header to all requests
-app.pb.beforeSend = function (url, options) {
+app.pb.beforeSend = function(url, options) {
     options.headers["x-request-source"] = "pbui";
     return { url, options };
 };
-
-app.store.superuser = app.pb.authStore.record;
-app.pb.authStore.onChange((_, record) => {
-    if (!record && window.location.hash != LOGIN_PATH) {
-        app.modals?.close(null, true);
-        window.location.hash = LOGIN_PATH;
-    }
-
-    app.store.superuser = record;
-});
 
 // refresh the token in the background
 if (app.pb.authStore.isValid) {
@@ -43,16 +33,25 @@ if (app.pb.authStore.isValid) {
                 app.pb.authStore.clear();
             }
         });
-} else {
+} else if (app.pb.authStore.token) {
     app.pb.authStore.clear();
 }
 
 // load initial store data
+app.store.superuser = app.pb.authStore.record;
 app.pb.authStore.onChange((_, record) => {
+    app.store.superuser = record;
+
     if (record?.id) {
         app.store.loadCollections();
         app.store.loadSettings();
         app.store.loadOAuth2Providers();
+        return
+    }
+
+    if (window.location.hash != LOGIN_PATH) {
+        app.modals?.close(null, true);
+        window.location.hash = LOGIN_PATH;
     }
 });
 
@@ -61,7 +60,7 @@ app.pb.authStore.onChange((_, record) => {
 // -------------------------------------------------------------------
 
 const originalRecordService = app.pb.collection;
-app.pb.collection = function (idOrName) {
+app.pb.collection = function(idOrName) {
     const service = originalRecordService.call(this, idOrName);
 
     bindRecordServiceEvents(service);
@@ -77,7 +76,7 @@ function bindRecordServiceEvents(service) {
     service.__customUIEvents = true;
 
     const originalCreate = service.create;
-    service.create = function () {
+    service.create = function() {
         return originalCreate.apply(service, arguments).then((r) => {
             setTimeout(() => {
                 document.dispatchEvent(new CustomEvent("record:create", { detail: r }));
@@ -88,7 +87,7 @@ function bindRecordServiceEvents(service) {
     };
 
     const originalUpdate = service.update;
-    service.update = function () {
+    service.update = function() {
         return originalUpdate.apply(service, arguments).then((r) => {
             setTimeout(() => {
                 document.dispatchEvent(new CustomEvent("record:update", { detail: r }));
@@ -99,7 +98,7 @@ function bindRecordServiceEvents(service) {
     };
 
     const originalDelete = service.delete;
-    service.delete = function () {
+    service.delete = function() {
         return originalDelete.apply(service, arguments).then((r) => {
             const minimalRecord = {
                 id: arguments[0],
@@ -137,7 +136,7 @@ app.pb.authStore.onChange((_, record) => {
  * @param  {String} optCollectionIdORName
  * @return {Promise<string>}
  */
-window.app.getFileToken = async function (optCollectionIdORName = "") {
+window.app.getFileToken = async function(optCollectionIdORName = "") {
     // check if the collection needs a file token
     const collection = optCollectionIdORName
         && app.store.collections?.find((c) => c.id == optCollectionIdORName || c.name == optCollectionIdORName);
@@ -201,7 +200,7 @@ async function fetchFileToken() {
  * @param {Error}   err
  * @param {boolean} [showToast]
  */
-window.app.checkApiError = function (err, showToast = true) {
+window.app.checkApiError = function(err, showToast = true) {
     if (!err || !(err instanceof Error) || err.isAbort) {
         console.warn("checkApiError - unexpected error type:", err);
         return;
