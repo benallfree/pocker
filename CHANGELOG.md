@@ -1,4 +1,4 @@
-## v0.42.0 (WIP)
+## v0.42.0
 
 - Allow previewing JPEG XL images (`.jxl`) in the superuser UI.
     _Note that there is no thumbs support for JPEG XL yet._
@@ -18,10 +18,14 @@
 
 - Allowed the `update/Config.Channel` field to be optional so that it can be configured to fetch the latest release from any of the repo release channels.
 
-- Added a global middleware to reject with 401 unknown or expired `Auhorization` tokens to allow client-side apps to more easily trigger auth state. As a side-effect this also enables practically any endpoint, not just `authRefresh()`, to be used as a very rudimentary token verification.
-    _⚠️ For most applications this should be a none breaking change but note that previously such `Authorization` header values were silently ignored to allow custom token processing because pre v0.23 middlewares didn't have a way to control the execution priority. Now this global middleware acts as a catch-all fallback and applies as latest as possible and only if `e.Auth` is not already loaded._
+- Added a global middleware to reject with 401 unknown or expired `Auhorization` tokens so that client-side apps can more easily handle auth state changes _(e.g. invalidating session screens after the user has changed password on another device)_. As a side-effect this also enables practically any endpoint, not just `authRefresh()`, to be used as a very rudimentary auth token verification.
+    _⚠️ For most applications this should be a none breaking change but note that previously such `Authorization` header values were silently ignored to allow custom token handling because pre v0.23 middlewares didn't have a way to control the execution priority. Now this global middleware acts as a catch-all fallback and applies as latest as possible and only if `e.Auth` is not already loaded._
 
 - Log harmless mid-response network errors with level `INFO (0)` ([#8361](https://ganigeorgiev.com/pocketbase/discussions/8361)).
+
+- Bumped `modernc.org/sqlite` to 1.62.0 _([SQLite 3.54.1](https://sqlite.org/src/timeline?from=version-3.54.0&to=version-3.54.1&y=ci) and other minor fixes)_.
+
+- Bumped `golang.org/x/*` dependencies and use Go 1.27.4 to generate the prebuilt binaries since it has some [minor security fixes](https://groups.google.com/g/golang-announce/c/iY8TY0wWgbM) _(none of them are critical for PocketBase but nevertheless it is advised to update)_.
 
 
 ## v0.41.1
