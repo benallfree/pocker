@@ -10,7 +10,7 @@ import (
 )
 
 // TLSConfig enables HTTPS on Listen (pocker.yaml `tls:`), either from certificate files (re-read when they change, so
-// a renewal needs no restart) or automatically with ACME (`auto: true`, see [DNSConfig]).
+// a renewal needs no restart). Automatic certificates (ACME) are the autotls plugin, which also reads `tls:`.
 //
 //	tls:
 //	  cert: /etc/letsencrypt/live/example.com/fullchain.pem
@@ -20,14 +20,6 @@ type TLSConfig struct {
 	Cert       string `yaml:"cert"`
 	Key        string `yaml:"key"`
 	HTTPListen string `yaml:"http_listen"`
-
-	// Automatic certificates (see [DNSConfig] for the full example).
-	Auto    bool       `yaml:"auto"`
-	Email   string     `yaml:"email"`
-	CA      string     `yaml:"ca"`
-	Storage string     `yaml:"storage"`
-	Domains []string   `yaml:"domains"`
-	DNS     *DNSConfig `yaml:"dns"`
 }
 
 // certReloader serves the current certificate, checking the files at most every 30s.

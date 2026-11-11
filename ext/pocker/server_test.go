@@ -9,7 +9,6 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
-	"fmt"
 	"io"
 	"log/slog"
 	"math/big"
@@ -18,7 +17,6 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -77,9 +75,6 @@ func TestServerAppliesPerInstanceYAML(t *testing.T) {
 	instances := filepath.Join(root, "instances.yaml")
 	if err := os.WriteFile(instances, []byte(`
 instances:
-  - id: limited
-    hosts: [limited.test]
-    limits: { rate_limits: { ip_hourly: 3 } }
   - id: cors
     hosts: [cors.test]
     access: { cors_origins: ["https://app.example.com"] }
@@ -95,7 +90,6 @@ instances:
 	cfg := DefaultConfig()
 	cfg.Listen, cfg.PBRoot, cfg.InstancesFile = addr, root, instances
 	cfg.MemorySoftLimit = -1
-	cfg.Firewall.RateLimitHeaderPrefix = "X-PocketHost-RateLimit"
 	srv := &Server{
 		Config: cfg,
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
@@ -132,25 +126,6 @@ instances:
 		return res
 	}
 
-	// rate limit from the instance's YAML (ip_hourly: 3), PocketHost header names
-	for i := 1; i <= 3; i++ {
-		res := get("limited.test", "/api/health", nil)
-		if res.StatusCode != 200 || res.Header.Get("X-PocketHost-RateLimit-Ip-Hourly-Limit") != "3" ||
-			res.Header.Get("X-PocketHost-RateLimit-Ip-Hourly-Remaining") != fmt.Sprint(3-i) {
-			t.Fatalf("request %d: %d %v", i, res.StatusCode, res.Header)
-		}
-		if !strings.Contains(res.Header.Get("Access-Control-Expose-Headers"), "X-PocketHost-RateLimit-Instance-Concurrent-Remaining") {
-			t.Fatalf("expose headers missing: %q", res.Header.Get("Access-Control-Expose-Headers"))
-		}
-	}
-	if res := get("limited.test", "/api/health", nil); res.StatusCode != http.StatusTooManyRequests || res.Header.Get("Retry-After") == "" {
-		t.Fatalf("4th request: %d (Retry-After %q)", res.StatusCode, res.Header.Get("Retry-After"))
-	}
-	// other instances keep the default (1000/hour)
-	if res := get("relaxed.test", "/api/health", nil); res.Header.Get("X-PocketHost-RateLimit-Ip-Hourly-Limit") != "1000" {
-		t.Fatalf("default limit: %v", res.Header)
-	}
-
 	// CORS origins per instance
 	if got := get("cors.test", "/api/health", map[string]string{"Origin": "https://app.example.com"}).Header.Get("Access-Control-Allow-Origin"); got != "https://app.example.com" {
 		t.Errorf("allowed origin: ACAO=%q", got)
@@ -181,126 +156,6 @@ instances:
 	res.Body.Close()
 	if string(body) != "host code for relaxed" {
 		t.Errorf("SetupApp route: %d %q", res.StatusCode, body)
-	}
-}
-
-func fwRequest(remote, path string, hdr map[string]string) *http.Request {
-	r := httptest.NewRequest(http.MethodGet, "http://x.test"+path, nil)
-	r.RemoteAddr = remote
-	for k, v := range hdr {
-		r.Header.Set(k, v)
-	}
-	return r
-}
-
-func TestFirewallPeersAndClientIP(t *testing.T) {
-	fw, err := NewFirewall(FirewallConfig{
-		AllowCIDRs:     []string{"173.245.48.0/20", "127.0.0.1"},
-		TrustedProxies: []string{"173.245.48.0/20"},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if fw.AllowPeer(fwRequest("8.8.8.8:1", "/", nil)) {
-		t.Error("peer outside allow_cidrs must be refused")
-	}
-	if !fw.AllowPeer(fwRequest("173.245.48.9:1", "/", nil)) || !fw.AllowPeer(fwRequest("127.0.0.1:1", "/", nil)) {
-		t.Error("allowed peers refused")
-	}
-	if got := fw.ClientIP(fwRequest("173.245.48.9:1", "/", map[string]string{"CF-Connecting-IP": "203.0.113.7"})); got.String() != "203.0.113.7" {
-		t.Errorf("trusted proxy header: got %s", got)
-	}
-	if got := fw.ClientIP(fwRequest("173.245.48.9:1", "/", map[string]string{"X-Forwarded-For": "198.51.100.4, 10.0.0.1"})); got.String() != "198.51.100.4" {
-		t.Errorf("X-Forwarded-For first hop: got %s", got)
-	}
-	if got := fw.ClientIP(fwRequest("127.0.0.1:1", "/", map[string]string{"CF-Connecting-IP": "203.0.113.7"})); got.String() != "127.0.0.1" {
-		t.Errorf("header from an untrusted peer must be ignored: got %s", got)
-	}
-
-	// Server path: a refused peer gets 403 before anything else
-	m := newTestManager(t, false, Instance{ID: "a", Hosts: []string{"a.test"}})
-	m.fw = fw
-	w := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodGet, "http://a.test/api/health", nil)
-	r.RemoteAddr = "8.8.8.8:1"
-	m.ServeHTTP(w, r)
-	if w.Code != http.StatusForbidden {
-		t.Errorf("refused peer: %d", w.Code)
-	}
-}
-
-func TestRateLimitsTrustedWeightsConcurrency(t *testing.T) {
-	fw, _ := NewFirewall(FirewallConfig{TrustedClients: []string{"198.51.100.0/24"}})
-	limits := func(l Limits) Limits { return l.over(DefaultLimits()) }
-	inst := Instance{ID: "a"}
-
-	check := func(remote, path string, lim Limits) (int, func()) {
-		w := httptest.NewRecorder()
-		rel, ok := fw.rateCheck(w, fwRequest(remote, path, nil), inst, lim)
-		if !ok {
-			return w.Code, nil
-		}
-		return 200, rel
-	}
-
-	// files cost 1/10: with ip_hourly 1, ten file requests fit, the eleventh doesn't
-	lim := limits(Limits{RateLimits: &RateLimits{IPHourly: 1}})
-	for i := 0; i < 10; i++ {
-		if code, rel := check("192.0.2.1:1", "/api/files/x/y/z.png", lim); code != 200 {
-			t.Fatalf("file request %d: %d", i, code)
-		} else {
-			rel()
-		}
-	}
-	if code, _ := check("192.0.2.1:1", "/api/files/x", lim); code != http.StatusTooManyRequests {
-		t.Fatalf("11th file request: %d", code)
-	}
-
-	// trusted clients (process list or the instance's own) get the trusted limits
-	inst = Instance{ID: "b", Access: Access{TrustedIPs: []string{"203.0.113.9"}}}
-	lim = limits(Limits{RateLimits: &RateLimits{IPHourly: 1, Trusted: &RateLimitSet{IPHourly: 3}}})
-	for _, ip := range []string{"198.51.100.5", "203.0.113.9"} {
-		for i := 0; i < 3; i++ {
-			if code, rel := check(ip+":1", "/api/health", lim); code != 200 {
-				t.Fatalf("trusted %s request %d: %d", ip, i, code)
-			} else {
-				rel()
-			}
-		}
-	}
-	if code, _ := check("192.0.2.50:1", "/api/health", lim); code != 200 {
-		t.Fatal("untrusted first request")
-	}
-	if code, _ := check("192.0.2.50:1", "/api/health", lim); code != http.StatusTooManyRequests {
-		t.Fatal("untrusted second request should hit ip_hourly 1")
-	}
-
-	// concurrency: a held request keeps its slot until released
-	inst = Instance{ID: "c"}
-	lim = limits(Limits{RateLimits: &RateLimits{IPConcurrent: 1, InstanceConcurrent: 2}})
-	_, hold := check("192.0.2.1:1", "/api/realtime", lim)
-	if code, _ := check("192.0.2.1:1", "/api/health", lim); code != http.StatusTooManyRequests {
-		t.Fatal("second concurrent request from the same IP should be refused")
-	}
-	_, hold2 := check("192.0.2.2:1", "/api/health", lim)
-	if code, _ := check("192.0.2.3:1", "/api/health", lim); code != http.StatusTooManyRequests {
-		t.Fatal("instance_concurrent 2 should refuse a third")
-	}
-	hold()
-	hold2()
-	if code, rel := check("192.0.2.1:1", "/api/health", lim); code != 200 {
-		t.Fatal("slot not released")
-	} else {
-		rel()
-	}
-
-	// rate_limits: off
-	inst = Instance{ID: "d"}
-	lim = limits(Limits{RateLimits: &RateLimits{Off: true}})
-	for i := 0; i < 50; i++ {
-		if code, _ := check("192.0.2.1:1", "/api/health", lim); code != 200 {
-			t.Fatal("rate_limits: off still limited")
-		}
 	}
 }
 

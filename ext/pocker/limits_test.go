@@ -241,3 +241,12 @@ func TestWithInstanceStopped(t *testing.T) {
 		t.Fatal("unknown instance must fail")
 	}
 }
+
+func containsString(list []string, s string) bool {
+	for _, v := range list {
+		if v == s {
+			return true
+		}
+	}
+	return false
+}

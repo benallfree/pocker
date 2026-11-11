@@ -9,7 +9,6 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
-	"path/filepath"
 	"runtime/debug"
 	"time"
 
@@ -36,6 +35,11 @@ type Server struct {
 
 	// Forward, if set, serves requests for instances another server runs (see [ManagerOptions.Forward]).
 	Forward func(w http.ResponseWriter, r *http.Request, inst Instance)
+
+	// Plugins extend the server (see [Plugin]): settings from the config file, a request gate (e.g. the firewall
+	// plugin), TLS (e.g. the autotls plugin), handler wrappers and background work. Order matters for wrappers: the
+	// first listed is the outermost.
+	Plugins []Plugin
 
 	// OnStart, if set, receives the Manager once Run has created it, before any request is served: the safe way for
 	// host code running in other goroutines (scheduled jobs, maintenance) to get it.
@@ -73,21 +77,41 @@ func (s *Server) Run(ctx context.Context) error {
 	if s.Config.HooksPoolSize != nil {
 		pool = *s.Config.HooksPoolSize
 	}
-	defaults := s.Config.Limits
-	if s.Config.Dev && defaults.RateLimits == nil {
-		defaults.RateLimits = &RateLimits{Off: true} // local development: no request budgets unless configured
-	}
-	fw, err := NewFirewall(s.Config.Firewall)
-	if err != nil {
-		return err
+	var (
+		gates    []Gate
+		tlsProv  TLSProvider
+		wrappers []Wrapper
+		starters []Starter
+	)
+	for _, p := range s.Plugins {
+		if c, ok := p.(Configurer); ok {
+			if err := c.Configure(s.Config.Doc(), s.Config); err != nil {
+				return fmt.Errorf("plugin %s: %w", p.Name(), err)
+			}
+		}
+		if g, ok := p.(Gate); ok {
+			gates = append(gates, g)
+		}
+		if t, ok := p.(TLSProvider); ok {
+			if tlsProv != nil {
+				return fmt.Errorf("plugin %s: another plugin already provides TLS", p.Name())
+			}
+			tlsProv = t
+		}
+		if wr, ok := p.(Wrapper); ok {
+			wrappers = append(wrappers, wr)
+		}
+		if st, ok := p.(Starter); ok {
+			starters = append(starters, st)
+		}
 	}
 	s.Manager = NewManager(source, ManagerOptions{
 		PBRoot:        s.Config.PBRoot,
 		Dev:           s.Config.Dev,
 		HooksPoolSize: pool,
 		Logger:        log,
-		Defaults:      defaults,
-		Firewall:      fw,
+		Defaults:      s.Config.Limits,
+		Gate:          chainGates(gates),
 		OnEvent:       s.onEvent(source, log),
 		Setup:         s.SetupApp,
 		Forward:       s.Forward,
@@ -101,11 +125,17 @@ func (s *Server) Run(ctx context.Context) error {
 	if s.Wrap != nil {
 		handler = s.Wrap(handler)
 	}
+	for i := len(wrappers) - 1; i >= 0; i-- {
+		handler = wrappers[i].Wrap(handler)
+	}
 
 	runCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	managerErr := make(chan error, 1)
 	go func() { managerErr <- s.Manager.Run(runCtx) }()
+	for _, st := range starters {
+		go st.Start(runCtx, s.Manager)
+	}
 
 	if s.Config.MemoryLimit > 0 {
 		debug.SetMemoryLimit(s.Config.MemoryLimit)
@@ -147,8 +177,12 @@ func (s *Server) Run(ctx context.Context) error {
 			}
 		}()
 	}
-	if s.Config.TLS.Auto {
-		auto, err := newAutoTLS(runCtx, s.Config.TLS, filepath.Join(s.Config.PBRoot, ".pocker-certs"), func(host string) bool {
+	var (
+		tlsCfg   *tls.Config
+		wrapHTTP func(http.Handler) http.Handler
+	)
+	if tlsProv != nil {
+		tlsCfg, wrapHTTP, err = tlsProv.TLS(runCtx, func(host string) bool {
 			_, ok := s.Manager.Lookup(host)
 			return ok
 		})
@@ -156,9 +190,15 @@ func (s *Server) Run(ctx context.Context) error {
 			_ = ln.Close()
 			return err
 		}
-		srv.TLSConfig = auto.tlsConfig()
+	}
+	if tlsCfg != nil {
+		srv.TLSConfig = tlsCfg
 		go func() { serveErr <- srv.ServeTLS(ln, "", "") }()
-		startRedirect(auto.httpHandler(httpsRedirect(handler)))
+		h := httpsRedirect(handler)
+		if wrapHTTP != nil {
+			h = wrapHTTP(h)
+		}
+		startRedirect(h)
 	} else if s.Config.TLS.Cert != "" || s.Config.TLS.Key != "" {
 		certs, err := newCertReloader(s.Config.TLS.Cert, s.Config.TLS.Key)
 		if err != nil {
@@ -244,4 +284,44 @@ func (s *Server) onEvent(source InstanceSource, log *slog.Logger) func(Event) {
 			sink.InstanceEvent(e)
 		}
 	}
+}
+
+// chainGates combines gates: a peer must pass every gate, and a request is admitted only when all admit it.
+func chainGates(gates []Gate) Gate {
+	switch len(gates) {
+	case 0:
+		return nil
+	case 1:
+		return gates[0]
+	}
+	return gateChain(gates)
+}
+
+type gateChain []Gate
+
+func (c gateChain) AllowPeer(r *http.Request) bool {
+	for _, g := range c {
+		if !g.AllowPeer(r) {
+			return false
+		}
+	}
+	return true
+}
+
+func (c gateChain) Admit(w http.ResponseWriter, r *http.Request, inst Instance) (func(), bool) {
+	var releases []func()
+	releaseAll := func() {
+		for i := len(releases) - 1; i >= 0; i-- {
+			releases[i]()
+		}
+	}
+	for _, g := range c {
+		rel, ok := g.Admit(w, r, inst)
+		if !ok {
+			releaseAll()
+			return nil, false
+		}
+		releases = append(releases, rel)
+	}
+	return releaseAll, true
 }

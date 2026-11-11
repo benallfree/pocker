@@ -1,4 +1,8 @@
-package pocker
+// Package servertiming is a PocketBase CE plugin for the pocker host: a Server-Timing response header with the
+// timings the host and other plugins register for each request (see pocker.Timing).
+//
+//	srv := &pocker.Server{Config: cfg, Plugins: []pocker.Plugin{servertiming.New()}}
+package servertiming
 
 import (
 	"bufio"
@@ -8,24 +12,41 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/pockethost/pocketbase/ext/pocker"
 )
 
-// ServerTimingHeader carries per-hop timing in the standard Server-Timing response header. Each hop measures from
+// Header carries per-hop timing in the standard Server-Timing response header. Each hop measures from
 // receiving the request to sending the response headers (time to first byte), keeps the entries the next hop sent
 // back, and adds its own after them, so the innermost hop comes first. The Manager adds:
 //
 //   - origin: the instance's own handler, from handing it the request until it sent its response headers
 //   - wake:   starting the instance for this request (0 when it was already running)
 //
-// Host code in front of the Manager can add its own entries (e.g. a total for the server) with WithServerTiming.
+// Host code and plugins add their own entries with pocker.Timing (e.g. a total for the server).
 // A hop's own overhead is its dur minus the entry it wraps. Only names go in desc, never addresses.
-const ServerTimingHeader = "Server-Timing"
+const Header = "Server-Timing"
 
 // TimingEntry is one Server-Timing metric.
-type TimingEntry struct {
-	Name string
-	Dur  time.Duration
-	Desc string
+type TimingEntry = pocker.TimingEntry
+
+// Plugin adds the header ([pocker.Wrapper]). List it before plugins and host code whose timings it should include:
+// the first listed wrapper is the outermost.
+type Plugin struct{}
+
+// New returns the plugin.
+func New() *Plugin { return &Plugin{} }
+
+// Name is the plugin's name.
+func (*Plugin) Name() string { return "servertiming" }
+
+// Wrap collects the request's timings and appends them to the response's Server-Timing header just before the
+// headers go out, after any values an upstream hop already sent.
+func (*Plugin) Wrap(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx, eval := pocker.WithTimings(r.Context())
+		next.ServeHTTP(WithServerTiming(w, eval), r.WithContext(ctx))
+	})
 }
 
 // FormatTiming renders an entry, e.g. `edge;dur=63.5;desc="sfo"` (milliseconds, one decimal).
@@ -47,7 +68,7 @@ func AppendServerTiming(h http.Header, entries ...TimingEntry) {
 		return
 	}
 	var parts []string
-	for _, v := range h.Values(ServerTimingHeader) {
+	for _, v := range h.Values(Header) {
 		if strings.TrimSpace(v) != "" {
 			parts = append(parts, v)
 		}
@@ -55,7 +76,7 @@ func AppendServerTiming(h http.Header, entries ...TimingEntry) {
 	for _, e := range entries {
 		parts = append(parts, FormatTiming(e))
 	}
-	h.Set(ServerTimingHeader, strings.Join(parts, ", "))
+	h.Set(Header, strings.Join(parts, ", "))
 }
 
 // WithServerTiming returns a writer that appends the entries fn returns just before the response headers go out

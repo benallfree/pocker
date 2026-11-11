@@ -50,10 +50,8 @@ type Config struct {
 	// EgressAllow lists private networks apps may still connect to (default none: public addresses only).
 	EgressAllow []string `yaml:"egress_allow"`
 
-	// Firewall: allowed peers, client IP headers, trusted clients, rate-limit header names.
-	Firewall FirewallConfig `yaml:"firewall"`
-
-	// TLS: certificate files for HTTPS, and an optional HTTP redirect listener.
+	// TLS: certificate files for HTTPS, and an optional HTTP redirect listener. (Automatic certificates are the
+	// autotls plugin, which reads its own keys under `tls:`.)
 	TLS TLSConfig `yaml:"tls"`
 
 	// MemoryLimit sets the Go runtime's soft memory limit (GOMEMLIMIT) in bytes (default 0 = leave as is).
@@ -62,7 +60,13 @@ type Config struct {
 	// MemorySoftLimit is the live-heap level at which the memory watch starts interrupting long JS calls and
 	// striking their instances (default 70% of memory_limit, or 1 GiB without one; negative disables the watch).
 	MemorySoftLimit int64 `yaml:"memory_soft_limit"`
+
+	// doc is the whole config file, for plugins that own their own keys (see [Configurer]).
+	doc *yaml.Node
 }
+
+// Doc returns the parsed config file (nil when there was none), for plugins that read their own keys.
+func (c Config) Doc() *yaml.Node { return c.doc }
 
 // DefaultConfig returns the defaults used when no config file (or field) is given.
 func DefaultConfig() Config {
@@ -114,10 +118,6 @@ func LoadConfig(path string) (Config, error) {
 		cfg.ShutdownTimeout = fromFile.ShutdownTimeout
 	}
 	cfg.Limits = fromFile.Limits.over(cfg.Limits)
-	if fromFile.Limits.RateLimits == nil {
-		cfg.Limits.RateLimits = nil // keep "not set" so --dev can default rate limiting to off
-	}
-	cfg.Firewall = fromFile.Firewall
 	cfg.TLS = fromFile.TLS
 	if fromFile.EgressAllow != nil {
 		cfg.EgressAllow = fromFile.EgressAllow
@@ -127,6 +127,10 @@ func LoadConfig(path string) (Config, error) {
 	}
 	if fromFile.MemorySoftLimit != 0 {
 		cfg.MemorySoftLimit = fromFile.MemorySoftLimit
+	}
+	var doc yaml.Node
+	if err := yaml.Unmarshal(raw, &doc); err == nil && len(doc.Content) > 0 {
+		cfg.doc = &doc
 	}
 	return cfg, nil
 }

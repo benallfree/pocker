@@ -1,10 +1,16 @@
-package pocker
+// Package autotls is a PocketBase CE plugin for the pocker host: automatic HTTPS certificates through ACME, with
+// CertMagic (Caddy's certificate engine). It reads its keys from pocker.yaml's `tls:` block; certificate files
+// (`tls.cert`/`tls.key`) stay a core feature.
+//
+//	srv := &pocker.Server{Config: cfg, Plugins: []pocker.Plugin{autotls.New()}}
+package autotls
 
 import (
 	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -12,7 +18,64 @@ import (
 
 	"github.com/caddyserver/certmagic"
 	"github.com/libdns/cloudflare"
+	"github.com/pockethost/pocketbase/ext/pocker"
+	"gopkg.in/yaml.v3"
 )
+
+// Config is the plugin's part of pocker.yaml's `tls:` block.
+type Config struct {
+	Auto    bool       `yaml:"auto"`
+	Email   string     `yaml:"email"`
+	CA      string     `yaml:"ca"`
+	Storage string     `yaml:"storage"`
+	Domains []string   `yaml:"domains"`
+	DNS     *DNSConfig `yaml:"dns"`
+}
+
+// AutoTLS is the plugin ([pocker.Configurer], [pocker.TLSProvider]). It does nothing unless `tls.auto` is true.
+type AutoTLS struct {
+	// Config may be set before the server starts; the config file's `tls:` block is used when Auto is false here.
+	Config Config
+
+	certFiles      bool   // tls.cert/tls.key are set (not allowed together with auto)
+	defaultStorage string // <pb_root>/.pocker-certs
+}
+
+// New returns the plugin.
+func New() *AutoTLS { return &AutoTLS{} }
+
+// Name is the plugin's name.
+func (a *AutoTLS) Name() string { return "autotls" }
+
+// Configure reads `tls:` from the config file and checks it without touching the network.
+func (a *AutoTLS) Configure(doc *yaml.Node, cfg pocker.Config) error {
+	if !a.Config.Auto {
+		if n := pocker.TopLevel(doc, "tls"); n != nil {
+			if err := n.Decode(&a.Config); err != nil {
+				return fmt.Errorf("tls: %w", err)
+			}
+		}
+	}
+	a.certFiles = cfg.TLS.Cert != "" || cfg.TLS.Key != ""
+	a.defaultStorage = filepath.Join(cfg.PBRoot, ".pocker-certs")
+	if !a.Config.Auto {
+		return nil
+	}
+	return validateAutoTLS(a.Config, a.certFiles)
+}
+
+// TLS starts the certificate manager when auto is on; otherwise it returns nothing and the server falls back to
+// certificate files or plain HTTP.
+func (a *AutoTLS) TLS(ctx context.Context, served func(host string) bool) (*tls.Config, func(http.Handler) http.Handler, error) {
+	if !a.Config.Auto {
+		return nil, nil, nil
+	}
+	auto, err := newAutoTLS(ctx, a.Config, a.certFiles, a.defaultStorage, served)
+	if err != nil {
+		return nil, nil, err
+	}
+	return auto.tlsConfig(), auto.httpHandler, nil
+}
 
 // AutoTLS obtains and renews certificates automatically with ACME (Let's Encrypt by default), using CertMagic,
 // Caddy's certificate engine. Enabled with `tls: { auto: true }`.
@@ -36,7 +99,7 @@ type DNSConfig struct {
 	APITokenEnv string `yaml:"api_token_env"` // name of the environment variable holding the token
 }
 
-// SupportedDNSProviders are the dns.provider values Pocker understands.
+// SupportedDNSProviders are the dns.provider values the plugin understands.
 var SupportedDNSProviders = []string{"cloudflare"}
 
 func (d *DNSConfig) provider() (certmagic.DNSProvider, error) {
@@ -94,8 +157,8 @@ type autoTLS struct {
 }
 
 // validateAutoTLS checks the auto-TLS settings without touching the network.
-func validateAutoTLS(cfg TLSConfig) error {
-	if cfg.Cert != "" || cfg.Key != "" {
+func validateAutoTLS(cfg Config, certFiles bool) error {
+	if certFiles {
 		return errors.New("tls: use either cert/key files or auto, not both")
 	}
 	if cfg.DNS != nil {
@@ -113,8 +176,8 @@ func validateAutoTLS(cfg TLSConfig) error {
 
 // newAutoTLS builds the certificate manager. allowHost decides which hostnames may get an on-demand certificate
 // (the instance source's mapped hosts), so random Host names can't trigger issuance.
-func newAutoTLS(ctx context.Context, cfg TLSConfig, defaultStorage string, allowHost func(string) bool) (*autoTLS, error) {
-	if err := validateAutoTLS(cfg); err != nil {
+func newAutoTLS(ctx context.Context, cfg Config, certFiles bool, defaultStorage string, allowHost func(string) bool) (*autoTLS, error) {
+	if err := validateAutoTLS(cfg, certFiles); err != nil {
 		return nil, err
 	}
 	storage := cfg.Storage
@@ -171,4 +234,12 @@ func (a *autoTLS) tlsConfig() *tls.Config {
 // httpHandler answers ACME HTTP-01 challenges, passing everything else to next.
 func (a *autoTLS) httpHandler(next http.Handler) http.Handler {
 	return a.issuer.HTTPChallengeHandler(next)
+}
+
+func normalizeHost(h string) string {
+	h = strings.ToLower(strings.TrimSpace(h))
+	if host, _, err := net.SplitHostPort(h); err == nil {
+		h = host
+	}
+	return strings.TrimSuffix(h, ".")
 }

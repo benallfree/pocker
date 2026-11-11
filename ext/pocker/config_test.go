@@ -20,7 +20,7 @@ hooks_pool_size: 4
 shutdown_timeout: 30s
 max_js_execution: 5s
 egress_allow: [10.0.0.0/8]
-firewall: { allow_cidrs: [10.0.0.0/8], rate_limit_header_prefix: X-Test }
+firewall: { allow_cidrs: [10.0.0.0/8], rate_limit_header_prefix: X-Test } # a plugin's key: kept in Doc()
 tls: { cert: /c.pem, key: /k.pem, http_listen: ":9081" }
 memory_limit: 1000
 memory_soft_limit: 500
@@ -36,14 +36,17 @@ memory_soft_limit: 500
 	v, d := reflect.ValueOf(cfg), reflect.ValueOf(def)
 	for i := 0; i < v.NumField(); i++ {
 		f := v.Type().Field(i)
-		if f.Name == "Limits" {
-			continue // inline limits: covered by TestLimitsYAML
+		if f.Name == "Limits" || f.PkgPath != "" {
+			continue // inline limits: covered by TestLimitsYAML; unexported: the raw doc, checked below
 		}
 		if reflect.DeepEqual(v.Field(i).Interface(), d.Field(i).Interface()) {
 			t.Errorf("%s (%s) was not read from the file", f.Name, f.Tag.Get("yaml"))
 		}
 	}
-	if cfg.PlainListen[0] != ":9080" || cfg.TLS.HTTPListen != ":9081" || cfg.Firewall.RateLimitHeaderPrefix != "X-Test" {
+	if cfg.PlainListen[0] != ":9080" || cfg.TLS.HTTPListen != ":9081" {
 		t.Fatalf("%+v", cfg)
+	}
+	if n := TopLevel(cfg.Doc(), "firewall"); n == nil || TopLevel(n, "rate_limit_header_prefix").Value != "X-Test" {
+		t.Fatal("plugin keys are not available through Doc()")
 	}
 }

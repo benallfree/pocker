@@ -40,7 +40,7 @@ type Manager struct {
 
 	defaults Limits
 	onEvent  func(Event)
-	fw       *Firewall
+	gate     Gate
 	forward  func(w http.ResponseWriter, r *http.Request, inst Instance)
 
 	held map[string]chan struct{} // by ID: instances under maintenance; requests wait for the channel to close
@@ -74,8 +74,9 @@ type ManagerOptions struct {
 	Defaults Limits
 	// OnEvent receives instance events (memory strikes, pauses, restarts), e.g. to log them or notify the owner.
 	OnEvent func(Event)
-	// Firewall, if set, checks peers and applies per-instance rate limits.
-	Firewall *Firewall
+	// Gate, if set, admits requests: a peer check before routing, and per-instance admission (e.g. rate limits)
+	// before an instance is served here or forwarded (see [Gate]).
+	Gate Gate
 	// Setup runs host Go code for each app after migrations and before it serves (see [Server.SetupApp]).
 	Setup func(inst Instance, app core.App) error
 	// Forward serves requests for instances with [Instance.Remote] set, after the firewall checks. Nil = a plain
@@ -96,7 +97,7 @@ func NewManager(source InstanceSource, opts ManagerOptions) *Manager {
 		opts:      appOptions{PBRoot: opts.PBRoot, HooksPoolSize: opts.HooksPoolSize, ForceDev: opts.Dev, Defaults: defaults, Setup: opts.Setup},
 		defaults:  defaults,
 		onEvent:   opts.OnEvent,
-		fw:        opts.Firewall,
+		gate:      opts.Gate,
 		forward:   opts.Forward,
 		qstate:    map[string]*quarantineState{},
 		paused:    map[string]time.Time{},
@@ -312,7 +313,7 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		m.serveHealth(w)
 		return
 	}
-	if m.fw != nil && !m.fw.AllowPeer(r) {
+	if m.gate != nil && !m.gate.AllowPeer(r) {
 		http.Error(w, "forbidden: "+peerAddr(r).String(), http.StatusForbidden)
 		return
 	}
@@ -358,12 +359,12 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if m.fw != nil {
-		release, ok := m.fw.rateCheck(w, r, inst, inst.Limits.over(m.defaults))
+	if m.gate != nil {
+		release, ok := m.gate.Admit(w, r, inst)
 		if !ok {
 			return
 		}
-		defer release() // long-lived responses (realtime) hold their concurrency slot until they end
+		defer release() // long-lived responses (realtime) hold their admission until they end
 	}
 
 	wakeStart := time.Now()
@@ -373,16 +374,16 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	readyAt := time.Now()
-	w = WithServerTiming(w, func() []TimingEntry {
+	Timing(r.Context(), func() []TimingEntry {
 		return []TimingEntry{{Name: "origin", Dur: time.Since(readyAt)}, {Name: "wake", Dur: readyAt.Sub(wakeStart)}}
 	})
 	app.handler.ServeHTTP(w, r)
 }
 
-// serveRemote forwards a request for an instance another server runs, after the rate limits.
+// serveRemote forwards a request for an instance another server runs, after admission.
 func (m *Manager) serveRemote(w http.ResponseWriter, r *http.Request, inst Instance) {
-	if m.fw != nil {
-		release, ok := m.fw.rateCheck(w, r, inst, inst.Limits.over(m.defaults))
+	if m.gate != nil {
+		release, ok := m.gate.Admit(w, r, inst)
 		if !ok {
 			return
 		}
@@ -411,9 +412,9 @@ var forwardTransport = &http.Transport{
 	IdleConnTimeout:     90 * time.Second,
 }
 
-// Firewall returns the manager's firewall (nil if none), so host code in front of the manager (e.g. its own routes)
-// can apply the same peer check and client IP.
-func (m *Manager) Firewall() *Firewall { return m.fw }
+// Gate returns the manager's gate (nil if none), so host code in front of the manager (e.g. its own routes) can
+// apply the same peer check.
+func (m *Manager) Gate() Gate { return m.gate }
 
 // LogInstance appends a line to the instance's log (<instance folder>/logs/exec.log, the same file its app writes),
 // e.g. for a scheduled job's result. Unknown instances are ignored.

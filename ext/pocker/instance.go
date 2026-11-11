@@ -43,6 +43,11 @@ type Instance struct {
 	// Limits override the process defaults for this instance (zero fields keep the default).
 	Limits Limits `yaml:"limits,omitempty"`
 
+	// Plugins holds per-instance settings for plugins, by plugin name (e.g. `plugins: {firewall: {rate_limits:
+	// ...}}`). A host application's instance source may set typed values; see [DecodePluginConfig]. Changes apply
+	// without restarting the instance's app.
+	Plugins map[string]any `yaml:"plugins,omitempty"`
+
 	// Blocked, when set, answers every request for this instance with the given status and message instead of
 	// serving it (e.g. suspended, unpaid). A running app is left running.
 	Blocked *Blocked `yaml:"blocked,omitempty"`
@@ -58,10 +63,6 @@ type Access struct {
 	// CORSOrigins restricts which browser origins may call the instance cross-origin (PocketBase's matching: exact,
 	// "*", and "*"/"?" wildcards). Empty = any origin.
 	CORSOrigins []string `yaml:"cors_origins,omitempty"`
-
-	// TrustedIPs are client IPs/CIDRs that get the trusted rate limits on this instance, in addition to the
-	// process-wide firewall.trusted_clients (e.g. the owner's account-level list, merged by an instance source).
-	TrustedIPs []string `yaml:"trusted_ips,omitempty"`
 }
 
 // Superuser is a PocketBase superuser kept in sync by Pocker.

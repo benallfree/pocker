@@ -1,4 +1,9 @@
-package pocker
+// Package firewall is a PocketBase CE plugin for the pocker host: an allowed-peers list, trusted proxies and client
+// IPs, and per-IP and per-instance rate limits (hourly budgets and concurrency caps, with higher limits for trusted
+// clients). It reads `firewall:` and `rate_limits:` from pocker.yaml, and `plugins.firewall` per instance.
+//
+//	srv := &pocker.Server{Config: cfg, Plugins: []pocker.Plugin{firewall.New()}}
+package firewall
 
 import (
 	"fmt"
@@ -10,10 +15,13 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/pockethost/pocketbase/ext/pocker"
+	"gopkg.in/yaml.v3"
 )
 
-// FirewallConfig is the process-wide part of the firewall (pocker.yaml `firewall:`). Per-instance rate limits,
-// trusted clients and CORS origins live in [Limits].
+// Config is the process-wide part of the firewall (pocker.yaml `firewall:`). Rate limits are `rate_limits:` (the
+// defaults, see [RateLimits]) and, per instance, `plugins.firewall` (see [InstanceConfig]).
 //
 //	firewall:
 //	  allow_cidrs: []                 # peers allowed to connect (empty = everyone)
@@ -21,7 +29,7 @@ import (
 //	  client_ip_headers: [CF-Connecting-IP, True-Client-IP, X-Forwarded-For, X-Real-IP]
 //	  trusted_clients: []             # client IPs that get the trusted rate limits on every instance
 //	  rate_limit_header_prefix: X-RateLimit
-type FirewallConfig struct {
+type Config struct {
 	AllowCIDRs            []string `yaml:"allow_cidrs"`
 	TrustedProxies        []string `yaml:"trusted_proxies"`
 	ClientIPHeaders       []string `yaml:"client_ip_headers"`
@@ -32,8 +40,28 @@ type FirewallConfig struct {
 // DefaultClientIPHeaders are read, in order, from trusted proxies.
 var DefaultClientIPHeaders = []string{"CF-Connecting-IP", "True-Client-IP", "X-Forwarded-For", "X-Real-IP"}
 
-// Firewall checks the connecting peer, works out the client IP, and applies per-instance rate limits.
+// InstanceConfig is an instance's firewall settings (`plugins.firewall`): its own rate limits over the defaults,
+// and client IPs/CIDRs that get the trusted limits on this instance (e.g. the owner's own list).
+type InstanceConfig struct {
+	RateLimits *RateLimits `yaml:"rate_limits,omitempty"`
+	TrustedIPs []string    `yaml:"trusted_ips,omitempty"`
+}
+
+// Firewall checks the connecting peer, works out the client IP, and applies per-instance rate limits. It is a
+// pocker plugin ([pocker.Configurer], [pocker.Gate]); New returns one with nothing set.
 type Firewall struct {
+	// Config and RateLimits may be set before the server starts; the config file adds to them.
+	Config     Config
+	RateLimits *RateLimits
+
+	// Adjust, if set, runs after the config file is read, e.g. for a host application that adds settings from its
+	// own environment.
+	Adjust func(cfg *Config, defaults **RateLimits)
+
+	once     sync.Once
+	setupErr error
+	defaults RateLimits // effective defaults for every instance
+
 	allow     []netip.Prefix
 	proxies   []netip.Prefix
 	headers   []string
@@ -54,23 +82,77 @@ type hourlyBucket struct {
 
 const microPerRequest = 10
 
-// NewFirewall builds a firewall from its config.
-func NewFirewall(cfg FirewallConfig) (*Firewall, error) {
-	f := &Firewall{
-		headers:    cfg.ClientIPHeaders,
-		prefix:     cfg.RateLimitHeaderPrefix,
-		hourly:     map[string]*hourlyBucket{},
-		concurrent: map[string]int64{},
+// New returns a firewall with nothing set: every peer allowed, the default rate limits.
+func New() *Firewall { return &Firewall{} }
+
+// NewFirewall returns a ready firewall for cfg with the default rate limits, for direct use without a server.
+func NewFirewall(cfg Config) (*Firewall, error) {
+	f := &Firewall{Config: cfg}
+	return f, f.setup()
+}
+
+// Name is the plugin's name: its key under an instance's `plugins:`.
+func (f *Firewall) Name() string { return "firewall" }
+
+// Configure reads `firewall:` and `rate_limits:` from the config file. List fields add to what was set before;
+// other fields fill in what wasn't. In dev mode, rate limiting is off unless rate_limits is set somewhere.
+func (f *Firewall) Configure(doc *yaml.Node, cfg pocker.Config) error {
+	if n := pocker.TopLevel(doc, "firewall"); n != nil {
+		var c Config
+		if err := n.Decode(&c); err != nil {
+			return fmt.Errorf("firewall: %w", err)
+		}
+		f.Config.AllowCIDRs = append(c.AllowCIDRs, f.Config.AllowCIDRs...)
+		f.Config.TrustedProxies = append(c.TrustedProxies, f.Config.TrustedProxies...)
+		f.Config.TrustedClients = append(c.TrustedClients, f.Config.TrustedClients...)
+		if f.Config.ClientIPHeaders == nil {
+			f.Config.ClientIPHeaders = c.ClientIPHeaders
+		}
+		if f.Config.RateLimitHeaderPrefix == "" {
+			f.Config.RateLimitHeaderPrefix = c.RateLimitHeaderPrefix
+		}
+	}
+	if n := pocker.TopLevel(doc, "rate_limits"); n != nil && f.RateLimits == nil {
+		var rl RateLimits
+		if err := n.Decode(&rl); err != nil {
+			return fmt.Errorf("rate_limits: %w", err)
+		}
+		f.RateLimits = &rl
+	}
+	if f.Adjust != nil {
+		f.Adjust(&f.Config, &f.RateLimits)
+	}
+	if cfg.Dev && f.RateLimits == nil {
+		f.RateLimits = &RateLimits{Off: true} // local development: no request budgets unless configured
+	}
+	return f.setup()
+}
+
+// setup builds the firewall from Config and RateLimits, once.
+func (f *Firewall) setup() error {
+	f.once.Do(func() { f.setupErr = f.build() })
+	return f.setupErr
+}
+
+func (f *Firewall) build() error {
+	cfg := f.Config
+	f.headers = cfg.ClientIPHeaders
+	f.prefix = cfg.RateLimitHeaderPrefix
+	f.hourly = map[string]*hourlyBucket{}
+	f.concurrent = map[string]int64{}
+	f.defaults = DefaultRateLimits
+	if f.RateLimits != nil {
+		f.defaults = f.RateLimits.merged(DefaultRateLimits)
 	}
 	var err error
 	if f.allow, err = parsePrefixes("firewall.allow_cidrs", cfg.AllowCIDRs); err != nil {
-		return nil, err
+		return err
 	}
 	if f.proxies, err = parsePrefixes("firewall.trusted_proxies", cfg.TrustedProxies); err != nil {
-		return nil, err
+		return err
 	}
 	if f.trusted, err = parsePrefixes("firewall.trusted_clients", cfg.TrustedClients); err != nil {
-		return nil, err
+		return err
 	}
 	if f.headers == nil {
 		f.headers = DefaultClientIPHeaders
@@ -83,7 +165,7 @@ func NewFirewall(cfg FirewallConfig) (*Firewall, error) {
 		names = append(names, f.prefix+"-"+n)
 	}
 	f.exposeAll = strings.Join(names, ", ")
-	return f, nil
+	return nil
 }
 
 var rateHeaderNames = []string{
@@ -132,14 +214,37 @@ func peerAddr(r *http.Request) netip.Addr {
 	return a.Unmap()
 }
 
-// AllowPeer reports whether the connecting peer may talk to Pocker at all.
+// AllowPeer reports whether the connecting peer may talk to the server at all.
 func (f *Firewall) AllowPeer(r *http.Request) bool {
+	if f.setup() != nil {
+		return false
+	}
 	return len(f.allow) == 0 || containsAddr(f.allow, peerAddr(r))
+}
+
+// Admit applies the instance's rate limits (its `plugins.firewall` over the defaults). Over a limit it answers 429
+// itself; otherwise the returned function frees the concurrency slots when the response ends.
+func (f *Firewall) Admit(w http.ResponseWriter, r *http.Request, inst pocker.Instance) (func(), bool) {
+	if err := f.setup(); err != nil {
+		http.Error(w, "firewall misconfigured", http.StatusInternalServerError)
+		return nil, false
+	}
+	var ic InstanceConfig
+	if err := pocker.DecodePluginConfig(inst.PluginConfig("firewall"), &ic); err != nil {
+		ic = InstanceConfig{}
+	}
+	rl := RateLimits{}
+	if ic.RateLimits != nil {
+		rl = *ic.RateLimits
+	}
+	rl = rl.merged(f.defaults)
+	return f.rateCheck(w, r, inst.ID, rl, ic.TrustedIPs)
 }
 
 // ClientIP is the request's client: from the first configured header when the peer is a trusted proxy, otherwise
 // the peer itself.
 func (f *Firewall) ClientIP(r *http.Request) netip.Addr {
+	_ = f.setup()
 	peer := peerAddr(r)
 	if !containsAddr(f.proxies, peer) {
 		return peer
@@ -161,16 +266,15 @@ func (f *Firewall) ClientIP(r *http.Request) netip.Addr {
 
 // rateCheck consumes the request's weight from the instance's buckets. When a limit is exceeded it writes the 429 and
 // returns ok=false; otherwise it returns a release function for the concurrency slots (call when the response ends).
-func (f *Firewall) rateCheck(w http.ResponseWriter, r *http.Request, inst Instance, lim Limits) (release func(), ok bool) {
-	rl := lim.RateLimits
-	if rl == nil || rl.Off {
+func (f *Firewall) rateCheck(w http.ResponseWriter, r *http.Request, instID string, rl RateLimits, trustedIPs []string) (release func(), ok bool) {
+	if rl.Off {
 		return func() {}, true
 	}
 	client := f.ClientIP(r)
 	trusted := containsAddr(f.trusted, client)
-	if !trusted && len(inst.Access.TrustedIPs) > 0 {
-		if inst, err := parsePrefixes("access.trusted_ips", inst.Access.TrustedIPs); err == nil {
-			trusted = containsAddr(inst, client)
+	if !trusted && len(trustedIPs) > 0 {
+		if list, err := parsePrefixes("plugins.firewall.trusted_ips", trustedIPs); err == nil {
+			trusted = containsAddr(list, client)
 		}
 	}
 	set := RateLimitSet{IPHourly: rl.IPHourly, InstanceHourly: rl.InstanceHourly, IPConcurrent: rl.IPConcurrent, InstanceConcurrent: rl.InstanceConcurrent}
@@ -183,8 +287,8 @@ func (f *Firewall) rateCheck(w http.ResponseWriter, r *http.Request, inst Instan
 		weight = int64(math.Max(1, math.Round(rl.FileWeight*microPerRequest)))
 	}
 
-	ipKey := client.String() + "|" + inst.ID
-	instKey := inst.ID
+	ipKey := client.String() + "|" + instID
+	instKey := instID
 	now := time.Now()
 	h := w.Header()
 	expose := func() {
@@ -221,7 +325,7 @@ func (f *Firewall) rateCheck(w http.ResponseWriter, r *http.Request, inst Instan
 		expose()
 		h.Set("Retry-After", strconv.Itoa(retryIn(ipH)))
 		http.Error(w, fmt.Sprintf("Too Many Requests: per-IP hourly limit of %d requests/hour exceeded for %s on instance %s; retry after %d seconds",
-			set.IPHourly, who(), inst.ID, retryIn(ipH)), http.StatusTooManyRequests)
+			set.IPHourly, who(), instID, retryIn(ipH)), http.StatusTooManyRequests)
 		return nil, false
 	}
 	instH := f.bucketLocked("i|"+instKey, now)
@@ -233,7 +337,7 @@ func (f *Firewall) rateCheck(w http.ResponseWriter, r *http.Request, inst Instan
 		expose()
 		h.Set("Retry-After", strconv.Itoa(retryIn(instH)))
 		http.Error(w, fmt.Sprintf("Too Many Requests: per-instance hourly limit of %d requests/hour exceeded for instance %s; retry after %d seconds",
-			set.InstanceHourly, inst.ID, retryIn(instH)), http.StatusTooManyRequests)
+			set.InstanceHourly, instID, retryIn(instH)), http.StatusTooManyRequests)
 		return nil, false
 	}
 	if f.concurrent[ipKey]+weight > int64(set.IPConcurrent)*microPerRequest {
@@ -244,7 +348,7 @@ func (f *Firewall) rateCheck(w http.ResponseWriter, r *http.Request, inst Instan
 		expose()
 		h.Set("Retry-After", "1")
 		http.Error(w, fmt.Sprintf("Too Many Requests: per-IP concurrent limit of %d concurrent requests exceeded for %s on instance %s",
-			set.IPConcurrent, who(), inst.ID), http.StatusTooManyRequests)
+			set.IPConcurrent, who(), instID), http.StatusTooManyRequests)
 		return nil, false
 	}
 	if f.concurrent[instKey]+weight > int64(set.InstanceConcurrent)*microPerRequest {
@@ -256,7 +360,7 @@ func (f *Firewall) rateCheck(w http.ResponseWriter, r *http.Request, inst Instan
 		expose()
 		h.Set("Retry-After", "1")
 		http.Error(w, fmt.Sprintf("Too Many Requests: per-instance concurrent limit of %d concurrent requests exceeded for instance %s",
-			set.InstanceConcurrent, inst.ID), http.StatusTooManyRequests)
+			set.InstanceConcurrent, instID), http.StatusTooManyRequests)
 		return nil, false
 	}
 	f.concurrent[ipKey] += weight
@@ -302,4 +406,76 @@ func (f *Firewall) sweepLocked(now time.Time) {
 			delete(f.hourly, k)
 		}
 	}
+}
+
+// RateLimits are request limits per client IP and per instance: an hourly budget and a concurrency cap, each with a
+// higher value for trusted clients. Requests to /api/files cost FileWeight of a request.
+type RateLimits struct {
+	IPHourly           int     `yaml:"ip_hourly,omitempty"`
+	InstanceHourly     int     `yaml:"instance_hourly,omitempty"`
+	IPConcurrent       int     `yaml:"ip_concurrent,omitempty"`
+	InstanceConcurrent int     `yaml:"instance_concurrent,omitempty"`
+	FileWeight         float64 `yaml:"file_weight,omitempty"`
+	// Trusted are the limits for trusted clients; zero fields fall back to the defaults' trusted values.
+	Trusted *RateLimitSet `yaml:"trusted,omitempty"`
+	// Off disables rate limiting for the instance.
+	Off bool `yaml:"off,omitempty"`
+}
+
+// RateLimitSet is one set of the four limits.
+type RateLimitSet struct {
+	IPHourly           int `yaml:"ip_hourly,omitempty"`
+	InstanceHourly     int `yaml:"instance_hourly,omitempty"`
+	IPConcurrent       int `yaml:"ip_concurrent,omitempty"`
+	InstanceConcurrent int `yaml:"instance_concurrent,omitempty"`
+}
+
+// DefaultRateLimits match the PocketHost edge firewall.
+var DefaultRateLimits = RateLimits{
+	IPHourly: 1000, InstanceHourly: 10000, IPConcurrent: 15, InstanceConcurrent: 250, FileWeight: 0.1,
+	Trusted: &RateLimitSet{IPHourly: 5000, InstanceHourly: 20000, IPConcurrent: 50, InstanceConcurrent: 250},
+}
+
+func pick(v, def int) int {
+	if v > 0 {
+		return v
+	}
+	return def
+}
+
+// merged returns r with zero fields taken from def.
+func (r RateLimits) merged(def RateLimits) RateLimits {
+	if r.Off || def.Off && r == (RateLimits{}) {
+		return RateLimits{Off: true}
+	}
+	out := RateLimits{
+		IPHourly:           pick(r.IPHourly, def.IPHourly),
+		InstanceHourly:     pick(r.InstanceHourly, def.InstanceHourly),
+		IPConcurrent:       pick(r.IPConcurrent, def.IPConcurrent),
+		InstanceConcurrent: pick(r.InstanceConcurrent, def.InstanceConcurrent),
+		FileWeight:         r.FileWeight,
+	}
+	if out.FileWeight <= 0 {
+		out.FileWeight = def.FileWeight
+	}
+	dt := RateLimitSet{}
+	if def.Trusted != nil {
+		dt = *def.Trusted
+	}
+	rt := RateLimitSet{}
+	if r.Trusted != nil {
+		rt = *r.Trusted
+	}
+	out.Trusted = &RateLimitSet{
+		IPHourly:           pick(rt.IPHourly, dt.IPHourly),
+		InstanceHourly:     pick(rt.InstanceHourly, dt.InstanceHourly),
+		IPConcurrent:       pick(rt.IPConcurrent, dt.IPConcurrent),
+		InstanceConcurrent: pick(rt.InstanceConcurrent, dt.InstanceConcurrent),
+	}
+	// a raised normal limit also lifts the trusted one (trusted is never lower)
+	out.Trusted.IPHourly = max(out.Trusted.IPHourly, out.IPHourly)
+	out.Trusted.InstanceHourly = max(out.Trusted.InstanceHourly, out.InstanceHourly)
+	out.Trusted.IPConcurrent = max(out.Trusted.IPConcurrent, out.IPConcurrent)
+	out.Trusted.InstanceConcurrent = max(out.Trusted.InstanceConcurrent, out.InstanceConcurrent)
+	return out
 }

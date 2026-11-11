@@ -1,35 +1,64 @@
-package pocker
+package autotls
 
 import (
 	"context"
 	"crypto/tls"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/pockethost/pocketbase/ext/pocker"
 )
+
+func freeAddr(t *testing.T) string {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	addr := ln.Addr().String()
+	_ = ln.Close()
+	return addr
+}
+
+func waitHTTP(t *testing.T, url string) {
+	t.Helper()
+	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(100 * time.Millisecond) {
+		if res, err := testClient.Get(url); err == nil {
+			res.Body.Close()
+			if res.StatusCode == http.StatusOK {
+				return
+			}
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("%s never answered", url)
+		}
+	}
+}
 
 func TestAutoTLSConfigValidation(t *testing.T) {
 	t.Setenv("TEST_CF_TOKEN", "token-from-env")
 	cases := []struct {
 		name    string
-		cfg     TLSConfig
+		cfg     Config
 		wantErr string
 	}{
-		{"per-host, no DNS provider", TLSConfig{Auto: true, Email: "ops@example.com"}, ""},
-		{"named domains without wildcards, no DNS provider", TLSConfig{Auto: true, Domains: []string{"example.com", "www.example.com"}}, ""},
-		{"wildcard without DNS provider", TLSConfig{Auto: true, Domains: []string{"*.example.com"}}, "needs a DNS provider"},
-		{"files and auto", TLSConfig{Auto: true, Cert: "a", Key: "b"}, "either cert/key files or auto"},
-		{"unknown provider", TLSConfig{Auto: true, DNS: &DNSConfig{Provider: "route66"}}, "unknown provider"},
-		{"cloudflare without token", TLSConfig{Auto: true, DNS: &DNSConfig{Provider: "cloudflare"}}, "needs api_token"},
-		{"cloudflare token from env, wildcard", TLSConfig{Auto: true, Domains: []string{"*.example.com"}, DNS: &DNSConfig{Provider: "cloudflare", APITokenEnv: "TEST_CF_TOKEN"}}, ""},
+		{"per-host, no DNS provider", Config{Auto: true, Email: "ops@example.com"}, ""},
+		{"named domains without wildcards, no DNS provider", Config{Auto: true, Domains: []string{"example.com", "www.example.com"}}, ""},
+		{"wildcard without DNS provider", Config{Auto: true, Domains: []string{"*.example.com"}}, "needs a DNS provider"},
+		{"files and auto", Config{Auto: true}, "either cert/key files or auto"},
+		{"unknown provider", Config{Auto: true, DNS: &DNSConfig{Provider: "route66"}}, "unknown provider"},
+		{"cloudflare without token", Config{Auto: true, DNS: &DNSConfig{Provider: "cloudflare"}}, "needs api_token"},
+		{"cloudflare token from env, wildcard", Config{Auto: true, Domains: []string{"*.example.com"}, DNS: &DNSConfig{Provider: "cloudflare", APITokenEnv: "TEST_CF_TOKEN"}}, ""},
 	}
 	for _, c := range cases {
-		err := validateAutoTLS(c.cfg)
+		err := validateAutoTLS(c.cfg, c.name == "files and auto")
 		switch {
 		case c.wantErr == "" && err != nil:
 			t.Errorf("%s: unexpected error %v", c.name, err)
@@ -55,7 +84,7 @@ func TestCoveredBy(t *testing.T) {
 
 func TestAutoTLSIssuesOnlyForMappedHosts(t *testing.T) {
 	mapped := map[string]bool{"blog.example.com": true}
-	auto, err := newAutoTLS(context.Background(), TLSConfig{Auto: true, Email: "ops@example.com"}, t.TempDir(),
+	auto, err := newAutoTLS(context.Background(), Config{Auto: true, Email: "ops@example.com"}, false, t.TempDir(),
 		func(h string) bool { return mapped[normalizeHost(h)] })
 	if err != nil {
 		t.Fatal(err)
@@ -88,18 +117,20 @@ func TestServerAutoTLSRefusesUnmappedSNI(t *testing.T) {
 		t.Fatal(err)
 	}
 	addr, httpAddr := freeAddr(t), freeAddr(t)
-	cfg := DefaultConfig()
+	cfg := pocker.DefaultConfig()
 	cfg.Listen, cfg.PBRoot, cfg.InstancesFile = addr, root, instances
 	cfg.MemorySoftLimit = -1
-	cfg.TLS = TLSConfig{Auto: true, Email: "ops@example.com", CA: "letsencrypt-staging", HTTPListen: httpAddr}
-	srv := &Server{Config: cfg, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))}
+	cfg.TLS.HTTPListen = httpAddr
+	auto := New()
+	auto.Config = Config{Auto: true, Email: "ops@example.com", CA: "letsencrypt-staging"}
+	srv := &pocker.Server{Config: cfg, Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), Plugins: []pocker.Plugin{auto}}
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
 	go func() { done <- srv.Run(ctx) }()
 	defer func() { cancel(); <-done }()
 
 	// plain HTTP: health passes, the rest redirects to HTTPS
-	waitHTTP(t, "http://"+httpAddr+HealthPath, "anything")
+	waitHTTP(t, "http://"+httpAddr+pocker.HealthPath)
 	noFollow := &http.Client{Transport: &http.Transport{}, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	req, _ := http.NewRequest(http.MethodGet, "http://"+httpAddr+"/api/health", nil)
 	req.Host = "blog.example.com"
@@ -120,3 +151,7 @@ func TestServerAutoTLSRefusesUnmappedSNI(t *testing.T) {
 		t.Fatalf("refusal took %s; it must not wait on ACME", time.Since(start))
 	}
 }
+
+// testClient has its own transport: the server installs its egress policy on http.DefaultTransport, which refuses
+// loopback.
+var testClient = &http.Client{Transport: &http.Transport{}}

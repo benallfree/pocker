@@ -42,15 +42,10 @@ func TestRemoteInstanceIsForwarded(t *testing.T) {
 		t.Fatalf("remote instance folder created: %v", err)
 	}
 
-	// Forward replaces the proxy, after the rate limits
-	fw, err := NewFirewall(FirewallConfig{})
-	if err != nil {
-		t.Fatal(err)
-	}
+	// Forward replaces the proxy, after the gate admits the request
 	var forwarded []string
 	limited := remote
-	limited.Limits.RateLimits = &RateLimits{IPHourly: 1, InstanceHourly: 100, IPConcurrent: 10, InstanceConcurrent: 10}
-	m = NewManager(staticSource{limited}, ManagerOptions{PBRoot: root, Logger: quiet, Firewall: fw,
+	m = NewManager(staticSource{limited}, ManagerOptions{PBRoot: root, Logger: quiet, Gate: &onceGate{},
 		Forward: func(w http.ResponseWriter, r *http.Request, inst Instance) {
 			forwarded = append(forwarded, inst.ID)
 			_, _ = io.WriteString(w, "forwarded")
@@ -63,9 +58,26 @@ func TestRemoteInstanceIsForwarded(t *testing.T) {
 		t.Fatalf("custom forward: %d %q", code, body)
 	}
 	if code, _ := get(m); code != http.StatusTooManyRequests {
-		t.Fatalf("rate limit before forwarding: got %d", code)
+		t.Fatalf("gate before forwarding: got %d", code)
 	}
 	if strings.Join(forwarded, ",") != "away" {
 		t.Fatalf("forwarded %v", forwarded)
 	}
+}
+
+// onceGate admits one request per instance, then answers 429.
+type onceGate struct{ seen map[string]bool }
+
+func (g *onceGate) AllowPeer(*http.Request) bool { return true }
+
+func (g *onceGate) Admit(w http.ResponseWriter, r *http.Request, inst Instance) (func(), bool) {
+	if g.seen == nil {
+		g.seen = map[string]bool{}
+	}
+	if g.seen[inst.ID] {
+		http.Error(w, "too many", http.StatusTooManyRequests)
+		return nil, false
+	}
+	g.seen[inst.ID] = true
+	return func() {}, true
 }
