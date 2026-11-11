@@ -211,3 +211,25 @@ func TestCEToCEWithImpersonateLogin(t *testing.T) {
 		t.Fatalf("%+v %v", w, err)
 	}
 }
+
+// The standard binary serves pb_public at "GET /{path...}"; the deploy routes must not conflict with it.
+func TestRoutesCoexistWithStaticCatchAll(t *testing.T) {
+	app, err := tests.NewTestApp()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer app.Cleanup()
+	MustRegister(app, Config{Dir: t.TempDir(), Restart: func(core.App) error { return nil }})
+	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
+		se.Router.GET("/{path...}", func(e *core.RequestEvent) error { return e.String(200, "static") })
+		return se.Next()
+	})
+	router, _ := apis.NewRouter(app)
+	err = app.OnServe().Trigger(&core.ServeEvent{App: app, Router: router}, func(e *core.ServeEvent) error {
+		_, err := e.Router.BuildMux()
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}

@@ -125,7 +125,10 @@ func Register(app core.App, cfg Config) (*API, error) {
 			return nil
 		}
 		// the API caps its own bodies (64 MB bundles), above PocketBase's default limit
-		se.Router.Any(cfg.Prefix+"/{path...}", h).Unbind(apis.DefaultBodyLimitMiddlewareId)
+		// explicit methods: a method-less pattern would conflict with the static "GET /{path...}" route
+		for _, m := range []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete} {
+			se.Router.Route(m, cfg.Prefix+"/{path...}", h).Unbind(apis.DefaultBodyLimitMiddlewareId)
+		}
 		return se.Next()
 	})
 	return api, nil
