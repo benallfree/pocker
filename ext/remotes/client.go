@@ -65,6 +65,15 @@ func Open(dir, name string) (*Client, error) {
 	}
 	if cr := creds.ByURL[r.URL]; cr != nil && cr.Token != "" {
 		c.Token, c.TokenSource = cr.Token, "saved login ("+cr.Via+")"
+		// an OAuth login renews itself a day before it expires
+		if cr.RefreshToken != "" && cr.TokenEndpoint != "" && !cr.Expires.IsZero() && time.Until(cr.Expires) < 24*time.Hour {
+			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+			err := refreshOAuth(ctx, c, creds, cr)
+			cancel()
+			if err == nil {
+				c.Token = cr.Token
+			}
+		}
 		if !cr.Expires.IsZero() && time.Now().After(cr.Expires) {
 			return c, fmt.Errorf("the saved login for %s expired: run 'pocketbase login %s': %w", r.URL, r.Name, ErrNotLoggedIn)
 		}

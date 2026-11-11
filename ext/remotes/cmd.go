@@ -418,6 +418,13 @@ func logoutCommand() *cobra.Command {
 				fmt.Fprintf(c.OutOrStdout(), "Not logged in to %s.\n", r.URL)
 				return nil
 			}
+			if cr.Via == "oauth" {
+				ctx, cancel := context.WithTimeout(c.Context(), 15*time.Second)
+				if err := revokeOAuth(ctx, &Client{Remote: r, HTTP: NewHTTPClient()}, cr); err != nil {
+					fmt.Fprintf(c.ErrOrStderr(), "Couldn't revoke the login on %s (%v); revoke it in the dashboard.\n", r.URL, err)
+				}
+				cancel()
+			}
 			if cr.MintedTokenId != "" {
 				cl := &Client{Remote: r, Token: cr.Token, HTTP: NewHTTPClient()}
 				ctx, cancel := context.WithTimeout(c.Context(), 15*time.Second)

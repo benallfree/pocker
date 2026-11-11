@@ -257,6 +257,9 @@ type Credential struct {
 	Collection   string    `json:"collection,omitempty"`
 	RefreshToken string    `json:"refreshToken,omitempty"`
 	Expires      time.Time `json:"expires,omitzero"`
+	// TokenEndpoint and RevokeEndpoint (OAuth logins) refresh and revoke it.
+	TokenEndpoint  string `json:"tokenEndpoint,omitempty"`
+	RevokeEndpoint string `json:"revokeEndpoint,omitempty"`
 	// MintedTokenId is the API token the CLI created on the remote at login; logout revokes it.
 	MintedTokenId string    `json:"mintedTokenId,omitempty"`
 	Created       time.Time `json:"created"`

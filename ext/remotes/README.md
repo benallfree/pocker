@@ -27,6 +27,10 @@ Try it: `go run ./example serve` (logins from [devusers](../devusers/devusers.go
   needs [tokens](../tokens/README.md); the session itself is never saved.
 - `logout [remote]`, `link <url> [token] [--name default]` (= `remote add` + `login`).
 
+Browser login runs the OAuth client against [oauth-server](../oauth-server/README.md): a loopback listener on
+127.0.0.1 with PKCE, or a device code when there's no browser here (SSH, no display) or with `--device`. The login
+keeps a refresh token and renews itself a day before it expires; `logout` revokes it on the remote.
+
 A remote name can also be a URL (`pocketbase deploy https://other.example.com`).
 
 ## Files
