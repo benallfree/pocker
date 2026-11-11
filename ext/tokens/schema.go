@@ -64,10 +64,12 @@ func EnsureSchema(app core.App) error {
 		return fmt.Errorf("tokens: collection %q is named %q, expected %q", want.Id, have.Name, want.Name)
 	}
 	var errs []error
+	added := false
 	for _, wf := range want.Fields {
 		hf := have.Fields.GetById(wf.GetId())
 		if hf == nil {
-			errs = append(errs, fmt.Errorf("missing field %q (%s)", wf.GetName(), wf.GetId()))
+			have.Fields.Add(wf) // a field a newer version added
+			added = true
 			continue
 		}
 		if hf.Type() != wf.Type() || hf.GetName() != wf.GetName() {
@@ -77,6 +79,11 @@ func EnsureSchema(app core.App) error {
 	}
 	if len(errs) > 0 {
 		return fmt.Errorf("tokens: %s doesn't match the tokens schema: %w", want.Name, errors.Join(errs...))
+	}
+	if added {
+		if err := app.Save(have); err != nil {
+			return fmt.Errorf("tokens: add fields to %s: %w", want.Name, err)
+		}
 	}
 	return nil
 }

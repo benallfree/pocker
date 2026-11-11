@@ -500,3 +500,19 @@ func TestOTPAndMFA(t *testing.T) {
 		t.Fatalf("consent after MFA: %s", b.page)
 	}
 }
+
+func TestEnsureSchemaAddsNewFields(t *testing.T) {
+	e := newEnv(t, Config{})
+	col, _ := e.app.FindCollectionByNameOrId(CodesCollectionId)
+	col.Fields.RemoveById("oad_resource")
+	if err := e.app.Save(col); err != nil {
+		t.Fatal(err)
+	}
+	if err := EnsureSchema(e.app); err != nil {
+		t.Fatal(err)
+	}
+	col, _ = e.app.FindCollectionByNameOrId(CodesCollectionId)
+	if col.Fields.GetById("oad_resource") == nil {
+		t.Fatal("field not added back")
+	}
+}

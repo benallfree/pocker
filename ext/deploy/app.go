@@ -362,14 +362,25 @@ func EnsureSchema(app core.App) error {
 		return nil
 	}
 	var errs []error
+	added := false
 	for _, wf := range want.Fields {
 		hf := have.Fields.GetById(wf.GetId())
-		if hf == nil || hf.Type() != wf.Type() || hf.GetName() != wf.GetName() {
+		if hf == nil {
+			have.Fields.Add(wf) // a field a newer version added
+			added = true
+			continue
+		}
+		if hf.Type() != wf.Type() || hf.GetName() != wf.GetName() {
 			errs = append(errs, fmt.Errorf("field %s (%s)", wf.GetName(), wf.GetId()))
 		}
 	}
 	if len(errs) > 0 {
 		return fmt.Errorf("deploy: %s doesn't match the schema: %w", want.Name, errors.Join(errs...))
+	}
+	if added {
+		if err := app.Save(have); err != nil {
+			return fmt.Errorf("deploy: add fields to %s: %w", want.Name, err)
+		}
 	}
 	return nil
 }
