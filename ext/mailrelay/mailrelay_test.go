@@ -12,7 +12,6 @@ import (
 
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/mailer"
-	"github.com/pockethost/pocketbase/ext/mailrelay/trap"
 	"github.com/pockethost/pocketbase/ext/pocker"
 )
 
@@ -184,16 +183,11 @@ func TestTrapCatchesEveryInstance(t *testing.T) {
 	smtpLn.Close()
 	httpLn.Close()
 
-	tr := &trap.Trap{SMTPAddr: smtpAddr, HTTPAddr: httpAddr}
+	tr := &mailer.Trap{SMTPAddr: smtpAddr, HTTPAddr: httpAddr}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	go tr.Run(ctx)
-	for i := 0; i < 50; i++ {
-		if c, err := net.Dial("tcp", smtpAddr); err == nil {
-			c.Close()
-			break
-		}
-		time.Sleep(20 * time.Millisecond)
+	if err := tr.Start(ctx); err != nil {
+		t.Fatal(err)
 	}
 
 	p := New(Config{Domain: "mail.localhost", Upstream: SMTPUpstream{Addr: smtpAddr, Timeout: 5 * time.Second}})

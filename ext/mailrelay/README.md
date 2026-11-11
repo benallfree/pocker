@@ -68,10 +68,11 @@ plugins:
   mailrelay: { per_minute: 60, daily: 2000 }
 ```
 
-## Try it: `example/` with a mail trap
+## Try it: `example/` with the dev mail trap
 
-[`trap`](trap/trap.go) is a development mail catcher, like MailDev or Mailpit, that runs in the same process: an
-SMTP server that accepts everything and delivers nothing, plus a web inbox. The example points the relay at it:
+PocketBase CE has a dev mail trap built in ([core features](../../README.md#core-features)): an in-process mail
+catcher, like MailDev or Mailpit, with an SMTP port and a web inbox. The example points the relay's upstream at its
+SMTP port, so relayed mail goes through the real SMTP path and lands in the inbox:
 
 ```bash
 go run ./example --dev
@@ -89,6 +90,8 @@ curl -X POST http://beta.localhost:8090/api/collections/users/request-password-r
   instance.
 - Each instance's dashboard shows the relay on Settings → Mail. The example's logins are the shared test accounts
   ([`ext/devusers`](../devusers)): `admin@example.com` / `password`, and the user `user@example.com` / `password`.
-- `--listen`, `--trap-smtp` and `--trap-http` change the ports.
+- `--listen` changes the instances' port. `PB_MAILTRAP_HTTP` and `PB_MAILTRAP_SMTP` change the trap's.
+- Without mailrelay, `pocker serve --dev` already sends every instance's SMTP-less mail to the same trap, as is, with
+  no relay rules.
 
-Never run the trap in production: it accepts mail from anyone who can reach its port.
+The trap only runs in dev mode. It accepts mail from anyone who can reach its port, so never expose it.

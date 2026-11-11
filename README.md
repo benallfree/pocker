@@ -5,11 +5,29 @@ upstream and aims to keep its own changes to the core small: just the hooks that
 PocketBase. Everything else is a plugin. Maintained by [PocketHost](https://pockethost.io); not affiliated with or
 endorsed by the PocketBase project.
 
+## Core features
+
+What PocketBase CE adds to PocketBase itself, with no plugin. Each change is small and marked `// POCKER:` in the code,
+so upstream merges stay easy.
+
+- **Dev mail trap.** In dev mode (`serve --dev`), an app without SMTP doesn't use the host's `sendmail`. Its mail is
+  caught by a mail catcher in the same process, like MailDev or Mailpit: nothing is delivered, and you read it at
+  http://127.0.0.1:8025 (SMTP on 127.0.0.1:1025 for other tools). A notice at startup says so. Under
+  [pocker](ext/pocker/README.md) every instance shares one inbox, tagged by instance. `PB_MAILTRAP_HTTP` and
+  `PB_MAILTRAP_SMTP` change the ports. Turn SMTP on and the app sends normally; outside dev mode nothing changes.
+- **Several apps in one process.** Settings, the JS migrations list and the encryption key belong to each app instead
+  of the process, so one Go process can host many apps (what [pocker](ext/pocker/README.md) builds on).
+- **Hooks for plugins.** A per-call wrapper around every JS hook, route and cron (`jsvm.Config.OnCall`, for time and
+  concurrency limits); `$http.send` caps per runtime or per process; a dialer for PocketBase's SMTP client
+  (`mailer.DialContext`, for egress rules).
+
+Everything else is a plugin (below). Without plugins, an app behaves like stock PocketBase plus the features above.
+
 ## Four ways to run it
 
 Each level adds plugins on top of the one before; dependencies only point down.
 
-1. **PocketBase CE.** One app. No plugins: it behaves exactly like stock PocketBase.
+1. **PocketBase CE.** One app. No plugins: it behaves like stock PocketBase, plus the [core features](#core-features).
 2. **Many instances, one process** ([pocker](ext/pocker/README.md)). One operator runs hundreds of PocketBase
    instances in a single Go process, routed by hostname.
 3. **Many edges and regions** ([mothership](ext/mothership/README.md)). Still one operator: a control plane and edges in
@@ -36,6 +54,7 @@ Feature plugins work at any level.
 | [servertiming](ext/servertiming/README.md) | any | 🟩🟩🟩 | Server-Timing headers |
 | [pitr](ext/pitr/README.md) | any | 🟧🟧⬜ | Point-in-time restore (Litestream) |
 | [bulkmail](ext/bulkmail/README.md) | any | 🟧🟧⬜ | Bulk mail campaigns to your app's own users |
+| [mailrelay](ext/mailrelay/README.md) | 2 | 🟧🟧⬜ | Outgoing mail for instances without SMTP, through the operator's relay as `<instance>@<domain>`, with limits |
 | [pages](ext/pages/README.md) | any | 🟥⬜⬜ | Server-rendered multi-page applications (PocketPages) |
 | [storage](ext/storage/README.md) | any | 🟥⬜⬜ | A default storage backend when an app's own S3 is off |
 | [s3redirect](ext/s3redirect/README.md) | any | 🟥⬜⬜ | File downloads as signed S3 redirects |
