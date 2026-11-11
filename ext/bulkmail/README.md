@@ -23,7 +23,7 @@ jsvm.MustRegister(app, jsvm.Config{OnInit: func(vm *goja.Runtime) { bulkmail.Bin
 ```
 
 ```sh
-go run ./example serve
+go run ./example serve --dev  # test mail shows in the dev mail trap at http://127.0.0.1:8025
 ```
 
 The dashboard gets a **Mail** page (campaigns, recipients, suppressions) and a **Bulk mail** section on Settings >
