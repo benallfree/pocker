@@ -453,6 +453,11 @@ type FileDownloadRequestEvent struct {
 	ServedPath string
 	ServedName string
 
+	// Filesystem is the app files filesystem the download is served from
+	// (e.g. to sign a direct URL instead of streaming). It is closed after
+	// the request; don't keep it.
+	Filesystem *filesystem.System
+
 	// ThumbError indicates the a thumb wasn't able to be generated
 	// (e.g. because it didn't satisfy the support image formats or it timed out).
 	//

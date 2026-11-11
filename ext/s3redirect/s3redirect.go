@@ -1,7 +1,7 @@
 // Package s3redirect answers PocketBase file downloads with a short-lived signed redirect to the bucket instead of
 // streaming the file through the app, when the app's files filesystem can sign URLs (S3).
 //
-// It asks the app's own filesystem (app.NewFilesystem()) to sign, so it works the same for an app's own S3 settings
+// It asks the filesystem PocketBase serves the download from (the event's Filesystem) to sign, so it works the same for an app's own S3 settings
 // and for any plugin that supplies the filesystem through OnFilesystemCreate (e.g. ext/storage's default bucket):
 // whatever the app's files live on, if it can sign, downloads redirect; if not (local disk), they stream as usual.
 //
@@ -140,12 +140,15 @@ func (p *Plugin) handle(e *core.FileDownloadRequestEvent, ttl time.Duration) err
 	// the signed URL itself is unique per signing, so the browser may keep the bytes as long as PocketBase would
 	overrides.Set("response-cache-control", "max-age=2592000, stale-while-revalidate=86400")
 
-	fsys, err := e.App.NewFilesystem()
-	if err != nil {
-		return e.Next() // PocketBase will report it while streaming
+	fsys := e.Filesystem // the one PocketBase serves from
+	if fsys == nil {     // event triggered by other code
+		var err error
+		if fsys, err = e.App.NewFilesystem(); err != nil {
+			return e.Next() // PocketBase will report it while streaming
+		}
+		defer fsys.Close()
 	}
 	signed, err := fsys.SignedURL(e.ServedPath, &blob.SignedURLOptions{Expiry: ttl, Overrides: overrides, Now: p.cfg.now()})
-	fsys.Close()
 	if errors.Is(err, errors.ErrUnsupported) {
 		return e.Next() // local disk: stream as usual
 	}

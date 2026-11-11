@@ -208,3 +208,28 @@ func TestProtectedFileWithTokenRedirects(t *testing.T) {
 		},
 	}).Test(t)
 }
+
+// On local disk the plugin signs nothing and opens no filesystem of its own: one per download, PocketBase's.
+func TestLocalDownloadOpensOneFilesystem(t *testing.T) {
+	app := fileApp(t, false, Config{}, AppConfig{})
+	defer app.Cleanup()
+	var n int
+	app.OnFilesystemCreate().BindFunc(func(e *core.FilesystemCreateEvent) error {
+		if e.Kind == core.FilesystemKindStorage {
+			n++
+		}
+		return e.Next()
+	})
+	(&tests.ApiScenario{
+		Method:                http.MethodGet,
+		URL:                   "/api/files/docs/rec000000000001/photo_abc.png",
+		TestAppFactory:        func(testing.TB) *tests.TestApp { return app },
+		DisableTestAppCleanup: true,
+		ExpectedStatus:        http.StatusNotFound, // nothing uploaded; streams (and 404s) as usual
+		ExpectedContent:       []string{`"data":{}`},
+		ExpectedEvents:        map[string]int{"OnFileDownloadRequest": 1},
+	}).Test(t)
+	if n != 1 {
+		t.Fatalf("%d storage filesystems opened for one download, want 1", n)
+	}
+}
