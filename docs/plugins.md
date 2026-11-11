@@ -134,7 +134,7 @@ Your Go code runs with the host's full power, outside the JS sandbox:
 - **Instance data needs instance auth.** Protect routes that read or change it with PocketBase's auth middlewares
   (`apis.RequireSuperuserAuth()`, record auth).
 - **Exposing something to JS is a sandbox decision.** Expose a function to an instance's JS only if it's safe for a
-  hostile tenant to call. See [multitenant.md](multitenant.md).
+  hostile tenant to call. See [How is this safe?](../ext/pocker/README.md#how-is-this-safe).
 - **Outbound calls follow the egress policy.** Go's default HTTP client already refuses private addresses. If your
   plugin must reach a private service, give it its own `http.Client` and transport, and never let instance input pick
   the address.
