@@ -366,11 +366,16 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		defer release() // long-lived responses (realtime) hold their concurrency slot until they end
 	}
 
+	wakeStart := time.Now()
 	app, err := m.app(inst)
 	if err != nil {
 		http.Error(w, "instance failed to start: "+err.Error(), http.StatusBadGateway)
 		return
 	}
+	readyAt := time.Now()
+	w = WithServerTiming(w, func() []TimingEntry {
+		return []TimingEntry{{Name: "origin", Dur: time.Since(readyAt)}, {Name: "wake", Dur: readyAt.Sub(wakeStart)}}
+	})
 	app.handler.ServeHTTP(w, r)
 }
 
