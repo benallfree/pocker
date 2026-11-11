@@ -12,7 +12,7 @@ import (
 
 	"ganigeorgiev.com/pocketbase/pocketbase"
 	"ganigeorgiev.com/pocketbase/pocketbase/plugins/jsvm"
-	"github.com/pockerbase/pocketbase/ext/sandbox"
+	"github.com/pockethost/pocketbase/ext/sandbox"
 )
 
 func main() {

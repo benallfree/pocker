@@ -9,7 +9,7 @@ import (
 	"runtime/metrics"
 	"time"
 
-	"github.com/pockerbase/pocketbase/ext/sandbox"
+	"github.com/pockethost/pocketbase/ext/sandbox"
 )
 
 // MemoryWatch guards the shared heap against JS that grows memory faster than a request would. goja has no per-VM

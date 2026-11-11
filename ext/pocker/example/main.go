@@ -13,7 +13,7 @@ import (
 
 	"ganigeorgiev.com/pocketbase/pocketbase/apis"
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
-	"github.com/pockerbase/pocketbase/ext/pocker"
+	"github.com/pockethost/pocketbase/ext/pocker"
 )
 
 //go:embed ui

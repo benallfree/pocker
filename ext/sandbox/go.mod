@@ -1,4 +1,4 @@
-module github.com/pockerbase/pocketbase/ext/sandbox
+module github.com/pockethost/pocketbase/ext/sandbox
 
 go 1.27
 

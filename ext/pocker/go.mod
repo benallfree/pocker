@@ -1,4 +1,4 @@
-module github.com/pockerbase/pocketbase/ext/pocker
+module github.com/pockethost/pocketbase/ext/pocker
 
 go 1.27
 
@@ -7,7 +7,7 @@ require (
 	ganigeorgiev.com/pocketbase/pocketbase v0.0.0-00010101000000-000000000000
 	github.com/caddyserver/certmagic v0.25.6
 	github.com/libdns/cloudflare v0.2.2
-	github.com/pockerbase/pocketbase/ext/sandbox v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketbase/ext/sandbox v0.0.0-00010101000000-000000000000
 	golang.org/x/crypto v0.58.0
 	gopkg.in/yaml.v3 v3.0.1
 	modernc.org/libc v1.77.1
@@ -61,5 +61,5 @@ require (
 
 replace (
 	ganigeorgiev.com/pocketbase/pocketbase => ../..
-	github.com/pockerbase/pocketbase/ext/sandbox => ../sandbox
+	github.com/pockethost/pocketbase/ext/sandbox => ../sandbox
 )

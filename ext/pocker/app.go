@@ -16,7 +16,7 @@ import (
 	"ganigeorgiev.com/pocketbase/pocketbase/plugins/jsvm"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/security"
 	"ganigeorgiev.com/pocketbase/pocketbase/ui"
-	"github.com/pockerbase/pocketbase/ext/sandbox"
+	"github.com/pockethost/pocketbase/ext/sandbox"
 )
 
 // runningApp is a bootstrapped PocketBase app and the HTTP handler that serves it.

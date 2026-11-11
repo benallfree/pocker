@@ -15,7 +15,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/pockerbase/pocketbase/ext/pocker"
+	"github.com/pockethost/pocketbase/ext/pocker"
 )
 
 func main() {

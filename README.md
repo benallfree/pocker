@@ -2,7 +2,8 @@
 
 PocketBase Community Edition (PocketBase CE) is a community fork of [PocketBase](https://pocketbase.io). It tracks
 upstream and aims to keep its own changes to the core small: just the hooks that let plugins extend and override
-PocketBase. Everything else is a plugin. It is not affiliated with or endorsed by the PocketBase project.
+PocketBase. Everything else is a plugin. Maintained by [PocketHost](https://pockethost.io); not affiliated with or
+endorsed by the PocketBase project.
 
 ## Plugins
 

@@ -31,7 +31,7 @@ PocketBase CE keeps PocketBase's module path, so upstream merges stay clean. Poi
 ```
 require ganigeorgiev.com/pocketbase/pocketbase v0.41.1
 
-replace ganigeorgiev.com/pocketbase/pocketbase => github.com/pockerbase/pocketbase <commit or version>
+replace ganigeorgiev.com/pocketbase/pocketbase => github.com/pockethost/pocketbase <commit or version>
 ```
 
 Go only honors `replace` in the main module, so the final binary's `go.mod` needs this line, not only your
@@ -162,7 +162,7 @@ core doesn't offer yet:
 
 ```
 ext/<name>/
-  go.mod            module github.com/pockerbase/pocketbase/ext/<name>
+  go.mod            module github.com/pockethost/pocketbase/ext/<name>
   README.md         what it does, runs on (single app, pocker or both), config
   <name>.go         the plugin
   <name>_test.go
@@ -180,4 +180,4 @@ ext/<name>/
 
 ## Planned plugins
 
-Our own plugins will live in this repo under [`ext/`](../ext), each as its own Go module (`github.com/pockerbase/pocketbase/ext/<name>`) with its own version tags. The list and what each will do is in [ext/README.md](../ext/README.md).
+Our own plugins will live in this repo under [`ext/`](../ext), each as its own Go module (`github.com/pockethost/pocketbase/ext/<name>`) with its own version tags. The list and what each will do is in [ext/README.md](../ext/README.md).

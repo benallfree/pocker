@@ -1,6 +1,6 @@
 # ext: PocketBase CE plugins
 
-Each folder here will be one plugin, with its own Go module (`github.com/pockerbase/pocketbase/ext/<name>`) and version tags (`ext/<name>/v0.1.0`), so heavy dependencies (Litestream, CertMagic) never reach core or other plugins. This folder is ours, separate from upstream's `plugins/`, so upstream merges never touch it.
+Each folder here will be one plugin, with its own Go module (`github.com/pockethost/pocketbase/ext/<name>`) and version tags (`ext/<name>/v0.1.0`), so heavy dependencies (Litestream, CertMagic) never reach core or other plugins. This folder is ours, separate from upstream's `plugins/`, so upstream merges never touch it.
 
 > **Planned, nothing here yet.** The plugin API is described in [docs/plugins.md](../docs/plugins.md).
 
