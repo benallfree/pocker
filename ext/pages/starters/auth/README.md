@@ -1,6 +1,6 @@
 # Auth starter
 
-Multi-page app (MPA) auth with the built-in `auth` plugin: register, password, anonymous, OTP and OAuth2 login, logout, email verification and a protected `/account` section (`account/+middleware.js`). Sessions are a `pb_auth` cookie managed through `ctx.session.*`; the logged-in user is `ctx.auth`. The included migrations point PocketBase's mail at a local maildev and its email templates at this app's `/auth/confirm/{TOKEN}/...` pages.
+Multi-page app (MPA) auth with the built-in `auth` plugin: register, password, anonymous, OTP and OAuth2 login, logout, email verification (with a resend page), password reset by email, email change with confirmation, and a protected `/account` section (`account/+middleware.js`). Sessions are a `pb_auth` cookie managed through `ctx.session.*`; the logged-in user is `ctx.auth`. The included migrations point PocketBase's mail at a local maildev and its email templates at this app's `/auth/confirm/{TOKEN}/...` pages.
 
 ```bash
 pocketbase pages create myapp --starter auth
@@ -10,7 +10,7 @@ pocketbase serve
 
 Then open http://127.0.0.1:8090.
 
-In another terminal, run a local mail catcher for verification and OTP emails (web UI at http://localhost:1080):
+In another terminal, run a local mail catcher for verification, OTP, password reset and email change emails (the migrations send mail to `localhost:1025`; maildev's web UI is at http://localhost:1080):
 
 ```bash
 npx maildev

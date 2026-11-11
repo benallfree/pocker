@@ -3,7 +3,8 @@
 <mark><%= data.error %></mark>
 <% } %>
 <form method="post">
-  <label>Login</label>
-  <input name="identity" value="<%= data.identity %>" />
+  <label>Email</label>
+  <input name="identity" type="email" value="<%= data.identity || '' %>" required />
   <button type="submit">Send Reset Email</button>
 </form>
+<p><a href="/auth/login">Back to sign in</a></p>

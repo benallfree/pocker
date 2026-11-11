@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"ganigeorgiev.com/pocketbase/ozzo-validation/v4/is"
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"ganigeorgiev.com/pocketbase/pocketbase/mails"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/routine"
@@ -415,6 +416,17 @@ func (r *request) sessionObject() *goja.Object {
 			r.fail400("ctx.session.requestEmailChange: not signed in")
 		}
 		rec := r.auth
+		// the checks PocketBase's request-email-change API makes
+		newEmail = strings.TrimSpace(newEmail)
+		if is.EmailFormat.Validate(newEmail) != nil || newEmail == "" {
+			r.fail400("Enter a valid email address.")
+		}
+		if strings.EqualFold(newEmail, rec.Email()) {
+			r.fail400("That's already your email address.")
+		}
+		if other, err := app.FindAuthRecordByEmail(rec.Collection(), newEmail); err == nil && other != nil {
+			r.fail400("That email address is already in use.")
+		}
 		routine.FireAndForget(func() {
 			if err := mails.SendRecordChangeEmail(app, rec, newEmail); err != nil {
 				app.Logger().Error("pages: email change email failed", "error", err)
