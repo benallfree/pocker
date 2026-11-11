@@ -22,6 +22,7 @@ const templatePrelude = `var ctx = __pp.ctx, data = ctx.data, params = ctx.param
 var asset = function (p) { return __pp.asset(__file, p); };
 var __b = { s: '' }, __l = 1;
 var include = function (n, l) { return __pp.include(__file, n, l); };
+var require = function (n) { return __pp.require(__file, n); };
 var slot = function (n, f) {
   if (typeof f === 'function') { var s = __b.s; __b.s = ''; f(); var c = __b.s; __b.s = s; __pp.setSlot(n, c); return ''; }
   if (n === undefined || n === null) return __pp.wrapped();

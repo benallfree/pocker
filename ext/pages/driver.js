@@ -224,6 +224,7 @@
   rt.setPP({
     ctx: ctx,
     include: rt.include,
+    require: rt.require,
     asset: rt.asset,
     setSlot: rt.setSlot,
     getSlot: rt.getSlot,

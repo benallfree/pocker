@@ -24,7 +24,17 @@ myapp/
   exists (it starts serving if the folder appears later). There is no on/off switch; no folder, no pages.
 - Under the multitenant host every instance has its own `pb_pages`.
 - If the folder doesn't exist, the plugin does nothing for that app.
-- Page code can `require()` modules from `pb_pages/node_modules`, then from the app's usual module paths.
+- Page code can `require()` modules from `pb_pages/node_modules`, then from the app's usual module paths. The same
+  `require` works in modules, JSX/TSX components and EJS templates:
+  - `./x` and `../x` are files in `pb_pages`, relative to the requiring file, never above `pb_pages`. Without an
+    extension, `.js`, `.ts`, `.tsx`, `.jsx`, `.json` and `.cjs` are tried, then a folder's `package.json` or `index`.
+  - A bare name (`pkg`, `pkg/sub`, `@scope/pkg`) is looked up in the nearest `node_modules` folder from the requiring
+    file's folder up to the top of `pb_pages`. A package resolves through its `package.json`: `exports` (a string,
+    or conditions, where `require`, then `node`, then `default` are used), else `main`, else `index.js`. With
+    `exports`, only what it lists can be required, and no entry may point outside the package.
+  - Anything not found that way goes to the app's own module loader.
+  - `node_modules` is never routed or served, and isn't watched: after changing files in it, change any file in
+    `pb_pages` (or restart) to reload.
 - Page code runs in the app's JS VM, so PocketBase's JSVM globals (`$app`, `Record`, `$dbx`, `$security`, ...) are
   available, as far as the sandbox allows for untrusted apps.
 - Deploying: `pb_pages` is part of an app's code, next to `pb_hooks` and `pb_migrations` (the `deploy` plugin

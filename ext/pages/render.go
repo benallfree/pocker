@@ -405,30 +405,7 @@ func (r *request) load(file string) goja.Value {
 	exports := r.vm.NewObject()
 	module.Set("exports", exports)
 	dir := path.Dir(file)
-	requireFn := r.vm.ToValue(func(call goja.FunctionCall) goja.Value {
-		name := call.Argument(0).String()
-		if strings.HasPrefix(name, "./") || strings.HasPrefix(name, "../") {
-			target := path.Clean(path.Join(dir, name))
-			if strings.HasPrefix(target, "../") || target == ".." {
-				panic(r.vm.NewGoError(fmt.Errorf("%s: require(%q) leaves pb_pages", file, name)))
-			}
-			for _, cand := range []string{target, target + ".js", target + ".ts", target + ".tsx", target + ".jsx", target + ".json", target + "/index.js", target + "/index.ts"} {
-				if st, err := r.root.Stat(cand); err == nil && st.Mode().IsRegular() {
-					return r.load(cand)
-				}
-			}
-			panic(r.vm.NewGoError(fmt.Errorf("%s: require(%q): not found", file, name)))
-		}
-		global, ok := goja.AssertFunction(r.vm.Get("require"))
-		if !ok {
-			panic(r.vm.NewGoError(fmt.Errorf("require(%q): no module loader", name)))
-		}
-		v, err := global(goja.Undefined(), call.Argument(0))
-		if err != nil {
-			panic(err)
-		}
-		return v
-	})
+	requireFn := r.vm.ToValue(func(name string) goja.Value { return r.requireFrom(file, name) })
 	var h, frag goja.Value = goja.Undefined(), goja.Undefined()
 	if _, ok := tsExts[path.Ext(file)]; ok {
 		rt := r.jsxRuntime()
@@ -887,6 +864,7 @@ func (r *request) rtObject() *goja.Object {
 		}
 	})
 	set("load", func(file string) goja.Value { return r.load(file) })
+	set("require", func(from, name string) goja.Value { return r.requireFrom(from, name) })
 	set("sdk", func() goja.Value { return r.sdkClass() })
 	set("authToken", func() string { return r.authToken() })
 	set("authRecordJSON", func() string { return r.authRecordJSON() })

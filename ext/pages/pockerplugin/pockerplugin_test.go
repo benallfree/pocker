@@ -180,7 +180,7 @@ func TestSandboxHoldsInPages(t *testing.T) {
 	// escapes: refused, and nothing of b's ever comes back
 	escapes := map[string]string{
 		"/inc":     "invalid name",     // include names can't climb out
-		"/req":     "Invalid module",   // the sandboxed require refuses paths outside the instance
+		"/req":     "leaves pb_pages",  // require resolves inside pb_pages, never above it
 		"/resolve": "invalid name",     // same rule as include
 		"/file":    "leaves pb_pages",  // ctx.res.file stays inside pb_pages
 		"/os":      "openat ../b/",     // $os file access is confined to the instance folder
