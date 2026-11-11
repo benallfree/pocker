@@ -3,11 +3,11 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title><%= meta('title') || 'PocketPages' %></title>
+    <title><%=meta('title') || 'PocketPages'%></title>
     <link href="<%=asset('/assets/prism.css')%>" rel="stylesheet" />
-    <link href="<%=asset(`/assets/app.css`)%>" rel="stylesheet" />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@docsearch/css" />
-    <script src="https://cdn.jsdelivr.net/npm/@docsearch/js"></script>
+    <link href="<%=asset(`/assets/site.css`)%>" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@docsearch/css@5.2.0" />
+    <script src="https://cdn.jsdelivr.net/npm/@docsearch/js@5.2.0"></script>
     <meta name="algolia-site-verification" content="715D807F817B1875" />
     <link
       rel="preconnect"
@@ -29,7 +29,7 @@
     />
     <meta
       property="og:url"
-      content="<%= meta('path') ? `https://pocketpages.dev${meta('path')}` : meta('url') || `https://pocketpages.dev${ctx.req.url.pathname}` %>"
+      content="<%=meta('path') ? `https://pocketpages.dev${meta('path')}` : meta('url') || `https://pocketpages.dev${ctx.req.url.pathname}`%>"
     />
     <style>
       :root {
@@ -87,48 +87,64 @@
           0 -3px 6px 0 color-mix(in srgb, var(--color-primary) 12%, transparent);
       }
     </style>
-    <%- ctx.datastar.scripts({ spa: { scope: '#toc', selector: '#content' } }) %>
-    <%- slot('head') %>
+    <%- ctx.datastar.scripts({ spa: { scope: '#toc', selector: '#content' } }) %> <%- slot('head') %>
   </head>
 
   <body>
-    <section class="-mt-px border-y border-border bg-background">
-      <div class="mx-auto max-w-screen-xl px-4 py-2">
-        <div class="flex flex-row items-center justify-end gap-1.5">
-          <div id="docsearch">Search</div>
-          <div>
-            <a href="https://github.com/pockethost/pocketbase" target="_blank">
-              <img
-                src="https://api.iconify.design/simple-icons:github.svg?color=%23536dfe"
-              />
-            </a>
-          </div>
-
-          <div>
-            <a href="https://discord.gg/nVTxCMEcGT" target="_blank">
-              <img
-                src="https://api.iconify.design/simple-icons:discord.svg?color=%23536dfe"
-              />
-            </a>
-          </div>
-        </div>
+    <% const section = ctx.req.url.pathname.split('/')[1] %>
+    <header class="site-header">
+      <% if (section === 'docs') { %>
+      <button
+        class="icon-btn lg-hidden"
+        popovertarget="mobile-nav"
+        aria-label="Open docs navigation"
+      >
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M4 6h16M4 12h16M4 18h16"
+          ></path>
+        </svg>
+      </button>
+      <% } %>
+      <a href="/" class="brand">
+        <span class="avatar">
+          <img src="<%=asset('/apple-touch-icon.png')%>" alt="" />
+        </span>
+        <span class="brand-name">PocketPages</span>
+      </a>
+      <a
+        class="version"
+        href="https://github.com/pockethost/pocketbase/tree/main/ext/pages"
+        target="_blank"
+        title="PocketPages v1, built into PocketBase CE"
+      >v1</a>
+      <nav aria-label="Site">
+        <ul class="nav-links">
+          <li><a href="/docs" <%- section === 'docs' ? 'aria-current="page"' : '' %>>Docs</a></li>
+          <li><a href="/blog" <%- section === 'blog' ? 'aria-current="page"' : '' %>>Blog</a></li>
+        </ul>
+      </nav>
+      <div class="header-tools">
+        <div id="docsearch">Search</div>
+        <%# Icons are CSS masks so they take the theme's text color %>
+        <a class="icon-link" href="https://github.com/pockethost/pocketbase/tree/main/ext/pages" target="_blank" aria-label="GitHub">
+          <span class="icon" style="--icon: url(https://api.iconify.design/simple-icons/github.svg)"></span>
+        </a>
+        <a class="icon-link" href="https://discord.gg/nVTxCMEcGT" target="_blank" aria-label="Discord">
+          <span class="icon" style="--icon: url(https://api.iconify.design/simple-icons/discord.svg)"></span>
+        </a>
       </div>
-    </section>
+    </header>
     <%- slot() %>
     <script src="<%=asset('/assets/prism.js')%>" defer></script>
-    <script
-      defer
-      src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/js/all.min.js"
-      integrity="sha512-6sSYJqDreZRZGkJ3b+YfdhB3MzmuP9R7X1QZ6g5aIXhRvR1Y/N/P47jmnkENm7YL3oqsmI6AK+V6AD99uWDnIw=="
-      crossorigin="anonymous"
-      referrerpolicy="no-referrer"
-      defer
-    ></script>
     <script>
       docsearch({
         container: '#docsearch',
         appId: 'BRYSO1SKCE',
-        indexName: 'PocketPages Crawler',
+        indices: ['PocketPages Crawler'],
         apiKey: '8f90b040a2f9726fdf47acc203b9bedb',
       })
     </script>

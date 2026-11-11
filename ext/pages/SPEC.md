@@ -386,6 +386,7 @@ Query values and cookies are strings unless you ask for JSON. Nothing is parsed 
 | `ctx.asset(path)` | URL for a static file in `pb_pages`, with its content hash: `asset('app.css')` → `/assets/app.3f9a1c2b7d4e.css`. Relative paths resolve from the current file's folder; `/`-paths from `pb_pages`. A path that isn't a file in `pb_pages` is returned unchanged. |
 | `ctx.include(name, locals?)` | Render a `_private/` partial from JS (handlers, middleware, plugins) and get its text; same lookup as the template `include`, from the route's folder. |
 | `ctx.resolve(name, { mode }?)` | Load a module from `_private/` (same lookup as `include`; without an extension, the name, then `.js`, then `.json` are tried). Modes: `require` (default, the module's exports), `raw` (file text), `script` (text wrapped in `<script>`), `style` (wrapped in `<style>`). |
+| `ctx.pagesDir` | The absolute path of this app's `pb_pages` folder, e.g. for listing files with `$os.readDir`. Read-only. |
 | `ctx.store(name, value?)` | The app's in-memory store (`$app.store()`): set with two arguments, read with one. |
 | `ctx.dev` | `true` in dev mode. |
 

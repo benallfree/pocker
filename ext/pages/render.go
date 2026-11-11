@@ -761,6 +761,7 @@ func (r *request) rtObject() *goja.Object {
 		set("session", r.sessionObject())
 	}
 	set("dev", r.dev)
+	set("pagesDir", r.p.dir)
 
 	set("setStatus", func(code int) { r.status = code })
 	set("getHeader", func(name string) string { return e.Response.Header().Get(name) })

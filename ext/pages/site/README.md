@@ -7,8 +7,9 @@ The PocketPages website and docs, written as a PocketPages v1 app. It runs on Po
 
 - `pb_pages/` is the app: layouts, the splash page, and the docs under `(main)/docs/` (Markdown with EJS).
 - `pb_pages/(main)/_private/toc.md` is the docs navigation.
-- `package.json` only builds the CSS (Tailwind + daisyUI). The built `pb_pages/assets/app.css` is checked in, so
-  you don't need Node to run the site.
+- `pb_pages/(main)/blog/` is the blog: every `.md` file there is a post (front matter: title, description, date,
+  author, tags).
+- `pb_pages/assets/site.css` is the whole stylesheet: hand-written, no build step (the "Paper" theme).
 
 ## Run it
 
@@ -25,12 +26,3 @@ pocketbase serve --dev --dir /path/to/pb_data --pagesDir /path/to/site/pb_pages
 ```
 
 Open http://localhost:8090.
-
-## Rebuild the CSS
-
-After changing classes in templates or `assets/app.tailwind.css`:
-
-```bash
-npm install
-npm run build   # or: npm run dev, to watch
-```

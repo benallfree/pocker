@@ -12,7 +12,12 @@ description: 'Use HTMX with PocketPages: route organization, HTML fragments with
 Add HTMX to your layout:
 
 ```html
-<script src="https://unpkg.com/htmx.org@1.9.10"></script>
+<script
+  src="https://cdnjs.cloudflare.com/ajax/libs/htmx/2.0.11/htmx.min.js"
+  integrity="sha512-YdHy6FzjD4qoyI/yWGIbsKnJHe98r96np9XeYp3ovFL+0sNP/NbDrYlSLDr5a6Ndi5sRi9GgJj+suE7yLeUMNQ=="
+  crossorigin="anonymous"
+  referrerpolicy="no-referrer"
+></script>
 ```
 
 ## Route organization

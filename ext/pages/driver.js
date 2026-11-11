@@ -134,6 +134,7 @@
   ctx.auth = rt.auth
   ctx.app = $app
   ctx.dev = rt.dev
+  ctx.pagesDir = rt.pagesDir
   ctx.env = function (name) {
     return $os.getenv(name) || ''
   }
