@@ -62,6 +62,9 @@ type Table struct {
 	Config   string // +config.js ("" if none)
 	ErrorTpl string // +error.ejs ("" if none)
 	NotFound string // +404.ejs ("" if none)
+
+	// NotFoundRoute renders +404.ejs with the root middleware and layout (nil if there's no +404.ejs).
+	NotFoundRoute *Route
 }
 
 var (
@@ -293,6 +296,16 @@ func Build(dir string) (*Table, []error) {
 			Handler:     f.api,
 			Middlewares: middlewaresFor(d),
 		})
+	}
+
+	if t.NotFound != "" {
+		t.NotFoundRoute = &Route{
+			Kind:        KindPage,
+			Name:        "+404",
+			File:        t.NotFound,
+			Middlewares: middlewaresFor("."),
+			Layouts:     layoutsFor("."),
+		}
 	}
 
 	// patterns, reserved prefixes and conflicts

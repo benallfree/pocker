@@ -311,3 +311,36 @@ func TestJSSDKAppliesAPIRules(t *testing.T) {
 		t.Fatalf("%d %s", rec.Code, body)
 	}
 }
+
+func TestNotFoundPage(t *testing.T) {
+	dir := writeTree(t, map[string]string{
+		"+layout.ejs":     "<main><%- slot() %></main>",
+		"+middleware.js":  "module.exports = (ctx, next) => { ctx.data.mw = 'yes'; return next() }",
+		"+404.ejs":        "missing <%= ctx.req.url.pathname %> mw=<%= data.mw %>",
+		"index.ejs":       "home",
+		"sub/+layout.ejs": "<sub><%- slot() %></sub>",
+	})
+	h, _ := newServer(t, dir)
+	do := func(method, path string) (int, string) {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest(method, path, nil))
+		b, _ := io.ReadAll(rec.Result().Body)
+		return rec.Code, string(b)
+	}
+	code, body := do("GET", "/sub/nope")
+	if code != 404 || !strings.HasPrefix(body, "<main>missing /sub/nope mw=yes") || strings.Contains(body, "<sub>") {
+		t.Fatalf("GET: %d %q", code, body)
+	}
+	if code, _ := do("HEAD", "/nope"); code != 404 {
+		t.Fatalf("HEAD: %d", code)
+	}
+	if code, body := do("GET", "/"); code != 200 || body != "<main>home</main>" {
+		t.Fatalf("home: %d %q", code, body)
+	}
+	if code, body := do("POST", "/nope"); code != 404 || strings.Contains(body, "missing") {
+		t.Fatalf("POST: %d %q", code, body)
+	}
+	if code, body := do("GET", "/api/nope"); code != 404 || strings.Contains(body, "missing") {
+		t.Fatalf("api: %d %q", code, body)
+	}
+}

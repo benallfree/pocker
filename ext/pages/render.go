@@ -93,6 +93,11 @@ type request struct {
 
 // render runs a page or API route in one call into the app's JS VM.
 func (p *Pages) render(e *core.RequestEvent, root *os.Root, route *Route, params map[string]string) error {
+	return p.renderStatus(e, root, route, params, 0)
+}
+
+// renderStatus is render with a default response status (0 = 200), e.g. 404 for +404.ejs.
+func (p *Pages) renderStatus(e *core.RequestEvent, root *os.Root, route *Route, params map[string]string, status int) error {
 	t := p.Table()
 	dev := p.dev()
 
@@ -100,7 +105,7 @@ func (p *Pages) render(e *core.RequestEvent, root *os.Root, route *Route, params
 	err := jsvm.Run(p.app, func(vm *goja.Runtime) error {
 		r := &request{
 			p: p, e: e, root: root, route: route, params: params, vm: vm,
-			status: 0, layouts: true, slots: map[string]string{}, meta: map[string]any{}, dev: dev,
+			status: status, layouts: true, slots: map[string]string{}, meta: map[string]any{}, dev: dev,
 		}
 		r.cache = perVMCache(vm)
 		runErr = r.run(t)

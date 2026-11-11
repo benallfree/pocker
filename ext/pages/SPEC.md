@@ -91,7 +91,8 @@ mustn't be served (build inputs such as a Tailwind source) take a `-` prefix: `a
 3. A static file and a page can't claim the same URL (startup error).
 4. A URL nothing in `pb_pages` matches goes on to `pb_public`, then to PocketBase.
 5. If `pb_pages/+404.ejs` exists, a `GET`/`HEAD` that nothing (pages, `pb_public`, PocketBase) answers renders it
-   inside the root layout with status `404` (never for `/api/` or `/_/`).
+   inside the root layout with status `404` (never for `/api/` or `/_/`). The root `+middleware.js` runs first;
+   page code can still change the status.
 
 The route table is built when the app starts and rebuilt when anything in `pb_pages` changes. A rebuild never
 restarts the app or reloads `pb_hooks`. Startup errors (bad names, conflicts) are logged with the file path; the
