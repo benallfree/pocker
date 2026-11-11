@@ -39,7 +39,14 @@ export function pageSuperuserLogin(route) {
                 data.totalSteps += 2; // otp request + auth
             }
         } catch (err) {
-            app.checkApiError(err);
+            if (err.status == 401 && app.pb.authStore.token) {
+                // @todo remove once auto refresh is enabled in the JS SDK
+                // clear the authStore and try again
+                app.pb.authStore.clear();
+                loadAuthMethods();
+            } else {
+                app.checkApiError(err);
+            }
         }
 
         data.isAuthMethodsLoading = false;

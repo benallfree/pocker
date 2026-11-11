@@ -22,7 +22,7 @@ app.pb.beforeSend = function (url, options) {
 app.store.superuser = app.pb.authStore.record;
 app.pb.authStore.onChange((_, record) => {
     if (!record && window.location.hash != LOGIN_PATH) {
-        app.modals.close();
+        app.modals?.close(null, true);
         window.location.hash = LOGIN_PATH;
     }
 
@@ -43,6 +43,8 @@ if (app.pb.authStore.isValid) {
                 app.pb.authStore.clear();
             }
         });
+} else {
+    app.pb.authStore.clear();
 }
 
 // load initial store data
