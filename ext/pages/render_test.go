@@ -344,3 +344,23 @@ func TestNotFoundPage(t *testing.T) {
 		t.Fatalf("api: %d %q", code, body)
 	}
 }
+
+func TestMarkdownImagesUseAsset(t *testing.T) {
+	dir := writeTree(t, map[string]string{
+		"docs/guide.md":     "![a](img/shot.png) ![b](https://x.test/b.png) ![c](missing.png) ![d](/abs.png)",
+		"docs/img/shot.png": "png",
+		"abs.png":           "png",
+	})
+	code, body := get(t, dir, "/docs/guide", false)
+	if code != 200 {
+		t.Fatalf("%d %s", code, body)
+	}
+	for _, want := range []string{`src="/docs/img/shot.`, `src="https://x.test/b.png"`, `src="missing.png"`, `src="/abs.png"`} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("want %s in %s", want, body)
+		}
+	}
+	if strings.Contains(body, `src="img/shot.png"`) {
+		t.Fatalf("relative image not fingerprinted: %s", body)
+	}
+}

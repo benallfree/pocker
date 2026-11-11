@@ -264,7 +264,7 @@ func (r *request) renderFile(file string, locals goja.Value) string {
 	}
 	text := out.String()
 	if c.markdown {
-		text, err = renderMarkdown(text)
+		text, err = renderMarkdown(text, func(ref string) string { return r.p.Asset(path.Dir(file), ref) })
 		if err != nil {
 			panic(r.vm.NewGoError(fmt.Errorf("%s: markdown: %w", file, err)))
 		}
