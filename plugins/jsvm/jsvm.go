@@ -301,21 +301,18 @@ func (p *plugin) registerHooks() error {
 		}
 	}
 
-	if len(files) == 0 {
-		// no need to register the vms since there are no entrypoint files anyway
-		return nil
-	}
-
 	absHooksDir, err := filepath.Abs(p.config.HooksDir)
 	if err != nil {
 		return err
 	}
 
-	p.app.OnServe().BindFunc(func(e *core.ServeEvent) error {
-		e.Router.BindFunc(p.normalizeServeExceptions)
+	if len(files) > 0 { // POCKER: without hook files, only the (lazy) executors below are set up, for Run
+		p.app.OnServe().BindFunc(func(e *core.ServeEvent) error {
+			e.Router.BindFunc(p.normalizeServeExceptions)
 
-		return e.Next()
-	})
+			return e.Next()
+		})
+	}
 
 	// safe to be shared across multiple vms
 	requireRegistry := new(require.Registry)
@@ -348,12 +345,25 @@ func (p *plugin) registerHooks() error {
 	}
 
 	// initiliaze the executor vms
-	executors := newPool(p.config.HooksPoolSize, func() *goja.Runtime {
+	executorFactory := func() *goja.Runtime {
 		executor := goja.New()
 		sharedBinds(executor)
 		return executor
-	})
-	executors.onCall = p.config.OnCall // POCKER
+	}
+	// POCKER: with no hook files the vms are only created when Run first needs them
+	var executors *vmsPool
+	if len(files) > 0 {
+		executors = newPool(p.config.HooksPoolSize, executorFactory)
+	} else {
+		executors = newLazyPool(p.config.HooksPoolSize, executorFactory)
+	}
+	executors.onCall = p.config.OnCall              // POCKER
+	p.app.Store().Set(executorsStoreKey, executors) // POCKER: for Run
+
+	if len(files) == 0 {
+		// no need to register the hooks since there are no entrypoint files anyway
+		return nil
+	}
 
 	// initialize the loader vm
 	loader := goja.New()
