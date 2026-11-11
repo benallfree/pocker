@@ -78,11 +78,12 @@ func (s *Server) Run(ctx context.Context) error {
 		pool = *s.Config.HooksPoolSize
 	}
 	var (
-		gates    []Gate
-		tlsProv  TLSProvider
-		wrappers []Wrapper
-		starters []Starter
-		initers  []AppIniter
+		gates     []Gate
+		tlsProv   TLSProvider
+		wrappers  []Wrapper
+		starters  []Starter
+		initers   []AppIniter
+		jsIniters []JSIniter
 	)
 	for _, p := range s.Plugins {
 		if c, ok := p.(Configurer); ok {
@@ -108,6 +109,9 @@ func (s *Server) Run(ctx context.Context) error {
 		if in, ok := p.(AppIniter); ok {
 			initers = append(initers, in)
 		}
+		if js, ok := p.(JSIniter); ok {
+			jsIniters = append(jsIniters, js)
+		}
 	}
 	s.Manager = NewManager(source, ManagerOptions{
 		PBRoot:        s.Config.PBRoot,
@@ -118,6 +122,7 @@ func (s *Server) Run(ctx context.Context) error {
 		Gate:          chainGates(gates),
 		OnEvent:       s.onEvent(source, log),
 		Init:          chainIniters(initers),
+		InitJS:        chainJSIniters(jsIniters),
 		Setup:         s.SetupApp,
 		Forward:       s.Forward,
 	})

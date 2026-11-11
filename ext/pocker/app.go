@@ -16,6 +16,7 @@ import (
 	"ganigeorgiev.com/pocketbase/pocketbase/plugins/jsvm"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/security"
 	"ganigeorgiev.com/pocketbase/pocketbase/ui"
+	"github.com/dop251/goja"
 	"github.com/pockethost/pocketbase/ext/sandbox"
 )
 
@@ -36,6 +37,8 @@ type appOptions struct {
 	// Init, if set, runs for each app right after it is created, before its hooks load and before it bootstraps
 	// (opens its databases): the place to bind OnBootstrap/OnTerminate handlers.
 	Init func(inst Instance, app core.App) error
+	// InitJS, if set, adds globals to each JS runtime after the sandbox set it up.
+	InitJS func(inst Instance, app core.App, vm *goja.Runtime)
 	// Setup, if set, runs for each app after migrations and before it serves (host application Go code).
 	Setup func(inst Instance, app core.App) error
 }
@@ -105,8 +108,13 @@ func startApp(opts appOptions, inst Instance) (r *runningApp, err error) {
 		MigrationsDir: filepath.Join(dir, "pb_migrations"),
 		HooksWatch:    false, // one process serves every app: a hooks change must not restart it
 		HooksPoolSize: opts.HooksPoolSize,
-		OnInit:        sb.OnInit,
-		OnCall:        sb.OnCall,
+		OnInit: func(vm *goja.Runtime) {
+			sb.OnInit(vm)
+			if opts.InitJS != nil {
+				opts.InitJS(inst, app, vm)
+			}
+		},
+		OnCall: sb.OnCall,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("load hooks: %w", err)

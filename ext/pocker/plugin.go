@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
+	"github.com/dop251/goja"
 	"gopkg.in/yaml.v3"
 )
 
@@ -49,6 +50,24 @@ type Wrapper interface {
 // plugin). It runs on every start of the app, including restarts. An error fails that start.
 type AppIniter interface {
 	InitApp(inst Instance, app core.App) error
+}
+
+// JSIniter adds globals to each JS runtime of an instance (hooks, routes, migrations), after the sandbox has set
+// the runtime up, e.g. a plugin exposing its Go API as $name. What it exposes is a sandbox decision: only expose
+// what is safe for a hostile tenant to call on its own app.
+type JSIniter interface {
+	InitJS(inst Instance, app core.App, vm *goja.Runtime)
+}
+
+func chainJSIniters(in []JSIniter) func(Instance, core.App, *goja.Runtime) {
+	if len(in) == 0 {
+		return nil
+	}
+	return func(inst Instance, app core.App, vm *goja.Runtime) {
+		for _, i := range in {
+			i.InitJS(inst, app, vm)
+		}
+	}
 }
 
 func chainIniters(in []AppIniter) func(Instance, core.App) error {

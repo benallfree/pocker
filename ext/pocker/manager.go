@@ -18,6 +18,7 @@ import (
 
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/hook"
+	"github.com/dop251/goja"
 )
 
 // HealthPath answers on any host with the engine's status.
@@ -81,6 +82,8 @@ type ManagerOptions struct {
 	Gate Gate
 	// Init runs host Go code for each app before it bootstraps (plugins implementing [AppIniter]).
 	Init func(inst Instance, app core.App) error
+	// InitJS adds globals to each JS runtime after the sandbox set it up (plugins implementing [JSIniter]).
+	InitJS func(inst Instance, app core.App, vm *goja.Runtime)
 	// Setup runs host Go code for each app after migrations and before it serves (see [Server.SetupApp]).
 	Setup func(inst Instance, app core.App) error
 	// Forward serves requests for instances with [Instance.Remote] set, after the firewall checks. Nil = a plain
@@ -98,7 +101,7 @@ func NewManager(source InstanceSource, opts ManagerOptions) *Manager {
 	defaults := opts.Defaults.over(DefaultLimits())
 	return &Manager{
 		source:    source,
-		opts:      appOptions{PBRoot: opts.PBRoot, HooksPoolSize: opts.HooksPoolSize, ForceDev: opts.Dev, Defaults: defaults, Init: opts.Init, Setup: opts.Setup},
+		opts:      appOptions{PBRoot: opts.PBRoot, HooksPoolSize: opts.HooksPoolSize, ForceDev: opts.Dev, Defaults: defaults, Init: opts.Init, InitJS: opts.InitJS, Setup: opts.Setup},
 		defaults:  defaults,
 		onEvent:   opts.OnEvent,
 		gate:      opts.Gate,
