@@ -185,6 +185,19 @@
     }
     return flashValue
   }
+  if (rt.realtime) ctx.realtime = rt.realtime
+  if (rt.session) {
+    var session = rt.session
+    ctx.session = {}
+    Object.keys(session).forEach(function (name) {
+      if (name === 'current') return
+      ctx.session[name] = function () {
+        var out = session[name].apply(null, arguments)
+        ctx.auth = session.current()
+        return out
+      }
+    })
+  }
   ctx.httpError = function (status, message) {
     var e = new Error(message === undefined ? '' : String(message))
     e.__ppHttp = { status: status, message: message === undefined ? '' : String(message) }

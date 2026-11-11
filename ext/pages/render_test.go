@@ -1,11 +1,14 @@
 package pages
 
 import (
+	"ganigeorgiev.com/pocketbase/pocketbase/tools/subscriptions"
 	"io"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func get(t *testing.T, dir, path string, dev bool) (int, string) {
@@ -87,10 +90,10 @@ func TestModuleRequireRelative(t *testing.T) {
 }
 
 func TestStarterKitsRender(t *testing.T) {
-	// kits that need built-in plugins (auth, realtime, datastar) are checked once those land
-	for _, kit := range []string{"minimal", "mvp", "daisyui", "daisyui-docs"} {
-		t.Run(kit, func(t *testing.T) {
-			dir := filepath.Join("starters", kit, "pb_pages")
+	dirs, _ := filepath.Glob("starters/*/pb_pages")
+	dirs = append(dirs, "site/pb_pages")
+	for _, dir := range dirs {
+		t.Run(dir, func(t *testing.T) {
 			table, errs := Build(dir)
 			if len(errs) > 0 {
 				t.Fatal(errs)
@@ -99,16 +102,178 @@ func TestStarterKitsRender(t *testing.T) {
 			dev := true
 			p.cfg.Dev = &dev
 			for _, r := range table.Routes {
-				if r.Kind != KindPage || len(r.Segments) > 0 && r.Segments[len(r.Segments)-1].Param != "" {
+				if r.Kind != KindPage || strings.Contains(r.Pattern, "[") {
 					continue
 				}
 				rec := httptest.NewRecorder()
 				h.ServeHTTP(rec, httptest.NewRequest("GET", r.Pattern, nil))
-				if rec.Code != 200 {
+				if rec.Code >= 500 { // redirects and 4xx from the kit's own logic are fine
 					b, _ := io.ReadAll(rec.Result().Body)
 					t.Errorf("%s (%s): %d %.400s", r.Pattern, r.File, rec.Code, b)
 				}
 			}
 		})
+	}
+}
+
+func TestAddonCopiesMatch(t *testing.T) {
+	want, err := os.ReadFile("addons/datastar.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, copy := range []string{"starters/datastar/pb_pages/_private/datastar.js", "site/pb_pages/_private/datastar.js"} {
+		got, err := os.ReadFile(copy)
+		if err != nil || string(got) != string(want) {
+			t.Errorf("%s differs from addons/datastar.js (copy it again)", copy)
+		}
+	}
+}
+
+func TestSSE(t *testing.T) {
+	dir := writeTree(t, map[string]string{
+		"stream/+api.js": "module.exports = { get(ctx) { const s = ctx.res.sse(); s.send('hello', 'a\\nb', { id: 7 }); s.send('obj', { x: 1 }); s.comment('ping') } }",
+	})
+	h, _ := newServer(t, dir)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest("GET", "/stream", nil))
+	want := "id: 7\nevent: hello\ndata: a\ndata: b\n\nevent: obj\ndata: {\"x\":1}\n\n: ping\n\n"
+	if rec.Code != 200 || rec.Header().Get("Content-Type") != "text/event-stream" || rec.Body.String() != want {
+		t.Fatalf("%d %q\n%q", rec.Code, rec.Header().Get("Content-Type"), rec.Body.String())
+	}
+}
+
+func TestDatastarRequestGetsAPatch(t *testing.T) {
+	addon, _ := os.ReadFile("addons/datastar.js")
+	dir := writeTree(t, map[string]string{
+		"+config.js":           "module.exports = { plugins: [require('./_private/datastar.js')] }",
+		"_private/datastar.js": string(addon),
+		"+layout.ejs":          "<html><%- slot() %></html>",
+		"index.ejs":            "<div id=\"x\">\nhi\n</div>",
+		"sig/+api.js":          "module.exports = { get(ctx) { const s = ctx.datastar.signals(); ctx.datastar.patchSignals({ seen: s.n }) } }",
+	})
+	h, _ := newServer(t, dir)
+	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("Datastar-Request", "true")
+	req.Header.Set("Datastar-Selector", "#main")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	want := "event: datastar-patch-elements\ndata: selector #main\ndata: mode inner\ndata: elements <div id=\"x\">\ndata: elements hi\ndata: elements </div>\n\n"
+	if rec.Body.String() != want {
+		t.Fatalf("%q", rec.Body.String())
+	}
+	// a normal request still gets the page with its layout
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest("GET", "/", nil))
+	if !strings.Contains(rec.Body.String(), "<html><div id=\"x\">") {
+		t.Fatalf("%q", rec.Body.String())
+	}
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest("GET", "/sig?datastar=%7B%22n%22%3A5%7D", nil))
+	if !strings.Contains(rec.Body.String(), "data: signals {\"seen\":5}") {
+		t.Fatalf("%q", rec.Body.String())
+	}
+}
+
+func TestAuthSession(t *testing.T) {
+	dir := writeTree(t, map[string]string{
+		"+config.js": "module.exports = { plugins: ['auth'] }",
+		"login/+api.js": `module.exports = { post(ctx) {
+			const b = ctx.req.body()
+			try { ctx.session.signInWithPassword(b.email, b.password) } catch (e) { return ctx.res.json(401, { error: String(e) }) }
+			return ctx.res.json({ id: ctx.auth.id, email: ctx.auth.email() })
+		} }`,
+		"me/+api.js":      "module.exports = { get(ctx) { return ctx.res.json({ id: ctx.auth ? ctx.auth.id : null }) } }",
+		"logout/+api.js":  "module.exports = { post(ctx) { ctx.session.signOut(); return ctx.res.json({ id: ctx.auth }) } }",
+		"methods/+api.js": "module.exports = { get(ctx) { return ctx.res.json(ctx.session.authMethods()) } }",
+	})
+	h, _ := newServer(t, dir)
+	do := func(method, path, body, cookie string) *httptest.ResponseRecorder {
+		var rd io.Reader
+		if body != "" {
+			rd = strings.NewReader(body)
+		}
+		req := httptest.NewRequest(method, path, rd)
+		if body != "" {
+			req.Header.Set("Content-Type", "application/json")
+		}
+		if cookie != "" {
+			req.Header.Set("Cookie", cookie)
+		}
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		return rec
+	}
+	// tests.NewTestApp's users: test@example.com / 1234567890
+	rec := do("POST", "/login", `{"email":"test@example.com","password":"wrong"}`, "")
+	if rec.Code != 401 {
+		t.Fatalf("bad password: %d %s", rec.Code, rec.Body.String())
+	}
+	rec = do("POST", "/login", `{"email":"test@example.com","password":"1234567890"}`, "")
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "test@example.com") {
+		t.Fatalf("login: %d %s", rec.Code, rec.Body.String())
+	}
+	var cookie string
+	for _, c := range rec.Result().Cookies() {
+		if c.Name == "pb_auth" {
+			cookie = "pb_auth=" + c.Value
+			if !c.HttpOnly {
+				t.Error("pb_auth must be HttpOnly")
+			}
+		}
+	}
+	if cookie == "" {
+		t.Fatal("no pb_auth cookie")
+	}
+	if rec := do("GET", "/me", "", cookie); !strings.Contains(rec.Body.String(), `"id":"`) || strings.Contains(rec.Body.String(), `"id":null`) {
+		t.Fatalf("cookie session not read: %s", rec.Body.String())
+	}
+	if rec := do("GET", "/me", "", "pb_auth=garbage"); !strings.Contains(rec.Body.String(), `"id":null`) || !strings.Contains(strings.Join(rec.Header().Values("Set-Cookie"), ";"), "Max-Age=0") {
+		t.Fatalf("bad cookie should be cleared: %s %v", rec.Body.String(), rec.Header().Values("Set-Cookie"))
+	}
+	if rec := do("POST", "/logout", "", cookie); !strings.Contains(rec.Body.String(), `"id":null`) {
+		t.Fatalf("logout: %s", rec.Body.String())
+	}
+	if rec := do("GET", "/methods", "", ""); !strings.Contains(rec.Body.String(), `"password":{"enabled":true`) {
+		t.Fatalf("authMethods: %s", rec.Body.String())
+	}
+}
+
+func TestRealtimeSend(t *testing.T) {
+	dir := writeTree(t, map[string]string{
+		"+config.js":   "module.exports = { plugins: ['realtime'] }",
+		"send/+api.js": "module.exports = { post(ctx) { ctx.realtime.send('chat', '<p>hi</p>', { filter: (c) => c.get('room') === 'a' }); return ctx.res.json({ ok: true }) } }",
+	})
+	h, p := newServer(t, dir)
+	broker := p.app.SubscriptionsBroker()
+	inRoom := subscriptions.NewDefaultClient()
+	inRoom.Subscribe("chat")
+	inRoom.Set("room", "a")
+	otherRoom := subscriptions.NewDefaultClient()
+	otherRoom.Subscribe("chat")
+	otherRoom.Set("room", "b")
+	notSubscribed := subscriptions.NewDefaultClient()
+	notSubscribed.Set("room", "a")
+	for _, c := range []subscriptions.Client{inRoom, otherRoom, notSubscribed} {
+		broker.Register(c)
+	}
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest("POST", "/send", nil))
+	if rec.Code != 200 {
+		t.Fatalf("%d %s", rec.Code, rec.Body.String())
+	}
+	select {
+	case m := <-inRoom.Channel():
+		if m.Name != "chat" || string(m.Data) != `"<p>hi</p>"` {
+			t.Fatalf("got %s %s", m.Name, m.Data)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("subscribed client in the room got nothing")
+	}
+	for name, c := range map[string]subscriptions.Client{"other room": otherRoom, "not subscribed": notSubscribed} {
+		select {
+		case m := <-c.Channel():
+			t.Errorf("%s got %s", name, m.Data)
+		case <-time.After(200 * time.Millisecond):
+		}
 	}
 }

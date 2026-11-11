@@ -6,15 +6,15 @@ in Go and page code in the app's JS VM.
 **Runs on:** Single app, or many under [pocker](../pocker/README.md).
 
 > **In progress.** Working: the `pb_pages` route table, static files with ETags and fingerprints, live rescans,
-> and rendering: middleware, `+page.js` / `+api.js` handlers, EJS compiled in Go (cached per content hash), includes,
-> slots and layouts, Markdown pages, `ctx` (request, response, cookies, flash, data, meta, assets, resolve, store,
-> errors and `+error.ejs`), JS plugins. Not yet: the built-in `auth`, `realtime` and `datastar` plugins,
-> `ctx.res.sse()`, `+404.ejs`, JS plugins' `handles()`, Markdown image paths through `asset()`, `pages create`, and
+> rendering (middleware, `+page.js` / `+api.js`, EJS compiled in Go, includes, slots, layouts, Markdown, `ctx`,
+> `+error.ejs`), JS plugins, `ctx.res.sse()`, the built-in `realtime` and `auth` plugins (password, OTP, anonymous,
+> register, email flows, cookie sessions) and the Datastar add-on. Every starter kit and the site render. Not yet:
+> OAuth2 sign-in, `+404.ejs`, JS plugins' `handles()`, Markdown image paths through `asset()`, `pages create`, and
 > runs under pocker + the sandbox.
 
 - The contract: [SPEC.md](SPEC.md).
 - Test fixtures: [fixtures/](fixtures) (`go test ./...` runs every request case).
-- Starter kits: [starters/](starters). The PocketPages site: [site/](site).
+- Starter kits: [starters/](starters). Add-ons: [addons/](addons). The PocketPages site: [site/](site).
 
 ## Use it
 

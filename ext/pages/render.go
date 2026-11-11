@@ -83,6 +83,8 @@ type request struct {
 	depth    int
 	dev      bool
 	plugins  []goja.Value
+	builtins map[string]bool
+	auth     *core.Record
 	flashed  bool
 	errorCtx map[string]any
 }
@@ -136,6 +138,11 @@ func (r *request) run(t *Table) (err error) {
 	}
 	r.dev = r.dev || cfg.Debug
 	r.plugins = plugins
+	r.builtins = cfg.Builtins
+	r.auth = r.e.Auth
+	if r.builtins["auth"] {
+		r.readAuthCookie()
+	}
 
 	driver, err := r.programFunc("driver", driverProgram)
 	if err != nil {
@@ -700,10 +707,16 @@ func (r *request) rtObject() *goja.Object {
 	})
 	set("ip", e.RealIP())
 	set("event", e)
-	if e.Auth != nil {
-		set("auth", e.Auth)
+	if r.auth != nil {
+		set("auth", r.auth)
 	} else {
 		set("auth", goja.Null())
+	}
+	if r.builtins["realtime"] {
+		set("realtime", r.realtimeObject())
+	}
+	if r.builtins["auth"] {
+		set("session", r.sessionObject())
 	}
 	set("dev", r.dev)
 
@@ -759,7 +772,7 @@ func (r *request) rtObject() *goja.Object {
 		}
 		r.write(http.StatusOK, ct, body)
 	})
-	set("sse", func() any { panic(vm.NewGoError(errors.New("ctx.res.sse() isn't available yet"))) })
+	set("sse", func() *goja.Object { return r.sse() })
 	set("setLayout", func(on bool) { r.layouts = on })
 	set("layoutsOn", func() bool {
 		if !r.layouts {

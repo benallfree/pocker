@@ -339,14 +339,14 @@ Fingerprinted asset names carry the first 12 hex characters of the file's SHA-25
 ```js
 // pb_pages/+config.js
 module.exports = {
-  plugins: ['auth', 'datastar', require('./_private/my-plugin.js')],
+  plugins: ['auth', 'realtime', require('./_private/datastar.js')],
   debug: false,
 }
 ```
 
 | Key | Default | |
 |---|---|---|
-| `plugins` | `[]` | Built-ins by name, or JS plugin factories (9). EJS and Markdown are always on. |
+| `plugins` | `[]` | Built-ins by name (`auth`, `realtime`), or JS plugin factories such as add-ons (9). EJS and Markdown are always on. |
 | `debug` | `false` | Detailed error pages and `ctx.log.debug` output even outside dev mode. |
 
 Unknown keys, unknown built-in names and duplicates are startup errors.
@@ -402,22 +402,7 @@ Turned on by name in `+config.js`.
 - `filter(client)` returns `true` to include a client. `client` is PocketBase's realtime client: `id()`,
   `get(key)`, `set(key, value)`, `hasSubscription(topic)`.
 - `ctx.realtime.client(id)` returns one client by id, or `null`.
-
-**`datastar`:** Datastar helpers.
-- `ctx.datastar.scripts({ spa: { scope, selector }, realtime }?)` returns the script tags (`spa` turns on
-  client-side navigation for links under `scope`, swapping `selector`). With `realtime: true` the page subscribes to
-  the `datastar` realtime topic and sets a `$clientId` signal to its realtime client id.
-- `ctx.datastar.patchElements(html, { selector, mode }?)`, `ctx.datastar.patchSignals(signals, { onlyIfMissing }?)`
-  (`signals` is an object), `ctx.datastar.executeScript(js)` send SSE events on the current response. The first one
-  starts the stream (`ctx.res.sent` becomes `true`); later steps still run, but their output isn't sent and the
-  automatic patch below doesn't happen. The stream closes when the request ends.
-- `ctx.datastar.signals()` returns the request's signals as an object (from the `datastar` query parameter on
-  `GET`, the JSON body otherwise).
-- `mode` is one of `outer` (default), `inner`, `replace`, `prepend`, `append`, `before`, `after`, `remove`.
-- When a request has `Datastar-Request: true`, the rendered page (without layouts) is sent as a `patchElements`
-  event, into `Datastar-Selector` if given.
-- `ctx.datastar.realtime.patchElements(html, options?, { filter }?)`, `.patchSignals(signals, options?, { filter }?)`
-  and `.executeScript(js, { filter }?)` send the same events to `datastar` realtime subscribers (needs `realtime`).
+- Sending never waits for slow clients: each message is handed to the client's queue in the background.
 
 ### 9.2 JS plugins
 
@@ -439,6 +424,27 @@ module.exports = (config) => ({
   `/robots.txt`).
 - Hooks run in config order. Every hook is optional.
 - JS plugins run with the same permissions as the rest of the app's JS (sandboxed in a multitenant host).
+
+### 9.3 Add-ons
+
+Plugins for third-party libraries ship as JS files in `ext/pages/addons/`, not built into `ext/pages`. Copy one into
+`pb_pages` (usually `_private/`) and list it in `+config.js` with `require`.
+
+**`datastar.js`** ([Datastar](https://data-star.dev)) adds `ctx.datastar`:
+- `ctx.datastar.scripts({ spa: { scope, selector }, realtime }?)` returns the script tags (`spa` turns on
+  client-side navigation for links under `scope`, swapping `selector`). With `realtime: true` the page subscribes to
+  the `datastar` realtime topic and sets a `$clientId` signal to its realtime client id.
+- `ctx.datastar.patchElements(html, { selector, mode }?)`, `ctx.datastar.patchSignals(signals, { onlyIfMissing }?)`
+  (`signals` is an object), `ctx.datastar.executeScript(js)` send SSE events on the current response. The first one
+  starts the stream (`ctx.res.sent` becomes `true`); later steps still run, but their output isn't sent and the
+  automatic patch below doesn't happen. The stream closes when the request ends.
+- `ctx.datastar.signals()` returns the request's signals as an object (from the `datastar` query parameter on
+  `GET`, the JSON body otherwise).
+- `mode` is one of `outer` (default), `inner`, `replace`, `prepend`, `append`, `before`, `after`, `remove`.
+- When a request has `Datastar-Request: true`, the rendered page (without layouts) is sent as a `patchElements`
+  event, into `Datastar-Selector` if given.
+- `ctx.datastar.realtime.patchElements(html, options?, { filter }?)`, `.patchSignals(signals, options?, { filter }?)`
+  and `.executeScript(js, { filter }?)` send the same events to `datastar` realtime subscribers (needs `realtime`).
 
 ## 10. Dev mode
 

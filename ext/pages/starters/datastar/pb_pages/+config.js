@@ -1,3 +1,3 @@
 module.exports = {
-  plugins: ['datastar', 'realtime'],
+  plugins: ['realtime', require('./_private/datastar.js')],
 }

@@ -7,11 +7,12 @@ import (
 )
 
 // builtinPlugins are the plugins turned on by name in +config.js (SPEC 9.1).
-var builtinPlugins = map[string]bool{"auth": true, "realtime": true, "datastar": true}
+var builtinPlugins = map[string]bool{"auth": true, "realtime": true}
 
 // pagesConfig is +config.js.
 type pagesConfig struct {
-	Debug bool
+	Debug    bool
+	Builtins map[string]bool
 }
 
 // loadConfig runs +config.js (if any), validates it and returns the config and the JS plugin objects.
@@ -47,7 +48,11 @@ func (r *request) loadConfig(file string) (pagesConfig, []goja.Value, error) {
 						return cfg, nil, fmt.Errorf("%s: plugin %q listed twice", file, name)
 					}
 					seen[name] = true
-					return cfg, nil, fmt.Errorf("%s: the built-in %q plugin isn't available yet", file, name)
+					if cfg.Builtins == nil {
+						cfg.Builtins = map[string]bool{}
+					}
+					cfg.Builtins[name] = true
+					continue
 				}
 				factory, options := item, r.vm.NewObject()
 				if o, ok := item.(*goja.Object); ok {
