@@ -21,6 +21,7 @@ import (
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"ganigeorgiev.com/pocketbase/pocketbase/tests"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/mailer"
+	"ganigeorgiev.com/pocketbase/pocketbase/tools/types"
 	"github.com/dop251/goja"
 	"github.com/pockethost/pocketbase/ext/pocker"
 	"gopkg.in/yaml.v3"
@@ -676,5 +677,48 @@ func TestSuppressionRecordsAreNormalized(t *testing.T) {
 	bad.Set("email", "not an address")
 	if err := app.Save(bad); err == nil {
 		t.Fatal("saved an invalid address")
+	}
+}
+
+func TestViewAudience(t *testing.T) {
+	app, bm := newApp(t, Config{})
+	view := core.NewViewCollection("mail_audience")
+	view.ViewQuery = "SELECT id, email, lower(email) AS email_lc, name FROM users WHERE verified = TRUE"
+	if err := app.Save(view); err != nil {
+		t.Fatal(err)
+	}
+	want := len(verifiedUsers(t, app))
+
+	for _, field := range []string{"email", "email_lc"} {
+		n, _, _, err := bm.CountAudience(Audience{Collection: "mail_audience", EmailField: field}, 5)
+		if err != nil {
+			t.Fatalf("%s: %v", field, err)
+		}
+		if n != want {
+			t.Fatalf("%s: count = %d, want %d", field, n, want)
+		}
+	}
+	if _, _, _, err := bm.CountAudience(Audience{Collection: "mail_audience", EmailField: "id"}, 5); err == nil {
+		t.Fatal("id accepted as the email field")
+	}
+
+	// a view audience sends like a collection one, with the view's columns in templates
+	c := newCampaign(t, app, map[string]any{
+		"audience": map[string]any{"collection": "mail_audience", "email_field": "email_lc"},
+	})
+	if _, err := bm.Start(c.Id); err != nil {
+		t.Fatal(err)
+	}
+	drain(t, bm)
+	if n := app.TestMailer.TotalSend(); n != want {
+		t.Fatalf("sent %d, want %d", n, want)
+	}
+
+	// expression columns are json fields: templates show the value, not its JSON
+	if got := toString(types.JSONRaw(`"a@b.test"`)); got != "a@b.test" {
+		t.Fatalf("json string renders as %q", got)
+	}
+	if got := toString(types.JSONRaw(`3`)); got != "3" {
+		t.Fatalf("json number renders as %q", got)
 	}
 }

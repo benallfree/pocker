@@ -29,8 +29,11 @@ or Go (the dashboard doesn't show them): the app's SMTP account can usually send
 
 ## What it does
 
-- **Audience** from the app's own data, resolved when sending starts: a collection plus a filter (the same syntax as
-  API rules), or a read-only SQL `SELECT` that returns an `email` column. SQL runs with SQLite's `query_only` on,
+- **Audience** from the app's own data, resolved when sending starts: a collection or view plus a filter (the same
+  syntax as API rules) and the field that holds the address (email or text, or a view's computed json column), or a
+  read-only SQL `SELECT` that returns an `email` column. A view is the easy way to build a dynamic audience: it
+  picks who gets mail and computes the columns templates use (`{{record.column}}`); the example creates one
+  (`newsletter_audience`). SQL runs with SQLite's `query_only` on,
   inside a transaction that is always rolled back.
 - **Templates:** `{{record.field}}` per recipient, `{{campaign.name}}`, `{{unsubscribe_url}}`, campaign vars (fixed
   values or `{"sql": "SELECT … AS value"}` computed once), and `{{if path}}…{{else}}…{{end}}` blocks. Values are

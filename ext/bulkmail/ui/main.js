@@ -210,7 +210,8 @@
         async function load() {
             try {
                 init(await app.pb.collection(C).getOne(id));
-                data.collections = (await app.pb.collections.getFullList({ filter: "type != 'view'" }))
+                // collections and views: a view can shape exactly the audience and template data a campaign needs
+                data.collections = (await app.pb.collections.getFullList({ sort: "name" }))
                     .filter((c) => !c.name.startsWith("_"));
                 unsubscribe = await app.pb.collection(C).subscribe(id, (e) => {
                     if (e.action === "update") {
@@ -245,6 +246,22 @@
             } catch (_) {
                 return {};
             }
+        }
+        // fields that can hold the address (same rule as the Go side): email and text, plus json on views
+        function emailFields(name) {
+            const col = data.collections.find((c) => c.name === name);
+            if (!col) return [];
+            return (col.fields || [])
+                .filter((f) => f.name !== "id" && f.name !== "tokenKey" &&
+                    (f.type === "email" || f.type === "text" || (f.type === "json" && col.type === "view")))
+                .sort((a, b) => (a.type === "email" ? 0 : 1) - (b.type === "email" ? 0 : 1));
+        }
+        function pickCollection(name) {
+            const fields = emailFields(name);
+            const cur = audience().email_field;
+            const keep = fields.find((f) => f.name === cur) || fields.find((f) => f.name === "email") || fields[0];
+            const filter = name === audience().collection ? audience().filter : ""; // a filter is per collection
+            setAudience({ collection: name, email_field: keep?.name || "", filter });
         }
         function setAudience(patch) {
             data.audienceJSON = JSON.stringify({ ...audience(), ...patch });
@@ -402,24 +419,28 @@
                                 t.div({ className: "col-lg-4" }, field("Collection",
                                     app.components.select({
                                         disabled: () => !editable(),
-                                        options: () => data.collections.map((col) => ({ value: col.name, label: col.name })),
+                                        options: () => data.collections.map((col) => ({ value: col.name, label: col.type === "view" ? `${col.name} (view)` : col.name })),
                                         value: () => audience().collection || "",
-                                        onchange: (sel) => setAudience({ collection: sel?.[0]?.value || "" }),
+                                        onchange: (sel) => pickCollection(sel?.[0]?.value || ""),
                                     }),
+                                    "A collection or a view. A view can join and compute exactly the data a campaign needs; its columns are {{record.column}}.",
                                 )),
-                                t.div({ className: "col-lg-6" }, field("Filter",
+                                t.div({ className: "col-lg-5" }, field("Filter",
                                     t.input({
-                                        type: "text", disabled: () => !editable(), placeholder: "verified = true",
+                                        type: "text", disabled: () => !editable(),
+                                        placeholder: () => emailFields(audience().collection).length && data.collections.find((c) => c.name === audience().collection)?.type === "auth" ? "verified = true" : "Optional",
                                         value: () => audience().filter || "",
                                         oninput: (e) => setAudience({ filter: e.target.value }),
                                     }),
                                     "Same syntax as API rules.",
                                 )),
-                                t.div({ className: "col-lg-2" }, field("Email field",
-                                    t.input({
-                                        type: "text", disabled: () => !editable(),
+                                t.div({ className: "col-lg-3" }, field("Email field",
+                                    app.components.select({
+                                        disabled: () => !editable(),
+                                        options: () => emailFields(audience().collection).map((f) => ({ value: f.name, label: `${f.name} (${f.type})` })),
                                         value: () => audience().email_field || "email",
-                                        oninput: (e) => setAudience({ email_field: e.target.value }),
+                                        noItemsFoundText: "No email or text fields",
+                                        onchange: (sel) => setAudience({ email_field: sel?.[0]?.value || "" }),
                                     }),
                                 )),
                             ],

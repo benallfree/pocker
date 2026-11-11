@@ -23,7 +23,8 @@ func main() {
 	app := pocketbase.New()
 	devusers.Register(app) // local testing: superuser admin@example.com and user user@example.com, password "password"
 
-	registerOutbox(app) // while SMTP is off, mail lands in the "outbox" collection (outbox.go)
+	registerOutbox(app)   // while SMTP is off, mail lands in the "outbox" collection (outbox.go)
+	registerDemoView(app) // a "newsletter_audience" view to use as a campaign audience (demo.go)
 
 	bulkmail.MustRegister(app, bulkmail.Config{
 		Rate:  5,    // messages per second
