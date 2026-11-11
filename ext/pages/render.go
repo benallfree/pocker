@@ -100,6 +100,9 @@ func (p *Pages) render(e *core.RequestEvent, root *os.Root, route *Route, params
 func (p *Pages) renderStatus(e *core.RequestEvent, root *os.Root, route *Route, params map[string]string, status int) error {
 	t := p.Table()
 	dev := p.dev()
+	if ct := pageContentType(route); ct != "" {
+		e.Response.Header().Set("Content-Type", ct)
+	}
 
 	var runErr error
 	err := jsvm.Run(p.app, func(vm *goja.Runtime) error {
@@ -121,6 +124,19 @@ func (p *Pages) renderStatus(e *core.RequestEvent, root *os.Root, route *Route, 
 		return err
 	}
 	return nil
+}
+
+// pageContentType is the Content-Type a page's inner extension implies (robots.txt.ejs → text/plain), or "" for
+// HTML pages. Page code can still set another one.
+func pageContentType(route *Route) string {
+	if route.Kind != KindPage {
+		return ""
+	}
+	ext := strings.ToLower(path.Ext(route.Name))
+	if ext == "" || ext == ".html" || ext == ".htm" {
+		return ""
+	}
+	return mime.TypeByExtension(ext)
 }
 
 func perVMCache(vm *goja.Runtime) *goja.Object {

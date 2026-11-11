@@ -364,3 +364,28 @@ func TestMarkdownImagesUseAsset(t *testing.T) {
 		t.Fatalf("relative image not fingerprinted: %s", body)
 	}
 }
+
+func TestInnerExtensionSetsContentType(t *testing.T) {
+	dir := writeTree(t, map[string]string{
+		"+layout.ejs":    "<main><%- slot() %></main>",
+		"robots.txt.ejs": "User-agent: *\nDisallow: <%= '/admin' %>",
+		"feed.xml.ejs":   "<feed/>",
+		"page.html.ejs":  "hi",
+		"v1.2.ejs":       "ver",
+	})
+	h, _ := newServer(t, dir)
+	cases := map[string][2]string{
+		"/robots.txt": {"text/plain", "User-agent: *\nDisallow: /admin"},
+		"/feed.xml":   {"xml", "<feed/>"},
+		"/page.html":  {"text/html", "<main>hi</main>"},
+		"/v1.2":       {"text/html", "<main>ver</main>"},
+	}
+	for p, want := range cases {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest("GET", p, nil))
+		b, _ := io.ReadAll(rec.Result().Body)
+		if ct := rec.Header().Get("Content-Type"); rec.Code != 200 || !strings.Contains(ct, want[0]) || string(b) != want[1] {
+			t.Fatalf("%s: %d %s %q", p, rec.Code, ct, b)
+		}
+	}
+}

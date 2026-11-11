@@ -235,6 +235,9 @@ applied innermost first. A folder may have one layout.
   can wrap it (`slot('title', () => { %>Docs: <%- slot('title') %><% })`).
 - Layouts are skipped when the response isn't HTML (a handler set another `Content-Type`) or after
   `ctx.res.layout(false)`.
+- A page with an inner extension gets that type: `robots.txt.ejs` serves `/robots.txt` as `text/plain` and
+  `feed.xml.ejs` serves `/feed.xml` as XML, so layouts are skipped. `.html` (or no inner extension) is HTML. Page
+  code can still set another `Content-Type`.
 
 ### 4.4 Markdown pages
 
