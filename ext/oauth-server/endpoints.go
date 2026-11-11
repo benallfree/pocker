@@ -48,9 +48,9 @@ func (s *Server) bindRoutes(se *core.ServeEvent) {
 	se.Router.POST(registerPath, s.register) // answers 404 unless dynamic registration is on
 }
 
-// issuer is the public base URL: Config.Issuer, else the request's own scheme and host (so it always matches the
-// URL the metadata was fetched from).
-func (s *Server) issuer(e *core.RequestEvent) string {
+// Issuer is the public base URL: Config.Issuer, else the request's scheme and host (so it always matches the URL
+// the metadata was fetched from). It's the metadata's issuer; ext/mcp lists it in its protected resource metadata.
+func (s *Server) Issuer(e *core.RequestEvent) string {
 	if s.cfg.Issuer != "" {
 		return strings.TrimRight(s.cfg.Issuer, "/")
 	}
@@ -62,7 +62,7 @@ func (s *Server) issuer(e *core.RequestEvent) string {
 }
 
 func (s *Server) metadata(e *core.RequestEvent) error {
-	iss := s.issuer(e)
+	iss := s.Issuer(e)
 	scopes := []string{OfflineAccess}
 	for _, sc := range s.tokens().Scopes() {
 		scopes = append(scopes, sc.Name)
@@ -107,7 +107,7 @@ func (s *Server) validResource(e *core.RequestEvent, r string) bool {
 	if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Fragment != "" {
 		return false
 	}
-	iss, _ := url.Parse(s.issuer(e))
+	iss, _ := url.Parse(s.Issuer(e))
 	return strings.EqualFold(u.Host, e.Request.Host) || (iss != nil && strings.EqualFold(u.Host, iss.Host))
 }
 
@@ -504,7 +504,7 @@ func (s *Server) decide(e *core.RequestEvent, ar *authRequest, d PageData, user 
 	if ar.state != "" {
 		q.Set("state", ar.state)
 	}
-	q.Set("iss", s.issuer(e))
+	q.Set("iss", s.Issuer(e))
 	u.RawQuery = q.Encode()
 	return e.Redirect(http.StatusFound, u.String())
 }
@@ -554,7 +554,7 @@ func (s *Server) deviceAuthorization(e *core.RequestEvent) error {
 	if err := s.app.Save(rec); err != nil {
 		return err
 	}
-	verify := s.issuer(e) + deviceVerifyPath
+	verify := s.Issuer(e) + deviceVerifyPath
 	e.Response.Header().Set("Cache-Control", "no-store")
 	return e.JSON(http.StatusOK, map[string]any{
 		"device_code": deviceCode, "user_code": userCode, "verification_uri": verify,

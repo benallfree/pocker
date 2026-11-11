@@ -370,3 +370,14 @@ func TestSameResource(t *testing.T) {
 		}
 	}
 }
+
+func TestOAuthIssuerFromOAuthServer(t *testing.T) {
+	h := newHarness(t, Config{}, func(s *Server) {
+		tokens.MustRegister(s.App(), tokens.Config{})
+		oauthserver.MustRegister(s.App(), oauthserver.Config{Issuer: "https://auth.example.com/"})
+	})
+	r := h.do(http.MethodGet, "/.well-known/oauth-protected-resource/mcp", "", "")
+	if as := r.body["authorization_servers"].([]any); len(as) != 1 || as[0] != "https://auth.example.com" {
+		t.Fatalf("authorization_servers should be oauth-server's issuer: %s", r.raw)
+	}
+}

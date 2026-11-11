@@ -17,9 +17,8 @@ import (
 //
 // It's the default [Authenticator] when oauth-server is registered on the app.
 type OAuth struct {
-	// Issuer is the authorization server's public base URL, listed in the protected resource metadata. Set it to
-	// the same value as oauthserver.Config.Issuer when that's set; by default it's the request's own scheme and host,
-	// which is also oauth-server's default.
+	// Issuer overrides the authorization server listed in the protected resource metadata (default: oauth-server's
+	// own issuer, i.e. its Config.Issuer or the request's scheme and host).
 	Issuer string
 
 	// AllowUnbound also accepts API tokens without an audience (made by hand or for deploys) and PocketBase auth
@@ -61,6 +60,9 @@ func (a OAuth) Authenticate(e *core.RequestEvent, resource string) (*Grant, erro
 func (a OAuth) AuthorizationServers(e *core.RequestEvent, s *Server) []string {
 	if a.Issuer != "" {
 		return []string{strings.TrimRight(a.Issuer, "/")}
+	}
+	if osrv := oauthserver.For(s.app); osrv != nil {
+		return []string{osrv.Issuer(e)}
 	}
 	scheme := "http"
 	if e.IsTLS() || strings.EqualFold(e.Request.Header.Get("X-Forwarded-Proto"), "https") {

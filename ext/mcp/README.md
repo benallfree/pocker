@@ -46,7 +46,7 @@ Scopes: `ext/mcp` registers `mcp:read` and `mcp:write` with `ext/tokens`, and th
 
 Who may sign in comes from `oauthserver.Config.Collections` (and `tokens.Config.Collections`), which default to superusers.
 
-`OAuth.Issuer`: set it to the same value as `oauthserver.Config.Issuer` if you set that. By default both use the request's scheme and host.
+The authorization server listed in the metadata is oauth-server's own issuer (its `Config.Issuer`, else the request's scheme and host). `OAuth.Issuer` overrides it.
 
 Without oauth-server, `/mcp` falls back to `PocketBaseTokenAuth`: pasted superuser PocketBase tokens with full scope, and a warning in the log. The authenticator is chosen on serve, so plugin registration order doesn't matter. `Config.Auth` overrides the choice.
 
