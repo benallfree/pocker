@@ -43,12 +43,6 @@ func (p *Pages) serve(e *core.RequestEvent) error {
 		}
 		return p.serveStatic(e.Response, e.Request, root, route, fingerprinted)
 	default:
-		return p.render(e, route, params)
+		return p.render(e, root, route, params)
 	}
-}
-
-// render runs a page or API route. Rendering (the JS pass: middleware, handlers, EJS, layouts) is the next step of
-// the plugin; until then pages answer 501 so a half-built plugin is never mistaken for a working one.
-func (p *Pages) render(e *core.RequestEvent, route *Route, params map[string]string) error {
-	return e.String(http.StatusNotImplemented, "ext/pages: rendering "+route.Kind.String()+" routes isn't built yet ("+route.File+")\n")
 }

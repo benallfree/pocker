@@ -52,7 +52,8 @@ type Pages struct {
 	lastCheck time.Time
 	buildErrs []error
 
-	hashes hashCache
+	hashes   hashCache
+	programs programs
 }
 
 // MustRegister is [Register] that panics on error.
