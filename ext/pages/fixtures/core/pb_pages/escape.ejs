@@ -1,0 +1,11 @@
+<p><%= '<b>"x" & \'y\'</b>' %></p>
+<p><%- '<b>raw</b>' %></p>
+<p><%= null %>|<%= undefined %>|<%= 0 %></p>
+<%# not shown %>
+<p><%%</p>
+<ul>
+<% for (const n of [1, 2]) { -%>
+<li><%= n %></li>
+<% } -%>
+</ul>
+<p><%= ctx.resolve('shout')('hi') %></p>

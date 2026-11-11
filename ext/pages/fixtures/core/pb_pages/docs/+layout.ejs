@@ -1,0 +1,2 @@
+<% slot('title', () => { %>Docs: <%- slot('title') || meta('title') %><% }) %>
+<main data-layout="docs"><%- slot() %></main>

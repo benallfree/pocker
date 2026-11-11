@@ -1,0 +1,230 @@
+{
+  "fixture": "core",
+  "about": "Request/response cases for fixtures/core/pb_pages, against SPEC.md. Matchers: status (exact), headers (exact value), headerContains (substring), headerAbsent, bodyContains (each substring present), bodyNotContains, bodyJSON (deep equal), bodyEmpty, setCookieContains (each substring present in some Set-Cookie header).",
+  "cases": [
+    {
+      "name": "index page with root layout and middleware data",
+      "request": { "method": "GET", "path": "/" },
+      "expect": {
+        "status": 200,
+        "headers": { "Content-Type": "text/html; charset=utf-8" },
+        "bodyContains": ["<h1>Home</h1>", "trail=root", "data-layout=\"root\"", "<title>Fixture</title>"]
+      }
+    },
+    {
+      "name": "named slot fills the layout title; include with locals",
+      "request": { "method": "GET", "path": "/about" },
+      "expect": {
+        "status": 200,
+        "bodyContains": ["<title>About us</title>", "<h1>About</h1>", "<nav data-current=\"about\">root-nav</nav>"]
+      }
+    },
+    {
+      "name": "trailing slash matches the same route",
+      "request": { "method": "GET", "path": "/about/" },
+      "expect": { "status": 200, "bodyContains": ["<h1>About</h1>"] }
+    },
+    {
+      "name": "group folder adds no URL segment",
+      "request": { "method": "GET", "path": "/pricing" },
+      "expect": { "status": 200, "bodyContains": ["<h1>Pricing</h1>"] }
+    },
+    {
+      "name": "group folder name is not a URL",
+      "request": { "method": "GET", "path": "/(marketing)/pricing" },
+      "expect": { "status": 404, "bodyNotContains": ["<h1>Pricing</h1>"] }
+    },
+    {
+      "name": "markdown page: EJS first, front matter to meta, heading ids, GFM table, nested layout",
+      "request": { "method": "GET", "path": "/docs" },
+      "expect": {
+        "status": 200,
+        "bodyContains": [
+          "<h1 id=\"getting-started\">Getting Started</h1>",
+          "Hello world &amp; friends.",
+          "<table>",
+          "<title>Docs: Docs home</title>",
+          "data-layout=\"docs\"",
+          "data-layout=\"root\""
+        ],
+        "bodyNotContains": ["title: Docs home"]
+      }
+    },
+    {
+      "name": "folder index with trailing slash",
+      "request": { "method": "GET", "path": "/docs/" },
+      "expect": { "status": 200, "bodyContains": ["Getting Started"] }
+    },
+    {
+      "name": "include looks in the nearest _private first; / looks only at the root _private; outer layout wraps an inner slot",
+      "request": { "method": "GET", "path": "/docs/routing" },
+      "expect": {
+        "status": 200,
+        "bodyContains": [
+          "<nav>docs-nav</nav>",
+          "<nav data-current=\"abs\">root-nav</nav>",
+          "<title>Docs: Routing</title>"
+        ]
+      }
+    },
+    {
+      "name": "literal segment beats a param",
+      "request": { "method": "GET", "path": "/products/new" },
+      "expect": { "status": 200, "bodyContains": ["<h1>New product</h1>"] }
+    },
+    {
+      "name": "param route, load + get handlers, returned object shallow-assigned, no flash",
+      "request": { "method": "GET", "path": "/products/42" },
+      "expect": {
+        "status": 200,
+        "bodyContains": ["<h1>Product 42</h1>", "name=Widget 42 loaded=yes method=get", "<p>flash=</p>"]
+      }
+    },
+    {
+      "name": "post handler redirects with a flash cookie",
+      "request": {
+        "method": "POST",
+        "path": "/products/42",
+        "headers": { "Content-Type": "application/x-www-form-urlencoded" },
+        "body": "qty=3"
+      },
+      "expect": {
+        "status": 302,
+        "headers": { "Location": "/products/42" },
+        "setCookieContains": ["pp_flash=%22Saved%203%22", "Max-Age=300", "HttpOnly"]
+      }
+    },
+    {
+      "name": "flash is read once and cleared",
+      "request": { "method": "GET", "path": "/products/42", "headers": { "Cookie": "pp_flash=%22Saved%203%22" } },
+      "expect": {
+        "status": 200,
+        "bodyContains": ["<p>flash=Saved 3</p>"],
+        "setCookieContains": ["pp_flash=", "Max-Age=0"]
+      }
+    },
+    {
+      "name": "httpError from load renders +error.ejs inside the root layout",
+      "request": { "method": "GET", "path": "/products/missing" },
+      "expect": {
+        "status": 404,
+        "bodyContains": ["<p class=\"error\">404: No such product</p>", "<title>Error 404</title>", "data-layout=\"root\""]
+      }
+    },
+    {
+      "name": "method without a handler: 405 with Allow",
+      "request": { "method": "PUT", "path": "/products/42" },
+      "expect": { "status": 405, "headers": { "Allow": "GET, HEAD, POST" } }
+    },
+    {
+      "name": "HEAD renders like GET without a body",
+      "request": { "method": "HEAD", "path": "/products/42" },
+      "expect": { "status": 200, "headers": { "Content-Type": "text/html; charset=utf-8" }, "bodyEmpty": true }
+    },
+    {
+      "name": "two params",
+      "request": { "method": "GET", "path": "/acme/web" },
+      "expect": { "status": 200, "bodyContains": ["org=acme repo=web"] }
+    },
+    {
+      "name": "middleware can end the request with a redirect",
+      "request": { "method": "GET", "path": "/admin" },
+      "expect": { "status": 302, "headers": { "Location": "/login" }, "bodyNotContains": ["admin trail"] }
+    },
+    {
+      "name": "middleware chain runs root first",
+      "request": { "method": "GET", "path": "/admin?key=open" },
+      "expect": { "status": 200, "bodyContains": ["admin trail=root,admin"] }
+    },
+    {
+      "name": "+api.js sends JSON; query values are strings",
+      "request": { "method": "GET", "path": "/feeds/latest?q=x" },
+      "expect": {
+        "status": 200,
+        "headerContains": { "Content-Type": "application/json" },
+        "bodyJSON": { "items": [1, 2, 3], "q": "x" },
+        "bodyNotContains": ["data-layout"]
+      }
+    },
+    {
+      "name": "EJS tags: escape, raw, null/undefined, comment, literal, -%> trimming, resolve()",
+      "request": { "method": "GET", "path": "/escape" },
+      "expect": {
+        "status": 200,
+        "bodyContains": [
+          "<p>&lt;b&gt;&#34;x&#34; &amp; &#39;y&#39;&lt;/b&gt;</p>",
+          "<p><b>raw</b></p>",
+          "<p>||0</p>",
+          "<p><%</p>",
+          "<ul>\n<li>1</li>\n<li>2</li>\n</ul>",
+          "<p>HI</p>"
+        ],
+        "bodyNotContains": ["not shown"]
+      }
+    },
+    {
+      "name": "cookies: strings by default, json on request, encoded on write; query all values",
+      "request": {
+        "method": "GET",
+        "path": "/cookies?a=1&a=2",
+        "headers": { "Cookie": "in=hello; injson=%7B%22b%22%3A2%7D" }
+      },
+      "expect": {
+        "status": 200,
+        "bodyContains": ["in=hello json={&#34;b&#34;:2}", "q=1 all=[&#34;1&#34;,&#34;2&#34;]"],
+        "setCookieContains": ["plain=abc; Path=/; HttpOnly; SameSite=Lax", "obj=%7B%22a%22%3A1%7D", "Max-Age=60"]
+      }
+    },
+    {
+      "name": "static file with ETag",
+      "request": { "method": "GET", "path": "/assets/app.css" },
+      "expect": {
+        "status": 200,
+        "headerContains": { "Content-Type": "text/css", "ETag": "" },
+        "bodyContains": ["body { color: #333; }"]
+      }
+    },
+    {
+      "name": "fingerprinted static file is immutable",
+      "request": { "method": "GET", "path": "/assets/app.97e2e94903cc.css" },
+      "expect": {
+        "status": 200,
+        "headers": { "Cache-Control": "public, max-age=31536000, immutable" },
+        "bodyContains": ["body { color: #333; }"]
+      }
+    },
+    {
+      "name": "asset() fingerprints existing files and leaves others unchanged",
+      "request": { "method": "GET", "path": "/assets" },
+      "expect": {
+        "status": 200,
+        "bodyContains": ["href=\"/assets/app.97e2e94903cc.css\"", "href=\"/nope.css\""]
+      }
+    },
+    {
+      "name": "dash-prefixed folders are never routed",
+      "request": { "method": "GET", "path": "/-drafts/secret" },
+      "expect": { "status": 404, "bodyNotContains": ["draft"] }
+    },
+    {
+      "name": "_private is never routed",
+      "request": { "method": "GET", "path": "/_private/nav" },
+      "expect": { "status": 404, "bodyNotContains": ["root-nav"] }
+    },
+    {
+      "name": "+ files are never routed",
+      "request": { "method": "GET", "path": "/+layout" },
+      "expect": { "status": 404 }
+    },
+    {
+      "name": "unmatched URL falls through to PocketBase",
+      "request": { "method": "GET", "path": "/nothing-here" },
+      "expect": { "status": 404, "bodyNotContains": ["data-layout"] }
+    },
+    {
+      "name": "/api is PocketBase's",
+      "request": { "method": "GET", "path": "/api/health" },
+      "expect": { "status": 200, "headerContains": { "Content-Type": "application/json" } }
+    }
+  ]
+}

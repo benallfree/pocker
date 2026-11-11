@@ -1,0 +1,424 @@
+# PocketPages v1 specification
+
+The contract for `ext/pages`, PocketBase CE's server-rendered multi-page app plugin. The test fixtures
+([`fixtures/`](fixtures)), the starter kits and the PocketPages site are written against this document. Where the
+implementation and this document disagree, one of them is a bug.
+
+v1 is a clean API. It keeps PocketPages' ideas (a folder of files that become routes, EJS, layouts, middleware,
+private partials) and changes the shapes. Apps written for the npm package (0.x) don't run unchanged; "Changes from
+0.x" at the end lists every difference.
+
+## 1. The `pb_pages` folder
+
+Pages live in their own folder next to PocketBase's others:
+
+```
+myapp/
+  pb_data/  pb_hooks/  pb_migrations/  pb_public/
+  pb_pages/
+```
+
+- A single app finds it at `pb_pages` next to `pb_data`, or at `--pagesDir`.
+- Under the multitenant host every instance has its own `pb_pages`.
+- If the folder doesn't exist, the plugin does nothing for that app.
+- Page code can `require()` modules from `pb_pages/node_modules`, then from the app's usual module paths.
+- Pages' own file access (routes, static files, includes, assets) never leaves `pb_pages`.
+
+### 1.1 Special names
+
+A path segment (file or folder name) starting with one of these characters is never a URL:
+
+| Prefix | Meaning |
+|---|---|
+| `+` | Framework file: `+config.js`, `+layout.ejs`, `+middleware.js`, `+page.js`, `+api.js`. Any other `+` name is an error at startup. |
+| `_` | Private. `_private/` folders hold partials and modules for `include()` and `ctx.resolve()`. Other `_` names are ignored. |
+| `-` | Ignored (drafts, notes). |
+| `.` | Ignored (dotfiles). |
+
+`node_modules/` is never routed.
+
+### 1.2 Groups
+
+A folder named `(name)` groups files without adding a URL segment: `(marketing)/about.ejs` serves `/about`. Groups can
+carry their own `+layout.ejs`, `+middleware.js` and `_private/`.
+
+## 2. Routes
+
+### 2.1 Pages
+
+A **page** is a template file: `.ejs` or `.md`.
+
+| File | URL |
+|---|---|
+| `index.ejs` | `/` |
+| `about.ejs` | `/about` |
+| `docs/index.md` | `/docs` (and `/docs/`) |
+| `docs/routing.md` | `/docs/routing` |
+| `products/[id].ejs` | `/products/123`, with `ctx.params.id = "123"` |
+| `[org]/[repo]/index.ejs` | `/acme/web`, with `ctx.params = { org: "acme", repo: "web" }` |
+
+- The extension is dropped. `index` maps to its folder.
+- `[name]` matches exactly one non-empty segment. A segment may mix text and a parameter only as the whole segment;
+  `post-[id].ejs` is an error at startup.
+- A URL with a trailing slash matches the same route as without it. Pages never redirect to add or remove one.
+- Matching is case-sensitive.
+
+### 2.2 API routes
+
+A `+api.js` file serves its folder's URL without a template: `feeds/rss/+api.js` serves `/feeds/rss`.
+`[param]` folders work as for pages. If a folder has both `+api.js` and an `index` page, startup fails.
+
+### 2.3 Static files
+
+Every other file is served as-is at its path (groups removed): `assets/app.css` serves `/assets/app.css`.
+
+- Content type from the extension.
+- `ETag` from the content hash; `If-None-Match` answers `304`.
+- Fingerprinted URLs (see `ctx.asset`, 6.5) are served with `Cache-Control: public, max-age=31536000, immutable`.
+
+### 2.4 Precedence
+
+1. `/api/...` and `/_/...` are PocketBase's. Pages never see them, and a `pb_pages/api/` folder is an error at
+   startup.
+2. Among matching routes the most specific wins: compare segment by segment from the left; a literal segment beats a
+   `[param]`. So `products/new.ejs` beats `products/[id].ejs` for `/products/new`.
+3. A static file and a page can't claim the same URL (startup error).
+4. A URL nothing in `pb_pages` matches goes on to `pb_public`, then to PocketBase.
+
+The route table is built when the app starts and rebuilt when anything in `pb_pages` changes. A rebuild never
+restarts the app or reloads `pb_hooks`. Startup errors (bad names, conflicts) are logged with the file path; the
+previous table keeps serving if there was one.
+
+## 3. Request flow
+
+For a URL that matches a page or API route, one JS call does all of this, in order:
+
+1. **Plugins' `onRequest`** (built-in and JS plugins, in config order).
+2. **Middleware**, root first: every `+middleware.js` from `pb_pages/` down to the route's folder (groups included).
+3. **Handlers**: the folder's `+page.js` (or `+api.js`): `load`, then the handler for the request method.
+4. **Template** (pages only), then **layouts**, innermost first.
+5. **Response.**
+
+The call runs under the app's usual JS limits (execution time, memory), as one unit. If any step sends a response
+(`ctx.res.redirect`, `json`, `html`, `text`, `file`, `sse`), the later steps are skipped.
+
+### 3.1 Middleware
+
+```js
+// pb_pages/admin/+middleware.js
+module.exports = (ctx, next) => {
+  if (!ctx.auth) return ctx.res.redirect('/login')
+  ctx.data.section = 'admin'
+  return next()
+}
+```
+
+- One signature: `(ctx, next)`. Call `next()` to continue; return its result.
+- Returning without calling `next()` ends the request. If no response was sent, that's an error (500, and in dev
+  the error page names the middleware file).
+- Share data through `ctx.data`.
+
+### 3.2 Handlers: `+page.js`
+
+```js
+// pb_pages/products/[id]/+page.js
+module.exports = {
+  load(ctx) {
+    ctx.data.product = ctx.app.findRecordById('products', ctx.params.id)
+  },
+  post(ctx) {
+    const { qty } = ctx.req.body()
+    // ...
+    return ctx.res.redirect(`/products/${ctx.params.id}`, { flash: 'Added to cart' })
+  },
+}
+```
+
+- Exports any of `load`, `get`, `post`, `put`, `patch`, `delete`.
+- `load` runs for every method; then the method's handler, if there is one.
+- A handler may set `ctx.data` fields, or return a plain object, which is shallow-assigned into `ctx.data`
+  (`Object.assign`). There is no deep merge.
+- A `+page.js` applies to every page in its folder. `ctx.route.name` tells them apart.
+- A method with no handler still renders the page for `GET` and `HEAD`. Other methods without a handler answer
+  `405` with an `Allow` header listing `GET, HEAD` and the methods that have handlers, in the order
+  `GET, HEAD, POST, PUT, PATCH, DELETE`.
+
+### 3.3 API handlers: `+api.js`
+
+Same exports as `+page.js`. There is no template, so a handler must send a response; returning without one is a
+500.
+
+```js
+// pb_pages/feeds/latest/+api.js
+module.exports = {
+  get(ctx) {
+    const posts = ctx.app.findRecordsByFilter('posts', 'published = true', '-created', 20)
+    return ctx.res.json(posts.map((p) => ({ id: p.id, title: p.getString('title') })))
+  },
+}
+```
+
+## 4. Templates
+
+### 4.1 EJS
+
+| Tag | Meaning |
+|---|---|
+| `<% code %>` | Run JS, no output |
+| `<%= expr %>` | Output, HTML-escaped |
+| `<%- expr %>` | Output, raw |
+| `<%# comment %>` | Nothing |
+| `<%%` | A literal `<%` |
+| `-%>` | Also remove the newline right after the tag |
+| `<%_` / `_%>` | Also remove whitespace before / after the tag on its line |
+| `<script server> code </script>` | Same as `<% code %>` |
+
+- Escaping replaces `&` `<` `>` `"` `'` with `&amp;` `&lt;` `&gt;` `&#34;` `&#39;`. `null` and `undefined` output as an empty string.
+- A template is compiled once per content hash and reused.
+
+**In scope inside a template:** `ctx`, `data` (= `ctx.data`), `params` (= `ctx.params`), `include`, `slot`, `asset`
+(= `ctx.asset`), `meta` (= `ctx.meta`).
+
+A template returns its text. There is no `echo`; anything you want in the output goes through a tag.
+
+### 4.2 Partials: `include`
+
+```ejs
+<%- include('nav') %>
+<%- include('card', { product }) %>
+```
+
+- `include(name, locals?)` renders a template from a `_private/` folder and returns its text. Use `<%-` so its HTML
+  isn't escaped.
+- Lookup: `_private/` in the current template's folder, then each parent folder up to `pb_pages/`. A name starting
+  with `/` looks only in `pb_pages/_private/`.
+- `name` may omit the extension; `.ejs` then `.md` are tried.
+- The partial sees the same `ctx`, plus `locals` as top-level variables.
+- Including more than 64 levels deep is an error (recursion guard).
+
+### 4.3 Slots and layouts
+
+`+layout.ejs` files wrap pages. A page's layouts are every `+layout.ejs` from its own folder up to `pb_pages/`,
+applied innermost first. A folder may have one layout.
+
+```ejs
+<!-- pb_pages/products/[id].ejs -->
+<% slot('title', () => { %><%= data.product.getString('name') %><% }) %>
+<h1><%= data.product.getString('name') %></h1>
+```
+
+```ejs
+<!-- pb_pages/+layout.ejs -->
+<html>
+  <head><title><%- slot('title') || 'My shop' %></title></head>
+  <body><%- slot() %></body>
+</html>
+```
+
+- `slot(name, fn)` defines a named slot: `fn`'s output is captured and nothing is output in place.
+- `slot(name)` returns a slot's content (`''` if not defined). `slot()` returns the content being wrapped: the page,
+  or the inner layout.
+- Named slots defined by the page or by any inner layout are visible to every outer layout. Defining the same name
+  again replaces it; inside the new definition's `fn`, `slot(name)` still returns the previous content, so a layout
+  can wrap it (`slot('title', () => { %>Docs: <%- slot('title') %><% })`).
+- Layouts are skipped when the response isn't HTML (a handler set another `Content-Type`).
+
+### 4.4 Markdown pages
+
+A `.md` page is EJS first, then Markdown (CommonMark + GFM tables, strikethrough, task lists, autolinks).
+
+- Front matter between `---` lines at the top is YAML. Each top-level key is passed to `ctx.meta(key, value)`.
+- Headings get `id`s: lowercased, characters other than `a-z 0-9 - _ space` removed, spaces to `-`.
+- Relative image paths go through `ctx.asset`.
+- A `.md` partial included from EJS is rendered the same way.
+
+## 5. Responses
+
+| Situation | Response |
+|---|---|
+| A handler or middleware sent one | That one |
+| Page rendered | `200 text/html; charset=utf-8` (or the status set with `ctx.res.status`) |
+| `HEAD` | As `GET`, without a body |
+| Handler for another method missing | `405` + `Allow` |
+| Error thrown | `500` (see 8) |
+
+JSON is only sent through `ctx.res.json` (or `+api.js`). Template output is never parsed as JSON.
+
+## 6. The `ctx` object
+
+One object per request, passed to middleware, handlers, templates and plugins.
+
+### 6.1 `ctx.req`
+
+| Member | |
+|---|---|
+| `method` | `"GET"`, `"POST"`, ... |
+| `url` | `{ href, origin, pathname, search }` |
+| `query(name)` | First value of a query parameter as a string, or `undefined` |
+| `query(name, { all: true })` | Every value, as an array of strings |
+| `query()` | `{ name: firstValue }` for every parameter |
+| `header(name)` | Request header, `''` if absent |
+| `cookie(name)` | Cookie value as a string, or `undefined` |
+| `cookie(name, { json: true })` | Cookie parsed as JSON (`undefined` if absent or not JSON) |
+| `cookies()` | `{ name: value }`, strings |
+| `body()` | Parsed body: JSON object, or form fields (`application/x-www-form-urlencoded`, `multipart/form-data`) as `{ name: value }` (repeated names as arrays) |
+| `files(name)` | Uploaded files for a multipart field, as PocketBase `*filesystem.File` values ready for a record field |
+| `ip` | Client IP as PocketBase resolves it (trusted proxy settings apply) |
+| `event` | The underlying PocketBase `RequestEvent`, for anything not covered here |
+
+Query values and cookies are strings unless you ask for JSON. Nothing is parsed for you.
+
+### 6.2 `ctx.res`
+
+| Member | |
+|---|---|
+| `status(code)` | Status for the rendered page. Returns `ctx.res`. |
+| `header(name, value)` | Set a response header. `header(name)` reads it back. |
+| `cookie(name, value, options?)` | Set a cookie. Non-string values are `JSON.stringify`'d; the value is then percent-encoded (`encodeURIComponent`), and `ctx.req.cookie` decodes it. Defaults: `path=/`, `HttpOnly`, `SameSite=Lax`, `Secure` when the request is HTTPS. Options: `path`, `domain`, `maxAge` (seconds), `expires` (Date), `httpOnly`, `secure`, `sameSite`. |
+| `clearCookie(name, options?)` | Expire a cookie (same `path`/`domain` as when set). |
+| `redirect(location, { status = 302, flash }?)` | Send a redirect. `flash` sets a one-time message (6.4). |
+| `json(data)` / `json(status, data)` | Send JSON. |
+| `html(html)` / `html(status, html)` | Send HTML as-is (no layouts). |
+| `text(text)` / `text(status, text)` | Send plain text. |
+| `file(path)` | Send a file from `pb_pages` (path relative to `pb_pages`). |
+| `sse()` | Start a `text/event-stream` response; returns `{ send(event, data, { id, retry }?), comment(text), close() }`. |
+| `sent` | `true` once a response has been sent. |
+
+### 6.3 Data and routing
+
+| Member | |
+|---|---|
+| `ctx.data` | Plain object shared by middleware, handlers and templates. Starts as `{}`. |
+| `ctx.params` | Route parameters, strings. Never includes query parameters. |
+| `ctx.route` | `{ path, name, file }`: the route pattern (`/products/[id]`), the page name (`[id]`, `index`, ...) and its file relative to `pb_pages`. |
+
+### 6.4 Flash messages
+
+- `ctx.res.redirect(path, { flash: 'Saved' })` stores the message as JSON in a cookie (`pp_flash`, encoded like any
+  cookie, `HttpOnly`, `Max-Age=300`).
+- `ctx.flash()` on the next request returns it and clears it (`Max-Age=0`). It returns `undefined` when there is
+  none. Calling it again in the same request returns the same value.
+- A flash can be any JSON value.
+
+### 6.5 Helpers
+
+| Member | |
+|---|---|
+| `ctx.auth` | The authenticated record, or `null`. Set by PocketBase's own auth (an `Authorization` header) or by the `auth` plugin's cookie. |
+| `ctx.app` | The app (`$app`): records, collections, settings. |
+| `ctx.env(name)` | Environment variable, `''` if unset (the app's environment; under the sandbox, the instance's). |
+| `ctx.log` | `debug`, `info`, `warn`, `error`: to the app's log. `debug` only shows in dev. |
+| `ctx.meta(key, value?)` | Per-request key/value store for page metadata (title, description). Set with two arguments, read with one. |
+| `ctx.asset(path)` | URL for a static file in `pb_pages`, with its content hash: `asset('app.css')` → `/assets/app.3f9a1c2b7d4e.css`. Relative paths resolve from the current file's folder; `/`-paths from `pb_pages`. A path that isn't a file in `pb_pages` is returned unchanged. |
+| `ctx.resolve(name, { mode }?)` | Load a module from `_private/` (same lookup as `include`). Modes: `require` (default, the module's exports), `raw` (file text), `script` (text wrapped in `<script>`), `style` (wrapped in `<style>`). |
+| `ctx.store(name, value?)` | The app's in-memory store (`$app.store()`): set with two arguments, read with one. |
+| `ctx.dev` | `true` in dev mode. |
+
+Fingerprinted asset names carry the first 12 hex characters of the file's SHA-256: `name.<hash>.ext`.
+
+## 7. Configuration: `+config.js`
+
+```js
+// pb_pages/+config.js
+module.exports = {
+  plugins: ['auth', 'datastar', require('./_private/my-plugin.js')],
+  debug: false,
+}
+```
+
+| Key | Default | |
+|---|---|---|
+| `plugins` | `[]` | Built-ins by name, or JS plugin factories (9). EJS and Markdown are always on. |
+| `debug` | `false` | Detailed error pages and `ctx.log.debug` output even outside dev mode. |
+
+Unknown keys, unknown built-in names and duplicates are startup errors.
+
+## 8. Errors
+
+- Anything thrown in middleware, a handler or a template becomes a `500`.
+- **Dev mode or `debug: true`:** an HTML error page with the message, the file and line (template lines map to the
+  `.ejs`/`.md` source), and the stack trimmed to `pb_pages`-relative paths.
+- **Otherwise:** a plain "Something went wrong" page. The full error always goes to the app's log.
+- `throw ctx.httpError(status, message)` sends that status (e.g. `404`, `403`) with a plain page showing `message`.
+  In a `+api.js` it's JSON: `{ "status": 404, "message": "..." }`.
+- A custom error page: `pb_pages/+error.ejs` renders for every `ctx.httpError` and every 500 outside dev mode, with
+  `ctx.error = { status, message }`, inside the root layout.
+
+## 9. Plugins
+
+### 9.1 Built-in
+
+Turned on by name in `+config.js`.
+
+**`auth`:** cookie sessions on PocketBase auth, without calling the app over HTTP.
+- Every request: reads the `pb_auth` cookie, validates the token, sets `ctx.auth` (or clears a bad cookie).
+- `ctx.session.register(email, password, { collection = 'users', data })`
+- `ctx.session.signInWithPassword(email, password, { collection })`
+- `ctx.session.requestOTP(email, { collection })` → `otpId`
+- `ctx.session.signInWithOTP(otpId, code, { collection })`
+- `ctx.session.signInAnonymously({ collection })`
+- `ctx.session.requestOAuth2(provider, { collection, redirectPath = '/auth/oauth/confirm' })`: stores state in a
+  cookie and redirects to the provider.
+- `ctx.session.signInWithOAuth2(state, code)`: completes it on the redirect path.
+- `ctx.session.signIn(record)`: set the cookie for a record you authenticated yourself.
+- `ctx.session.signOut()`
+- Every sign-in method sets `ctx.auth` for the rest of the request and returns `{ token, record }`.
+
+**`realtime`:** `ctx.realtime.send(topic, data, { filter }?)` sends to PocketBase realtime subscribers of `topic`.
+`filter(client)` may limit recipients.
+
+**`datastar`:** Datastar helpers.
+- `ctx.datastar.scripts({ spa, realtime }?)` returns the script tags.
+- `ctx.datastar.patchElements(html, { selector, mode }?)`, `ctx.datastar.patchSignals(signals)`,
+  `ctx.datastar.executeScript(js)` send SSE events on the current response.
+- `ctx.datastar.signals()` reads the request's signals.
+- When a request has `Datastar-Request: true`, the rendered page (without layouts) is sent as a `patchElements`
+  event, into `Datastar-Selector` if given.
+- `ctx.datastar.realtime.*` sends the same patches to realtime subscribers (needs `realtime`).
+
+### 9.2 JS plugins
+
+A JS plugin is a factory that returns hooks:
+
+```js
+module.exports = (config) => ({
+  name: 'my-plugin',
+  onRequest(ctx) {},                       // before middleware
+  extendContext(ctx) { ctx.hello = () => 'hi' },
+  handles(file) { return file.endsWith('.txt.ejs') }, // treat extra files as pages
+  transform({ html, ctx, file }) { return html },     // after each template or layout renders
+})
+```
+
+- `config` is the plugin's entry in `+config.js` when it's an object (`{ factory, ...options }`), else `{}`.
+- Hooks run in config order. Every hook is optional.
+- JS plugins run with the same permissions as the rest of the app's JS (sandboxed in a multitenant host).
+
+## 10. Dev mode
+
+On when the app runs in dev mode (`--dev`) or `+config.js` sets `debug: true`:
+- detailed error pages (8);
+- `ctx.log.debug` output;
+- template cache keyed by content hash, so edits show on the next request (the route table is rebuilt on any file
+  change in every mode).
+
+## 11. Changes from 0.x (npm PocketPages)
+
+| 0.x | v1 |
+|---|---|
+| `pb_hooks/pages/`, booted by `require('pocketpages')` in a `.pb.js` | `pb_pages/`, no boot file, no npm install |
+| `api` object, re-spread into each call | `ctx` with `req`, `res`, `data`, `params`, `route`, helpers |
+| Query parameters mixed into `params`, JSON-parsed | `ctx.params` is route parameters only; `ctx.req.query()` returns strings |
+| Cookies JSON-parsed on read | Strings; `{ json: true }` to parse |
+| Middleware: return a value, or call `next(extra)`, chosen by arity | `(ctx, next)`, data on `ctx.data` |
+| `+load.js`, `+get.js`, `+post.js`, ... per folder, results deep-merged | One `+page.js` exporting `load`, `get`, `post`, ...; returned objects shallow-assigned |
+| Template output that parses as JSON is sent as JSON | Only `ctx.res.json` or `+api.js` |
+| `<!-- slot:name -->` comments; layouts read `slot` / `slots` | `slot(name, fn)` to define, `slot(name)` / `slot()` to read |
+| `echo()` writes during render | Templates return text; streaming only through `ctx.res.sse()` |
+| `redirect(path, { message })` puts the flash in `?__flash=` | `ctx.res.redirect(path, { flash })`, one-time cookie, `ctx.flash()` |
+| `asset()` fingerprint: full SHA-256 | First 12 hex characters |
+| `+config.js` plugins: npm package names, EJS options | Built-in names or JS factories; EJS and Markdown always on |
+| auth plugin through the JS SDK over HTTP (`api.pb()`) | `ctx.session.*`, direct app calls |
+| `url()`, `stringify()`, micro-dash, `pb()` globals | Removed: use `ctx.req.url`, `JSON.stringify`, plain JS, `ctx.app` |
+| Route with fewer segments could match a longer URL | Segment counts must match |
+| `create-pocketpages` | `pocketbase pages create <name> [--starter <kit>]` |

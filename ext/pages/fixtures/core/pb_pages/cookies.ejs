@@ -1,0 +1,6 @@
+<script server>
+  ctx.res.cookie('plain', 'abc')
+  ctx.res.cookie('obj', { a: 1 }, { maxAge: 60 })
+</script>
+<p>in=<%= ctx.req.cookie('in') %> json=<%= JSON.stringify(ctx.req.cookie('injson', { json: true })) %></p>
+<p>q=<%= ctx.req.query('a') %> all=<%= JSON.stringify(ctx.req.query('a', { all: true })) %></p>

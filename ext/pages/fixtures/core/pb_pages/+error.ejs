@@ -1,0 +1,2 @@
+<% slot('title', () => { %>Error <%= ctx.error.status %><% }) %>
+<p class="error"><%= ctx.error.status %>: <%= ctx.error.message %></p>
