@@ -20,7 +20,7 @@ func (bm *BulkMail) bindRoutes(se *core.ServeEvent) {
 	su.GET("/settings", bm.handleGetSettings)
 	su.PATCH("/settings", bm.handleSaveSettings)
 	su.POST("/audience/count", bm.handleCount)
-	su.POST("/campaigns/{id}/start", bm.campaignAction(bm.Start))
+	su.POST("/campaigns/{id}/start", bm.handleStart)
 	su.POST("/campaigns/{id}/pause", bm.campaignAction(bm.Pause))
 	su.POST("/campaigns/{id}/resume", bm.campaignAction(bm.Resume))
 	su.POST("/campaigns/{id}/cancel", bm.campaignAction(bm.Cancel))
@@ -120,6 +120,19 @@ func (bm *BulkMail) campaignAction(fn func(id string) (*core.Record, error)) fun
 		}
 		return e.JSON(http.StatusOK, c)
 	}
+}
+
+// handleStart takes an optional {"limit": N}: queue at most N new recipients (0 = everyone).
+func (bm *BulkMail) handleStart(e *core.RequestEvent) error {
+	var body struct {
+		Limit int `json:"limit"`
+	}
+	_ = json.NewDecoder(io.LimitReader(e.Request.Body, 1<<12)).Decode(&body)
+	c, err := bm.StartLimit(e.Request.PathValue("id"), max(body.Limit, 0))
+	if err != nil {
+		return e.BadRequestError(err.Error(), nil)
+	}
+	return e.JSON(http.StatusOK, c)
 }
 
 func (bm *BulkMail) handleTest(e *core.RequestEvent) error {

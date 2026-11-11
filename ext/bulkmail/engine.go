@@ -26,6 +26,12 @@ const (
 // Start queues a campaign's audience and starts (or schedules) sending. Starting a finished campaign again queues
 // only addresses that aren't in its ledger yet ("send to new matches").
 func (bm *BulkMail) Start(id string) (*core.Record, error) {
+	return bm.StartLimit(id, 0)
+}
+
+// StartLimit is [BulkMail.Start] that queues at most limit new recipients (0 = everyone), for sending a campaign in
+// steps: each call adds the next limit addresses that aren't in the ledger yet.
+func (bm *BulkMail) StartLimit(id string, limit int) (*core.Record, error) {
 	c, err := bm.campaign(id)
 	if err != nil {
 		return nil, err
@@ -53,15 +59,15 @@ func (bm *BulkMail) Start(id string) (*core.Record, error) {
 		bm.poke()
 		return c, nil
 	}
-	return bm.queueAndSend(c)
+	return bm.queueAndSend(c, limit)
 }
 
-func (bm *BulkMail) queueAndSend(c *core.Record) (*core.Record, error) {
+func (bm *BulkMail) queueAndSend(c *core.Record, limit int) (*core.Record, error) {
 	bm.forgetVars(c.Id)
 	if _, err := bm.resolveVars(c); err != nil {
 		return nil, err
 	}
-	if err := bm.queue(c); err != nil {
+	if err := bm.queue(c, limit); err != nil {
 		return nil, err
 	}
 	c.Set("status", StatusSending)
@@ -232,7 +238,7 @@ func (bm *BulkMail) validateCampaign(c *core.Record) error {
 }
 
 // queue resolves the audience into ledger rows. Existing rows (any status) are left alone.
-func (bm *BulkMail) queue(c *core.Record) error {
+func (bm *BulkMail) queue(c *core.Record, limit int) error {
 	a, err := ParseAudience(c.Get("audience"))
 	if err != nil {
 		return err
@@ -255,6 +261,8 @@ func (bm *BulkMail) queue(c *core.Record) error {
 	if err != nil {
 		return err
 	}
+	queued := 0
+	errLimit := errors.New("limit")
 
 	var batch []*core.Record
 	flush := func() error {
@@ -287,14 +295,22 @@ func (bm *BulkMail) queue(c *core.Record) error {
 		if sup[e] {
 			rec.Set("status", SendSkipped)
 			rec.Set("reason", "suppressed")
+		} else {
+			queued++
 		}
 		batch = append(batch, rec)
+		if limit > 0 && queued >= limit {
+			if err := flush(); err != nil {
+				return err
+			}
+			return errLimit
+		}
 		if len(batch) >= 200 {
 			return flush()
 		}
 		return nil
 	})
-	if err != nil {
+	if err != nil && !errors.Is(err, errLimit) {
 		return err
 	}
 	return flush()
@@ -498,7 +514,7 @@ func (bm *BulkMail) Step() (time.Duration, error) {
 		return 0, err
 	}
 	if len(due) > 0 {
-		if _, err := bm.queueAndSend(due[0]); err != nil {
+		if _, err := bm.queueAndSend(due[0], 0); err != nil {
 			_ = bm.setStatus(due[0], StatusPaused, "Couldn't start: "+err.Error())
 		}
 		return 0, nil

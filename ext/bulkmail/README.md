@@ -66,7 +66,7 @@ that move onto this schema before they run this plugin.
 |---|---|
 | `GET`/`PATCH /api/bulkmail/settings` | settings (secrets are never returned), limits, feedback endpoint URLs |
 | `POST /api/bulkmail/audience/count` | `{"audience": {...}}` → count, suppressed, sample |
-| `POST /api/bulkmail/campaigns/{id}/start\|pause\|resume\|cancel` | campaign actions |
+| `POST /api/bulkmail/campaigns/{id}/start\|pause\|resume\|cancel` | campaign actions; `start` takes an optional `{"limit": N}` to queue only the next N new recipients |
 | `POST /api/bulkmail/campaigns/{id}/preview` | rendered message for one recipient |
 | `POST /api/bulkmail/campaigns/{id}/test` | send to `test_to` (no ledger rows) |
 
@@ -80,7 +80,7 @@ Public: `GET`/`POST /api/bulkmail/unsubscribe?t=…`, `POST /api/bulkmail/feedba
 - **Go:** `bulkmail.For(app)` returns the service: `Start`, `Pause`, `Resume`, `Cancel`, `Preview`, `Test`,
   `CountAudience`, `Suppress`, `Unsubscribe`, `UnsubscribeURL`, and the hooks `OnSend`, `OnUnsubscribe` and
   `OnFeedback`. `Config.Mailer` swaps the mail client, for example for a platform relay.
-- **JS:** `$bulkmail.start(id)`, `.pause`, `.resume`, `.cancel`, `.test(id, [to])`, `.preview(id, [email])`,
+- **JS:** `$bulkmail.start(id, [limit])`, `.pause`, `.resume`, `.cancel`, `.test(id, [to])`, `.preview(id, [email])`,
   `.count(audience)`, `.suppress(email, [reason])`, `.unsuppress`, `.isSuppressed`, `.unsubscribe`, `.unsubscribeURL`,
   `.limits()`. React to activity with record hooks on the collections above, for example
   `onRecordAfterCreateSuccess((e) => { … }, "_bulkmail_suppressions")`.

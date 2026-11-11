@@ -239,6 +239,26 @@ func TestCampaignSendsOncePerAddressAndHonorsSuppressions(t *testing.T) {
 	}
 }
 
+func TestStartLimitQueuesInSteps(t *testing.T) {
+	app, bm := newApp(t, Config{Rate: 1000})
+	users := verifiedUsers(t, app)
+	c := newCampaign(t, app, nil)
+	if _, err := bm.StartLimit(c.Id, 1); err != nil {
+		t.Fatal(err)
+	}
+	drain(t, bm)
+	if n := app.TestMailer.TotalSend(); n != 1 {
+		t.Fatalf("limit 1: sent %d", n)
+	}
+	if _, err := bm.StartLimit(c.Id, 0); err != nil {
+		t.Fatal(err)
+	}
+	drain(t, bm)
+	if n := app.TestMailer.TotalSend(); n != len(users) {
+		t.Fatalf("rest: sent %d, want %d", n, len(users))
+	}
+}
+
 type failingMailer struct{ err error }
 
 func (f failingMailer) Send(*mailer.Message) error { return f.err }

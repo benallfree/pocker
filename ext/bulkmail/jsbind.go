@@ -15,7 +15,7 @@ import (
 //
 //	jsvm.MustRegister(app, jsvm.Config{OnInit: func(vm *goja.Runtime) { bulkmail.BindJS(vm, app) }})
 //
-//	$bulkmail.start(id), .pause(id), .resume(id), .cancel(id)  -> campaign record
+//	$bulkmail.start(id, [limit]), .pause(id), .resume(id), .cancel(id) -> campaign record
 //	$bulkmail.test(id, [to]), .preview(id, [email])           -> preview: {subject, html, text, to}
 //	$bulkmail.count({collection, filter, email_field} | {sql}) -> {count, suppressed, sample}
 //	$bulkmail.suppress(email, [reason]), .unsuppress(email), .isSuppressed(email)
@@ -55,7 +55,13 @@ func BindJS(vm *goja.Runtime, app core.App) {
 		}
 	}
 
-	_ = obj.Set("start", action((*BulkMail).Start))
+	_ = obj.Set("start", func(call goja.FunctionCall) goja.Value {
+		limit := 0
+		if v := call.Argument(1); !goja.IsUndefined(v) && !goja.IsNull(v) {
+			limit = int(v.ToInteger())
+		}
+		return vm.ToValue(must(get().StartLimit(str(call, 0), max(limit, 0))))
+	})
 	_ = obj.Set("pause", action((*BulkMail).Pause))
 	_ = obj.Set("resume", action((*BulkMail).Resume))
 	_ = obj.Set("cancel", action((*BulkMail).Cancel))
