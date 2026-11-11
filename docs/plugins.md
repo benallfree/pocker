@@ -141,10 +141,4 @@ Your Go code runs with the host's full power, outside the JS sandbox:
 
 ## Planned plugins
 
-| Plugin | What it adds |
-|---|---|
-| PITR | Litestream replication per instance; restore in place from the Backups screen. |
-| Bulk mail | Campaigns to an app's own users, with unsubscribe and bounce handling. |
-| Pages | Server-rendered multi-page apps from a `pb_pages` folder. |
-| Storage | A default storage backend per instance when its own S3 is off. |
-| S3 redirects | File downloads as signed redirects after PocketBase's access check. |
+Our own plugins will live in this repo under [`ext/`](../ext), each as its own Go module (`github.com/pockerbase/pocketbase/ext/<name>`) with its own version tags. The list and what each will do is in [ext/README.md](../ext/README.md).
