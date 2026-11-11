@@ -5,7 +5,7 @@ File downloads as short-lived signed redirects, after PocketBase's own access ch
 **Runs on:** Single app, or many under [pocker](../pocker/README.md).
 
 > **Status.** Working: Go module `github.com/pockethost/pocketbase/ext/s3redirect`, no dependencies beyond
-> PocketBase CE. [`example/main.go`](example/main.go) runs one app with redirects on.
+> PocketBase CE. [`example/`](example/main.go) runs one app with its own in-process bucket, nothing to set up.
 
 ## What it does
 
@@ -65,11 +65,24 @@ Each instance signs with its own S3 settings. `Config.Target` lets Go code pick 
 example [`ext/storage`](../storage/README.md)'s operator bucket, fenced to `instances/<id>/storage/`); it can't be
 set from config files or instance data.
 
-## Testing it locally
+## Try it
 
-With MinIO (`minio server ./data`, `mc mb local/files`), run the example, set Files storage to endpoint
-`http://127.0.0.1:9000`, bucket `files`, path style on, upload a file to a record, and open its URL:
-`curl -I` shows `302` and a `Location` on the bucket.
+```
+cd example && go run . serve
+```
+
+The example is its own Go module, so its demo dependencies (gofakes3, the AWS SDK signer) never reach the plugin's
+`go.mod`. It:
+- starts an S3-compatible bucket in-process on `127.0.0.1:9199` ([gofakes3](https://github.com/johannesboyne/gofakes3),
+  objects kept in `pb_data/demo-s3.bolt`), and points the app's Files storage at it;
+- seeds a `demo_files` record with an image (thumbs `100x100`) and a protected text file, uploaded through PocketBase;
+- prints the URLs to open. Each answers `302` to the bucket.
+
+The bucket only serves presigned GETs whose signature, re-computed with the **AWS SDK's own SigV4 signer**, matches
+and hasn't expired, and logs each one (`demo bucket: presigned GET ..., signature valid`). Unsigned or edited URLs get
+`403`. So a working download proves the plugin's signatures are AWS-compatible, not just accepted by a lenient fake.
+
+`S3REDIRECT_DEMO=0` skips the demo bucket (use your own Files storage settings); `S3REDIRECT_DEMO_ADDR` moves it.
 
 ## License
 

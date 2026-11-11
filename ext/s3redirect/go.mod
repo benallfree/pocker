@@ -4,7 +4,6 @@ go 1.27
 
 require (
 	ganigeorgiev.com/pocketbase/pocketbase v0.0.0-00010101000000-000000000000
-	github.com/pockethost/pocketbase/ext/devusers v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketbase/ext/pocker v0.0.0-00010101000000-000000000000
 	gopkg.in/yaml.v3 v3.0.1
 )
