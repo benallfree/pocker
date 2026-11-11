@@ -163,7 +163,7 @@ in-flight requests first), so a rotated secret takes effect immediately. Host ch
 the app, holds new requests for that instance, runs `fn(dir)`, then lets them through to a fresh app.
 `Manager.StartInstance(ctx, id)` starts it right away and returns the start error (for example to tell a deploy that
 a hook is broken), `Manager.Running(id)` says whether it is started, and `Manager.InstanceDir(id)` gives its folder.
-`Manager.LogInstance(id, stream, message)` appends to the instance's `logs/exec.log` (e.g. a scheduled job's result).
+`Manager.Ready()` says whether the instance list has loaded. `Manager.LogInstance(id, stream, message)` appends to the instance's `logs/exec.log` (e.g. a scheduled job's result).
 Host code that runs in its own goroutines gets the Manager from `Server.OnStart`, before any request is served.
 
 **Several servers, one set of instances.** An instance with `remote: <url>` runs on another server: Pocker checks the

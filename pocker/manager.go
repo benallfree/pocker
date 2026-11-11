@@ -637,6 +637,13 @@ func (m *Manager) WithInstanceStopped(ctx context.Context, id string, fn func(di
 	return fn(instanceDir(m.opts, inst))
 }
 
+// Ready reports whether the instance list has loaded (before that, requests get 503 "starting").
+func (m *Manager) Ready() bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.ready
+}
+
 // Running reports whether the instance's app is started (or starting).
 func (m *Manager) Running(id string) bool {
 	m.mu.RLock()
