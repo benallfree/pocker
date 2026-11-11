@@ -309,8 +309,10 @@ func (h slogHandler) Enabled(ctx context.Context, l slog.Level) bool {
 func (h slogHandler) Handle(ctx context.Context, r slog.Record) error {
 	return h.app.Logger().Handler().Handle(ctx, r)
 }
-func (h slogHandler) WithAttrs(a []slog.Attr) slog.Handler { return h.app.Logger().Handler().WithAttrs(a) }
-func (h slogHandler) WithGroup(n string) slog.Handler      { return h.app.Logger().Handler().WithGroup(n) }
+func (h slogHandler) WithAttrs(a []slog.Attr) slog.Handler {
+	return h.app.Logger().Handler().WithAttrs(a)
+}
+func (h slogHandler) WithGroup(n string) slog.Handler { return h.app.Logger().Handler().WithGroup(n) }
 
 // ---------------------------------------------------------------------------------------------------------------
 // _deploys
@@ -368,4 +370,3 @@ func EnsureSchema(app core.App) error {
 	}
 	return nil
 }
-

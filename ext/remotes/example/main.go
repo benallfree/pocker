@@ -22,7 +22,7 @@ func main() {
 	app := pocketbase.New()
 	devusers.Register(app) // local testing: superuser admin@example.com and user user@example.com, password "password"
 
-	tokens.MustRegister(app, tokens.Config{})  // so login can mint a revocable API token
+	tokens.MustRegister(app, tokens.Config{})   // so login can mint a revocable API token
 	remotes.MustRegister(app, remotes.Config{}) // GET /_pocker/whoami + remote/login/logout/link commands
 
 	if err := app.Start(); err != nil {
