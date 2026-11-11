@@ -1,0 +1,20 @@
+{
+  "date": "2026-11-11",
+  "machine": "Apple M1 Max, 10 cores, macOS 27, hey against 127.0.0.1",
+  "pages": [
+    {
+      "name": "minimal",
+      "path": "/",
+      "what": "EJS page",
+      "npm": { "rps": 620, "p50": 30, "p99": 670, "single": 5.7 },
+      "v1": { "rps": 10850, "p50": 1.8, "p99": 37, "single": 0.2 }
+    },
+    {
+      "name": "daisyui-docs",
+      "path": "/docs/overview",
+      "what": "layouts, Markdown, partial",
+      "npm": { "rps": 580, "p50": 28, "p99": 1100, "single": 6.5 },
+      "v1": { "rps": 6510, "p50": 4.1, "p99": 49, "single": 0.4 }
+    }
+  ]
+}

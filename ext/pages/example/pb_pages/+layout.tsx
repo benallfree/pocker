@@ -8,6 +8,7 @@ export default function Layout({ ctx, children, slot, asset }: any) {
     ['/notes', 'Notes'],
     ['/clock', 'SSE'],
     ['/stats', 'JSON'],
+    ['/speed', 'Speed'],
   ]
   return (
     <html lang="en">
@@ -16,6 +17,7 @@ export default function Layout({ ctx, children, slot, asset }: any) {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <title>{slot('title') || 'PocketPages demo'}</title>
         <link rel="stylesheet" href={asset('assets/app.css')} />
+        {slot('head')}
       </head>
       <body>
         <header>
