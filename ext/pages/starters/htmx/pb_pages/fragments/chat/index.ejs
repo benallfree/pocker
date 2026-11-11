@@ -1,0 +1,3 @@
+<%_ if (ctx.req.method === 'POST') {
+  ctx.realtime.send('chat', include('chat-msg.ejs', { message: data.message }))
+} _%>

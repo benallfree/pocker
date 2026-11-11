@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title><%=meta('title') || 'htmx starter kit'%></title>
+  <meta name="description" content="<%=meta('description') || 'htmx starter kit'%>" />
+  <meta property="og:title" content="<%=meta('title') || 'htmx starter kit'%>" />
+  <meta property="og:description" content="<%=meta('description') || 'htmx starter kit'%>" />
+  <meta property="og:image" content="<%=meta('image') || '/android-chrome-512x512.png'%>" />
+  <meta property="og:url" content="<%=meta('path') ? `${meta('path')}` : meta('url') || ctx.req.url.href%>" />
+  <link rel="stylesheet" href="https://unpkg.com/mvp.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/htmx/2.0.3/htmx.min.js" integrity="sha512-dQu3OKLMpRu85mW24LA1CUZG67BgLPR8Px3mcxmpdyijgl1UpCM1RtJoQP6h8UkufSnaHVRTUx98EQT9fcKohw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+  <script src="https://unpkg.com/pocketbase-htmx-ext-sse"></script>
+  <%- slot('head') %>
+</head>
+
+<body>
+  <main><%- slot() %></main>
+</body>
+
+</html>

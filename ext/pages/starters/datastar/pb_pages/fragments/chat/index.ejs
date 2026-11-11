@@ -1,0 +1,20 @@
+<script server>
+  const { clientId, roomName, messages } = data
+  const html = include('chat-messages.ejs', { roomName, messages })
+
+  // Broadcast the chat box to every realtime client in this room. A client
+  // joins a room by sending a message there: the sender is tagged as it passes
+  // through the filter.
+  ctx.datastar.realtime.patchElements(html, {}, {
+    filter: (client) => {
+      if (client.id() === clientId) client.set('roomName', roomName)
+      const shouldSend = client.get('roomName') === roomName
+      ctx.log.debug(`${client.id()} roomName is ${client.get('roomName')}, should send: ${shouldSend}`)
+      return shouldSend
+    },
+  })
+
+  // Clear the message input
+  ctx.datastar.patchSignals({ message: '' })
+</script>
+<%- html %>

@@ -70,7 +70,8 @@ A `+api.js` file serves its folder's URL without a template: `feeds/rss/+api.js`
 
 ### 2.3 Static files
 
-Every other file is served as-is at its path (groups removed): `assets/app.css` serves `/assets/app.css`.
+Every other file is served as-is at its path (groups removed): `assets/app.css` serves `/assets/app.css`. Files that
+mustn't be served (build inputs such as a Tailwind source) take a `-` prefix: `assets/-app.tailwind.css`.
 
 - Content type from the extension.
 - `ETag` from the content hash; `If-None-Match` answers `304`.
@@ -135,7 +136,8 @@ module.exports = {
 ```
 
 - Exports any of `load`, `get`, `post`, `put`, `patch`, `delete`.
-- `load` runs for every method; then the method's handler, if there is one.
+- `load` runs for every method; then the method's handler, if there is one. `HEAD` runs `load` and `get` like
+  `GET` (only the body is dropped), so keep side effects in `post`/`put`/`patch`/`delete`.
 - A handler may set `ctx.data` fields, or return a plain object, which is shallow-assigned into `ctx.data`
   (`Object.assign`). There is no deep merge.
 - A `+page.js` applies to every page in its folder. `ctx.route.name` tells them apart.
@@ -221,7 +223,8 @@ applied innermost first. A folder may have one layout.
 - Named slots defined by the page or by any inner layout are visible to every outer layout. Defining the same name
   again replaces it; inside the new definition's `fn`, `slot(name)` still returns the previous content, so a layout
   can wrap it (`slot('title', () => { %>Docs: <%- slot('title') %><% })`).
-- Layouts are skipped when the response isn't HTML (a handler set another `Content-Type`).
+- Layouts are skipped when the response isn't HTML (a handler set another `Content-Type`) or after
+  `ctx.res.layout(false)`.
 
 ### 4.4 Markdown pages
 
@@ -282,6 +285,7 @@ Query values and cookies are strings unless you ask for JSON. Nothing is parsed 
 | `text(text)` / `text(status, text)` | Send plain text. |
 | `file(path)` | Send a file from `pb_pages` (path relative to `pb_pages`). |
 | `sse()` | Start a `text/event-stream` response; returns `{ send(event, data, { id, retry }?), comment(text), close() }`. |
+| `layout(false)` | Render this page without layouts (e.g. an HTML fragment for htmx). |
 | `sent` | `true` once a response has been sent. |
 
 ### 6.3 Data and routing
@@ -310,6 +314,7 @@ Query values and cookies are strings unless you ask for JSON. Nothing is parsed 
 | `ctx.log` | `debug`, `info`, `warn`, `error`: to the app's log. `debug` only shows in dev. |
 | `ctx.meta(key, value?)` | Per-request key/value store for page metadata (title, description). Set with two arguments, read with one. |
 | `ctx.asset(path)` | URL for a static file in `pb_pages`, with its content hash: `asset('app.css')` → `/assets/app.3f9a1c2b7d4e.css`. Relative paths resolve from the current file's folder; `/`-paths from `pb_pages`. A path that isn't a file in `pb_pages` is returned unchanged. |
+| `ctx.include(name, locals?)` | Render a `_private/` partial from JS (handlers, middleware, plugins) and get its text; same lookup as the template `include`, from the route's folder. |
 | `ctx.resolve(name, { mode }?)` | Load a module from `_private/` (same lookup as `include`). Modes: `require` (default, the module's exports), `raw` (file text), `script` (text wrapped in `<script>`), `style` (wrapped in `<style>`). |
 | `ctx.store(name, value?)` | The app's in-memory store (`$app.store()`): set with two arguments, read with one. |
 | `ctx.dev` | `true` in dev mode. |
@@ -352,29 +357,46 @@ Turned on by name in `+config.js`.
 
 **`auth`:** cookie sessions on PocketBase auth, without calling the app over HTTP.
 - Every request: reads the `pb_auth` cookie, validates the token, sets `ctx.auth` (or clears a bad cookie).
-- `ctx.session.register(email, password, { collection = 'users', data })`
+- `ctx.session.authMethods({ collection })` → `{ password: { enabled, identityFields }, otp: { enabled }, mfa:
+  { enabled }, oauth2: { enabled, providers: [{ name, displayName }] } }`, as PocketBase's auth-methods API.
+- `ctx.session.register(email, password, { collection = 'users', data, verify = true, signIn = true })`: creates the
+  record; sends the verification email when `verify`; signs in when `signIn`.
 - `ctx.session.signInWithPassword(email, password, { collection })`
-- `ctx.session.requestOTP(email, { collection })` → `otpId`
+- `ctx.session.requestOTP(email, { collection, create = false })` → `otpId`. Always returns an id (unknown emails
+  get one that never validates, as PocketBase does); with `create: true` a missing record is created first.
 - `ctx.session.signInWithOTP(otpId, code, { collection })`
 - `ctx.session.signInAnonymously({ collection })`
-- `ctx.session.requestOAuth2(provider, { collection, redirectPath = '/auth/oauth/confirm' })`: stores state in a
-  cookie and redirects to the provider.
+- `ctx.session.requestOAuth2(provider, { collection, redirectPath = '/auth/oauth/confirm', redirect = true })`:
+  stores state in a cookie and returns the provider's URL; with `redirect` it also sends the redirect
+  (`ctx.res.sent`).
 - `ctx.session.signInWithOAuth2(state, code)`: completes it on the redirect path.
 - `ctx.session.signIn(record)`: set the cookie for a record you authenticated yourself.
 - `ctx.session.signOut()`
+- Email flows, with PocketBase's own checks and mail templates: `requestVerification(email, { collection })`,
+  `confirmVerification(token)`, `requestPasswordReset(email, { collection })`,
+  `confirmPasswordReset(token, password, passwordConfirm)`, `requestEmailChange(newEmail)` (needs `ctx.auth`),
+  `confirmEmailChange(token, password)`. Request methods never reveal whether an email exists.
 - Every sign-in method sets `ctx.auth` for the rest of the request and returns `{ token, record }`.
 
-**`realtime`:** `ctx.realtime.send(topic, data, { filter }?)` sends to PocketBase realtime subscribers of `topic`.
-`filter(client)` may limit recipients.
+**`realtime`:** PocketBase realtime from page code.
+- `ctx.realtime.send(topic, data, { filter }?)` sends to every client subscribed to `topic`. `data` is always
+  JSON-encoded (a string arrives as a JSON string, as PocketBase's own messages do).
+- `filter(client)` returns `true` to include a client. `client` is PocketBase's realtime client: `id()`,
+  `get(key)`, `set(key, value)`, `hasSubscription(topic)`.
+- `ctx.realtime.client(id)` returns one client by id, or `null`.
 
 **`datastar`:** Datastar helpers.
-- `ctx.datastar.scripts({ spa, realtime }?)` returns the script tags.
-- `ctx.datastar.patchElements(html, { selector, mode }?)`, `ctx.datastar.patchSignals(signals)`,
-  `ctx.datastar.executeScript(js)` send SSE events on the current response.
+- `ctx.datastar.scripts({ spa, realtime }?)` returns the script tags. With `realtime: true` the page subscribes to
+  the `datastar` realtime topic and sets a `$clientId` signal to its realtime client id.
+- `ctx.datastar.patchElements(html, { selector, mode }?)`, `ctx.datastar.patchSignals(signals, { onlyIfMissing }?)`
+  (`signals` is an object), `ctx.datastar.executeScript(js)` send SSE events on the current response. The first one
+  starts the stream (`ctx.res.sent` becomes `true`); later steps still run, but their output isn't sent and the
+  automatic patch below doesn't happen. The stream closes when the request ends.
 - `ctx.datastar.signals()` reads the request's signals.
 - When a request has `Datastar-Request: true`, the rendered page (without layouts) is sent as a `patchElements`
   event, into `Datastar-Selector` if given.
-- `ctx.datastar.realtime.*` sends the same patches to realtime subscribers (needs `realtime`).
+- `ctx.datastar.realtime.patchElements(html, options?, { filter }?)`, `.patchSignals(signals, options?, { filter }?)`
+  and `.executeScript(js, { filter }?)` send the same events to `datastar` realtime subscribers (needs `realtime`).
 
 ### 9.2 JS plugins
 
@@ -402,7 +424,13 @@ On when the app runs in dev mode (`--dev`) or `+config.js` sets `debug: true`:
 - template cache keyed by content hash, so edits show on the next request (the route table is rebuilt on any file
   change in every mode).
 
-## 11. Changes from 0.x (npm PocketPages)
+## 11. Starter kits
+
+`pocketbase pages create <name> [--starter <kit>]` creates the folder `<name>` and copies the whole kit into it:
+`pb_pages/` plus anything beside it (`pb_migrations/`, `README.md`, a `package.json` for CSS tooling). The default
+kit is `minimal`. Kits ship inside `ext/pages` (`starters/`).
+
+## 12. Changes from 0.x (npm PocketPages)
 
 | 0.x | v1 |
 |---|---|
