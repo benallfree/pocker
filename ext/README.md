@@ -18,6 +18,7 @@ Each folder here will be one plugin, with its own Go module (`github.com/pocketh
 | [`tenants`](tenants/README.md) | Accounts that own instances: quotas, owner logins, tokens, the API for your own tenant dashboard (level 4). | Requires mothership and sandbox |
 | [`tenant-billing-ls`](tenant-billing-ls/README.md) | Lemon Squeezy billing for tenants: checkout, webhooks, quotas, reconcile. | Requires tenants |
 | [`vacuum`](vacuum/README.md) | Scheduled database compaction: online VACUUM for a single app; under pocker, one stopped instance at a time. | Single app, or many under pocker |
+| [`tokens`](tokens/README.md) | API tokens (`pbt_…`) for any auth collection: bearer auth, scopes that plugins register, revoke one or all, Settings → API tokens, `pocketbase token`. | Single app, or many under pocker |
 | [`deploy`](deploy/README.md) | A deploy API: upload code sets (hooks, migrations, public files), swap them in safely, stream logs. Pluggable auth. | Single app, or many under pocker |
 | [`firewall`](firewall/README.md) | Peer allow-lists, trusted proxies and per-IP rate limits; under pocker, per-instance and cross-instance limits too. | Single app, or many under pocker |
 | [`autotls`](autotls/README.md) | Automatic certificates through ACME: on demand for every served hostname, wildcards through DNS-01, more CAs. | Single app, or many under pocker |
