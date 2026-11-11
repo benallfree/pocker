@@ -5,4 +5,7 @@
 // Client half: `pocketbase deploy | dev | pull | logs [remote]` (remotes from ext/remotes). It speaks the same
 // protocol as the pockethost npm CLI, so it deploys to PocketHost edges (/_ph/deploy/v1) and to CE remotes
 // (/_pocker/deploy/v1), found through /_pocker/whoami.
+//
+// Server half: the deploy API. [Register] serves it on a single app (superusers; API tokens with the deploy scope);
+// [New] builds it for any [Backend] and [Instances] (PocketHost runs it under pocker with its own backend).
 package deploy

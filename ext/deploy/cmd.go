@@ -81,7 +81,7 @@ func open(ctx context.Context, remote string) (*Client, error) {
 
 func printer(w io.Writer) func(string) { return func(s string) { fmt.Fprintln(w, s) } }
 
-func first(args []string) string {
+func firstArg(args []string) string {
 	if len(args) > 0 {
 		return args[0]
 	}
@@ -136,7 +136,7 @@ func deployCommand() *cobra.Command {
 			}
 			ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 			defer stop()
-			c, err := open(ctx, first(args))
+			c, err := open(ctx, firstArg(args))
 			if err != nil {
 				return err
 			}
@@ -166,7 +166,7 @@ func devCommand() *cobra.Command {
 			defer stop()
 			out := cmd.OutOrStdout()
 			log := printer(out)
-			c, err := open(ctx, first(args))
+			c, err := open(ctx, firstArg(args))
 			if err != nil {
 				return err
 			}
@@ -282,7 +282,7 @@ func pullCommand() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 			defer stop()
-			c, err := open(ctx, first(args))
+			c, err := open(ctx, firstArg(args))
 			if err != nil {
 				return err
 			}
@@ -316,7 +316,7 @@ func logsCommand() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 			defer stop()
-			c, err := open(ctx, first(args))
+			c, err := open(ctx, firstArg(args))
 			if err != nil {
 				return err
 			}

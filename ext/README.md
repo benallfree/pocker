@@ -20,7 +20,7 @@ Each folder here will be one plugin, with its own Go module (`github.com/pocketh
 | [`vacuum`](vacuum/README.md) | Scheduled database compaction: online VACUUM for a single app; under pocker, one stopped instance at a time. | Single app, or many under pocker |
 | [`tokens`](tokens/README.md) | API tokens (`pbt_…`) for any auth collection: bearer auth, scopes that plugins register, revoke one or all, Settings → API tokens, `pocketbase token`. | Single app, or many under pocker |
 | [`remotes`](remotes/README.md) | Named remotes for the `pocketbase` command (`remote`, `login`, `logout`, `link`), saved logins, and `GET /_pocker/whoami` for discovery. | The `pocketbase` command; any app (whoami) |
-| [`deploy`](deploy/README.md) | A deploy API: upload code sets (hooks, migrations, public files), swap them in safely, stream logs. Pluggable auth. | Single app, or many under pocker |
+| [`deploy`](deploy/README.md) | Deploys: `pocketbase deploy | dev | pull | logs` (also to PocketHost edges) and the deploy API (hash diff, safe swap, history, logs), with pluggable auth. | The `pocketbase` command; single app, or many under pocker with your own backend |
 | [`firewall`](firewall/README.md) | Peer allow-lists, trusted proxies and per-IP rate limits; under pocker, per-instance and cross-instance limits too. | Single app, or many under pocker |
 | [`autotls`](autotls/README.md) | Automatic certificates through ACME: on demand for every served hostname, wildcards through DNS-01, more CAs. | Single app, or many under pocker |
 | [`servertiming`](servertiming/README.md) | `Server-Timing` headers with timings for each step of a request (and each hop under pocker). | Single app, or many under pocker |

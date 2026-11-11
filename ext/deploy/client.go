@@ -216,23 +216,6 @@ func (s *DeploySet) WriteTo(outDir string) error {
 	return nil
 }
 
-func copyFile(src, dst string) error {
-	in, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer in.Close()
-	out, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	if _, err := io.Copy(out, in); err != nil {
-		out.Close()
-		return err
-	}
-	return out.Close()
-}
-
 // EncodeBundle builds an upload body: "PHB1" + [32-byte sha256][uint32 BE length][bytes] per entry (gzip it).
 func EncodeBundle(entries [][]byte) []byte {
 	var b bytes.Buffer
