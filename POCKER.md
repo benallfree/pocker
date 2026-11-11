@@ -212,10 +212,26 @@ Kept small and marked `// POCKER:` so upstream merges stay easy:
   `HTTPSendMaxBodySize` caps for `$http.send`.
 - `tools/mailer`: `DialContext`, when set, sends SMTP through the host's dialer (same exchange as mailyak).
 
+## Versions
+
+PockerBase has its own version line, starting at `v0.0.1`, independent of PocketBase's numbers. When PocketBase
+releases, we merge it and decide then how to bump ours. Each release says which PocketBase version it's based on.
+
+The module path stays `ganigeorgiev.com/pocketbase/pocketbase`, so a build pins a PockerBase version through the
+`replace` line:
+
+```
+replace ganigeorgiev.com/pocketbase/pocketbase => github.com/pockerbase/pockerbase v0.0.1
+```
+
 ## Upstream tracking
+
+Fetch upstream without its tags: PocketBase's `v0.x` tags must never land in this repo, or Go would take `v0.41.1` for
+the newest PockerBase.
 
 ```sh
 git remote add upstream https://ganigeorgiev.com/git/pocketbase/pocketbase
-git fetch upstream --tags
-git merge v0.41.2   # resolve conflicts in the POCKER-marked spots, rerun `go test ./pocker/... ./core/... ./plugins/jsvm/...`
+git config remote.upstream.tagOpt --no-tags
+git fetch upstream refs/tags/v0.41.2   # one release, without creating the tag here
+git merge FETCH_HEAD   # resolve conflicts in the POCKER-marked spots, rerun `go test ./pocker/... ./core/... ./plugins/jsvm/...`
 ```
