@@ -14,6 +14,8 @@ import (
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	_ "ganigeorgiev.com/pocketbase/pocketbase/migrations" // registers PocketBase's system migrations, as pocketbase.go does
 	"ganigeorgiev.com/pocketbase/pocketbase/plugins/jsvm"
+	"ganigeorgiev.com/pocketbase/pocketbase/tools/hook"
+	"ganigeorgiev.com/pocketbase/pocketbase/tools/mailer"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/security"
 	"ganigeorgiev.com/pocketbase/pocketbase/ui"
 	"github.com/dop251/goja"
@@ -78,6 +80,18 @@ func startApp(opts appOptions, inst Instance) (r *runningApp, err error) {
 		IsDev:         inst.Dev || opts.ForceDev,
 		EncryptionKey: inst.EncryptionKey,
 		AppMigrations: &core.MigrationsList{}, // this app's JS migrations only
+	})
+	// every message names its instance (the dev mail trap and relays show it); first, so later hooks see it
+	app.OnMailerSend().Bind(&hook.Handler[*core.MailerEvent]{
+		Id:       "__pockerInstanceHeader__",
+		Priority: -1 << 30,
+		Func: func(e *core.MailerEvent) error {
+			if e.Message.Headers == nil {
+				e.Message.Headers = map[string]string{}
+			}
+			e.Message.Headers[mailer.InstanceHeader] = inst.ID
+			return e.Next()
+		},
 	})
 	if opts.Init != nil {
 		if err := opts.Init(inst, app); err != nil {

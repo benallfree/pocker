@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
+	"ganigeorgiev.com/pocketbase/pocketbase/tools/mailer"
 )
 
 // Server wires a [Config], an [InstanceSource] and a [Manager] into one HTTP server.
@@ -224,6 +225,10 @@ func (s *Server) Run(ctx context.Context) error {
 		go func() { serveErr <- srv.Serve(ln) }()
 	}
 	log.Info("pocker: listening", "addr", ln.Addr().String(), "pb_root", s.Config.PBRoot, "dev", s.Config.Dev)
+	if s.Config.Dev {
+		// instances start on their first request; start the dev mail trap now so its notice shows at startup
+		_, _ = mailer.DevTrap("Dev mode: instances without SMTP")
+	}
 	var plain []*http.Server
 	for _, addr := range s.Config.PlainListen {
 		pln, err := net.Listen("tcp", addr)
