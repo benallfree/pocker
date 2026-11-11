@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"math"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -16,6 +17,7 @@ import (
 	"time"
 
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
+	"ganigeorgiev.com/pocketbase/pocketbase/tools/hook"
 )
 
 // HealthPath answers on any host with the engine's status.
@@ -77,6 +79,8 @@ type ManagerOptions struct {
 	// Gate, if set, admits requests: a peer check before routing, and per-instance admission (e.g. rate limits)
 	// before an instance is served here or forwarded (see [Gate]).
 	Gate Gate
+	// Init runs host Go code for each app before it bootstraps (plugins implementing [AppIniter]).
+	Init func(inst Instance, app core.App) error
 	// Setup runs host Go code for each app after migrations and before it serves (see [Server.SetupApp]).
 	Setup func(inst Instance, app core.App) error
 	// Forward serves requests for instances with [Instance.Remote] set, after the firewall checks. Nil = a plain
@@ -94,7 +98,7 @@ func NewManager(source InstanceSource, opts ManagerOptions) *Manager {
 	defaults := opts.Defaults.over(DefaultLimits())
 	return &Manager{
 		source:    source,
-		opts:      appOptions{PBRoot: opts.PBRoot, HooksPoolSize: opts.HooksPoolSize, ForceDev: opts.Dev, Defaults: defaults, Setup: opts.Setup},
+		opts:      appOptions{PBRoot: opts.PBRoot, HooksPoolSize: opts.HooksPoolSize, ForceDev: opts.Dev, Defaults: defaults, Init: opts.Init, Setup: opts.Setup},
 		defaults:  defaults,
 		onEvent:   opts.OnEvent,
 		gate:      opts.Gate,
@@ -297,6 +301,7 @@ func (m *Manager) app(inst Instance) (*runningApp, error) {
 			openInstanceLog(instanceDir(m.opts, inst)).Write("stderr", "Instance failed to start: "+slot.err.Error())
 			m.emit(Event{Kind: EventFailed, InstanceID: inst.ID, Reason: slot.err.Error()})
 		} else {
+			m.catchRestart(inst.ID, slot)
 			m.log.Info("pocker: instance started", "id", inst.ID, "ms", time.Since(t).Milliseconds())
 			m.emit(Event{Kind: EventStarted, InstanceID: inst.ID})
 		}
@@ -696,4 +701,45 @@ func (m *Manager) waitHeld(ctx context.Context, id string) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	}
+}
+
+// catchRestart makes app.Restart() (PocketBase's backup restore, plugins) restart this one app instead of
+// re-executing the whole process, which would restart every instance. Two handlers: the innermost one replaces the
+// re-exec (close the databases, drop the slot); the outermost one starts a fresh app once every other OnTerminate
+// handler has finished (e.g. a plugin that detaches from the database after PocketBase closes it), so a start error
+// is reported right away and the restored data is served next.
+func (m *Manager) catchRestart(id string, slot *appSlot) {
+	var caught bool
+	slot.app.app.OnTerminate().Bind(&hook.Handler[*core.TerminateEvent]{
+		Priority: math.MinInt,
+		Func: func(e *core.TerminateEvent) error {
+			err := e.Next()
+			if caught {
+				caught = false
+				go func() {
+					if err := m.StartInstance(context.Background(), id); err != nil {
+						m.log.Error("pocker: instance failed to restart", "id", id, "error", err)
+					}
+				}()
+			}
+			return err
+		},
+	})
+	slot.app.app.OnTerminate().Bind(&hook.Handler[*core.TerminateEvent]{
+		Priority: math.MaxInt,
+		Func: func(e *core.TerminateEvent) error {
+			if !e.IsRestart {
+				return e.Next()
+			}
+			caught = true
+			m.mu.Lock()
+			if m.apps[id] == slot {
+				delete(m.apps, id)
+			}
+			m.mu.Unlock()
+			m.log.Info("pocker: instance restarting (app.Restart)", "id", id)
+			m.emit(Event{Kind: EventRestarted, InstanceID: id, Reason: "app restart"})
+			return e.App.ResetBootstrapState()
+		},
+	})
 }

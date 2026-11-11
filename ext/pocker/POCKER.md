@@ -150,8 +150,10 @@ instances:
 | `TLSProvider` | the main listener's TLS (e.g. automatic certificates) |
 | `Wrapper` | wrapping the server's handler (the first listed is outermost) |
 | `Starter` | background work once the Manager exists |
+| `AppIniter` | setting up each instance's app before it bootstraps (`InitApp(inst, app)`), e.g. [pitr](../pitr/README.md) binding `OnBootstrap`/`OnServe`/`OnTerminate`; runs on every start, including restarts |
 
 Per-instance settings for a plugin go under the instance's `plugins.<name>` (read them with `pocker.DecodePluginConfig`).
+`app.Restart()` (PocketBase's backup restore, pitr) restarts only that instance, not the process.
 Timings for the Server-Timing header are registered with `pocker.Timing(ctx, fn)`. The `pocker` command
 ([`cmd/pocker`](cmd/pocker)) bundles [servertiming](../servertiming/README.md), [firewall](../firewall/README.md) and
 [autotls](../autotls/README.md).

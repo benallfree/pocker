@@ -82,6 +82,7 @@ func (s *Server) Run(ctx context.Context) error {
 		tlsProv  TLSProvider
 		wrappers []Wrapper
 		starters []Starter
+		initers  []AppIniter
 	)
 	for _, p := range s.Plugins {
 		if c, ok := p.(Configurer); ok {
@@ -104,6 +105,9 @@ func (s *Server) Run(ctx context.Context) error {
 		if st, ok := p.(Starter); ok {
 			starters = append(starters, st)
 		}
+		if in, ok := p.(AppIniter); ok {
+			initers = append(initers, in)
+		}
 	}
 	s.Manager = NewManager(source, ManagerOptions{
 		PBRoot:        s.Config.PBRoot,
@@ -113,6 +117,7 @@ func (s *Server) Run(ctx context.Context) error {
 		Defaults:      s.Config.Limits,
 		Gate:          chainGates(gates),
 		OnEvent:       s.onEvent(source, log),
+		Init:          chainIniters(initers),
 		Setup:         s.SetupApp,
 		Forward:       s.Forward,
 	})
