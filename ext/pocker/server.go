@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/netip"
 	"runtime/debug"
+	"sync"
 	"time"
 
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
@@ -57,7 +58,8 @@ func (s *Server) Run(ctx context.Context) error {
 		// production needs the host -> id map; dev mode works with or without it
 		source = &YAMLSource{Path: s.Config.InstancesFile, Required: !s.Config.Dev}
 	}
-	if _, err := source.Snapshot(ctx); err != nil {
+	first, err := source.Snapshot(ctx)
+	if err != nil {
 		return err // fail fast, e.g. missing instances file in production
 	}
 	var allow []netip.Prefix
@@ -113,7 +115,7 @@ func (s *Server) Run(ctx context.Context) error {
 			jsIniters = append(jsIniters, js)
 		}
 	}
-	s.Manager = NewManager(source, ManagerOptions{
+	s.Manager = NewManager(&primedSource{InstanceSource: source, first: first}, ManagerOptions{
 		PBRoot:        s.Config.PBRoot,
 		Dev:           s.Config.Dev,
 		HooksPoolSize: pool,
@@ -334,4 +336,27 @@ func (c gateChain) Admit(w http.ResponseWriter, r *http.Request, inst Instance) 
 		releases = append(releases, rel)
 	}
 	return releaseAll, true
+}
+
+// primedSource hands the Manager the snapshot Run already loaded (to fail fast) instead of loading it a second time,
+// which for a remote source like a control-plane mirror is a second full download before the edge is ready. Later
+// Snapshot calls, if any, go to the source.
+type primedSource struct {
+	InstanceSource
+	mu    sync.Mutex
+	first []Instance
+	used  bool
+}
+
+func (p *primedSource) Snapshot(ctx context.Context) ([]Instance, error) {
+	p.mu.Lock()
+	if !p.used {
+		p.used = true
+		list := p.first
+		p.first = nil
+		p.mu.Unlock()
+		return list, nil
+	}
+	p.mu.Unlock()
+	return p.InstanceSource.Snapshot(ctx)
 }

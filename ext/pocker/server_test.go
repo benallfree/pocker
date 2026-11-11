@@ -343,3 +343,36 @@ func TestServerAppIniterPlugin(t *testing.T) {
 		t.Fatalf("InitApp got %q", id)
 	}
 }
+
+// countingSource counts Snapshot calls.
+type countingSource struct {
+	staticSource
+	mu    sync.Mutex
+	calls int
+}
+
+func (c *countingSource) Snapshot(ctx context.Context) ([]Instance, error) {
+	c.mu.Lock()
+	c.calls++
+	c.mu.Unlock()
+	return c.staticSource.Snapshot(ctx)
+}
+
+// Run loads the instance list once: the fail-fast load is the one the Manager serves from.
+func TestServerSnapshotsOnce(t *testing.T) {
+	addr := freeAddr(t)
+	cfg := DefaultConfig()
+	cfg.Listen, cfg.PBRoot, cfg.MemorySoftLimit = addr, t.TempDir(), -1
+	src := &countingSource{staticSource: staticSource{{ID: "one", Hosts: []string{"one.test"}}}}
+	srv := &Server{Config: cfg, Source: src, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))}
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- srv.Run(ctx) }()
+	defer func() { cancel(); <-done }()
+	waitHTTP(t, "http://"+addr+"/api/health", "one.test")
+	src.mu.Lock()
+	defer src.mu.Unlock()
+	if src.calls != 1 {
+		t.Fatalf("Snapshot calls: %d, want 1", src.calls)
+	}
+}
