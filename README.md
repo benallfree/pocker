@@ -8,8 +8,8 @@ PocketBase. Everything else is a plugin. It is not affiliated with or endorsed b
 
 | Plugin | Status | What it does |
 |---|---|---|
-| [pocker](ext/pocker/README.md) | 🟧🟧⬜ | Multitenant: run hundreds of untrusted PocketBase instances in one Go process ([how is this safe?](ext/pocker/README.md#how-is-this-safe)) |
-| [sandbox](ext/sandbox/README.md) | 🟧🟧⬜ | Confine untrusted JS hooks, SQL and outbound network |
+| [pocker](ext/pocker/README.md) | 🟩🟩🟩 | Multitenant: run hundreds of untrusted PocketBase instances in one Go process ([how is this safe?](ext/pocker/README.md#how-is-this-safe)) |
+| [sandbox](ext/sandbox/README.md) | 🟩🟩🟩 | Confine untrusted JS hooks, SQL and outbound network |
 | [pitr](ext/pitr/README.md) | 🟧🟧⬜ | Point-in-time restore (Litestream) |
 | [bulkmail](ext/bulkmail/README.md) | 🟥⬜⬜ | Bulk mail campaigns to your app's own users |
 | [pages](ext/pages/README.md) | 🟥⬜⬜ | Server-rendered multi-page applications (PocketPages) |

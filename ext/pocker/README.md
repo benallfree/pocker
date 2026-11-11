@@ -4,17 +4,17 @@ The multitenant engine (like Docker, but for PocketBase): many PocketBase apps i
 
 **Runs on:** it is the multitenant host; the other host-level plugins register on it.
 
-> **Status.** The engine works today, in core under [`pocker/`](../../pocker) (configuration and API in
-> [POCKER.md](../../POCKER.md)). It moves into this folder as its own Go module
-> (`github.com/pockerbase/pocketbase/ext/pocker`), with a minimal `example/main.go`, as part of the plugin split.
+> **Status.** Working: this folder is the Go module `github.com/pockerbase/pocketbase/ext/pocker` (CLI in
+> [`cmd/pocker`](cmd/pocker), runnable [`example/`](example), configuration and API in [POCKER.md](POCKER.md)). The
+> firewall, auto TLS and Server-Timing still live here and move to their own plugins next.
 
 ## How is this safe?
 
 PocketBase CE can serve hundreds of PocketBase instances from one Go process, each with its own owner, hooks and data.
 This section explains why that's safe enough to run code from people you don't know, and where it isn't.
 
-Configuration and the engine API are in [POCKER.md](../../POCKER.md). The attack tests are in
-[`pocker/sandbox_test.go`](../../pocker/sandbox_test.go).
+Configuration and the engine API are in [POCKER.md](POCKER.md). The JS sandbox is the [sandbox](../sandbox/README.md)
+plugin; the attack tests are in [`sandbox_test.go`](sandbox_test.go).
 
 ### Why one process
 

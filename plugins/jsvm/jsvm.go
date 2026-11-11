@@ -32,6 +32,7 @@ import (
 	"github.com/dop251/goja_nodejs/buffer"
 	"github.com/dop251/goja_nodejs/console"
 	"github.com/dop251/goja_nodejs/process"
+	"github.com/dop251/goja_nodejs/require"
 	"github.com/fatih/color"
 	"github.com/fsnotify/fsnotify"
 )
@@ -58,13 +59,15 @@ func init() {
 
 // Config defines the config options of the jsvm plugin.
 type Config struct {
-	// POCKER: Sandbox, when set, confines the JS hooks and migrations to one app folder (see [Sandbox]).
-	Sandbox *Sandbox
-
 	// OnInit is an optional function that will be called
 	// after a JS runtime is initialized, allowing you to
 	// attach custom Go variables and functions.
 	OnInit func(vm *goja.Runtime)
+
+	// POCKER: OnCall is an optional function that wraps every call into a JS runtime: hook, route and cron
+	// handlers, migrations and loading a hooks file. A non-nil error refuses the call; otherwise done runs when the
+	// call ends. Use it for per-call time limits, concurrency caps or tracing.
+	OnCall func(vm *goja.Runtime) (done func(), err error)
 
 	// HooksWatch enables auto app restarts when a JS app hook file changes.
 	//
@@ -195,7 +198,7 @@ func (p *plugin) registerMigrations() error {
 		return err
 	}
 
-	registry := newRequireRegistry(p.config.Sandbox) // POCKER: confined when sandboxed; shared by multiple runtimes
+	registry := new(require.Registry) // this can be shared by multiple runtimes
 	templateRegistry := template.NewRegistry()
 
 	for file, content := range files {
@@ -219,10 +222,6 @@ func (p *plugin) registerMigrations() error {
 		vm.Set("$template", templateRegistry)
 		vm.Set("__hooks", absHooksDir)
 
-		if p.config.Sandbox != nil { // POCKER
-			p.config.Sandbox.apply(vm, templateRegistry)
-		}
-
 		vm.Set("migrate", func(up, down func(txApp core.App) error) {
 			// note: safe wrap to capture any eventual panic and to allow
 			// the error message to print the migration filename
@@ -232,9 +231,11 @@ func (p *plugin) registerMigrations() error {
 						if up == nil {
 							return nil
 						}
-						if p.config.Sandbox != nil { // POCKER: time limit
-							defer p.config.Sandbox.interruptAfter(vm)()
+						done, err := p.onCall(vm) // POCKER
+						if err != nil {
+							return err
 						}
+						defer done()
 						return up(txApp)
 					})()
 				},
@@ -243,9 +244,11 @@ func (p *plugin) registerMigrations() error {
 						if down == nil {
 							return nil
 						}
-						if p.config.Sandbox != nil { // POCKER: time limit
-							defer p.config.Sandbox.interruptAfter(vm)()
+						done, err := p.onCall(vm) // POCKER
+						if err != nil {
+							return err
 						}
+						defer done()
 						return down(txApp)
 					})()
 				},
@@ -315,7 +318,7 @@ func (p *plugin) registerHooks() error {
 	})
 
 	// safe to be shared across multiple vms
-	requireRegistry := newRequireRegistry(p.config.Sandbox) // POCKER: confined when sandboxed
+	requireRegistry := new(require.Registry)
 	templateRegistry := template.NewRegistry()
 
 	sharedBinds := func(vm *goja.Runtime) {
@@ -339,10 +342,6 @@ func (p *plugin) registerHooks() error {
 		vm.Set("$template", templateRegistry)
 		vm.Set("__hooks", absHooksDir)
 
-		if p.config.Sandbox != nil { // POCKER
-			p.config.Sandbox.apply(vm, templateRegistry)
-		}
-
 		if p.config.OnInit != nil {
 			p.config.OnInit(vm)
 		}
@@ -354,7 +353,7 @@ func (p *plugin) registerHooks() error {
 		sharedBinds(executor)
 		return executor
 	})
-	executors.sandbox = p.config.Sandbox // POCKER: time limit per call
+	executors.onCall = p.config.OnCall // POCKER
 
 	// initialize the loader vm
 	loader := goja.New()
@@ -377,9 +376,11 @@ func (p *plugin) registerHooks() error {
 				}
 			}()
 
-			if p.config.Sandbox != nil { // POCKER: time limit for loading a hooks file
-				defer p.config.Sandbox.interruptAfter(loader)()
+			done, callErr := p.onCall(loader) // POCKER
+			if callErr != nil {
+				panic(callErr)
 			}
+			defer done()
 			_, err := loader.RunScript(defaultScriptPath, string(content))
 			if err != nil {
 				panic(err)
@@ -617,4 +618,12 @@ func appMigrations(app core.App) *core.MigrationsList {
 		return l.AppMigrationsList()
 	}
 	return &core.AppMigrations
+}
+
+// POCKER: onCall runs Config.OnCall for one call into vm, if set.
+func (p *plugin) onCall(vm *goja.Runtime) (func(), error) {
+	if p.config.OnCall == nil {
+		return func() {}, nil
+	}
+	return p.config.OnCall(vm)
 }

@@ -9,7 +9,7 @@ import (
 	"runtime/metrics"
 	"time"
 
-	"ganigeorgiev.com/pocketbase/pocketbase/plugins/jsvm"
+	"github.com/pockerbase/pocketbase/ext/sandbox"
 )
 
 // MemoryWatch guards the shared heap against JS that grows memory faster than a request would. goja has no per-VM
@@ -76,9 +76,9 @@ func (w *MemoryWatch) Run(ctx context.Context) {
 		var owners []string
 		switch {
 		case heap >= hard:
-			owners = jsvm.InterruptActive(0, fmt.Sprintf("memory: process heap over %d MiB", hard>>20))
+			owners = sandbox.InterruptActive(0, fmt.Sprintf("memory: process heap over %d MiB", hard>>20))
 		case heap >= w.SoftLimit && heap > last:
-			owners = jsvm.InterruptActive(minAge, fmt.Sprintf("memory: process heap over %d MiB", w.SoftLimit>>20))
+			owners = sandbox.InterruptActive(minAge, fmt.Sprintf("memory: process heap over %d MiB", w.SoftLimit>>20))
 		}
 		last = heap
 		if len(owners) == 0 {

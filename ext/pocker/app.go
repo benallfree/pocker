@@ -14,6 +14,7 @@ import (
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	_ "ganigeorgiev.com/pocketbase/pocketbase/migrations" // registers PocketBase's system migrations, as pocketbase.go does
 	"ganigeorgiev.com/pocketbase/pocketbase/plugins/jsvm"
+	"github.com/pockerbase/pocketbase/ext/sandbox"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/security"
 	"ganigeorgiev.com/pocketbase/pocketbase/ui"
 )
@@ -78,24 +79,26 @@ func startApp(opts appOptions, inst Instance) (r *runningApp, err error) {
 		env[k] = v
 	}
 
+	sb := &sandbox.Sandbox{
+		Dir:                dir,
+		Env:                env,
+		MaxExecution:       lim.MaxJSExecution,
+		MaxAllocation:      int64(lim.MaxJSAllocation),
+		MaxCallStackSize:   lim.MaxCallStackSize,
+		MaxSleep:           lim.MaxSleep,
+		HTTPSendMaxTimeout: int(lim.HTTPSendMaxTimeout / time.Second),
+		HTTPSendMaxBody:    int64(lim.HTTPSendMaxBody),
+		MaxConcurrent:      lim.MaxConcurrentJS,
+		Owner:              inst.ID,
+		Console:            openInstanceLog(dir).Write,
+	}
 	err = jsvm.Register(app, jsvm.Config{
 		HooksDir:      filepath.Join(dir, "pb_hooks"),
 		MigrationsDir: filepath.Join(dir, "pb_migrations"),
 		HooksWatch:    false, // one process serves every app: a hooks change must not restart it
 		HooksPoolSize: opts.HooksPoolSize,
-		Sandbox: &jsvm.Sandbox{
-			Dir:                dir,
-			Env:                env,
-			MaxExecution:       lim.MaxJSExecution,
-			MaxAllocation:      int64(lim.MaxJSAllocation),
-			MaxCallStackSize:   lim.MaxCallStackSize,
-			MaxSleep:           lim.MaxSleep,
-			HTTPSendMaxTimeout: int(lim.HTTPSendMaxTimeout / time.Second),
-			HTTPSendMaxBody:    int64(lim.HTTPSendMaxBody),
-			MaxConcurrent:      lim.MaxConcurrentJS,
-			Owner:              inst.ID,
-			Console:            openInstanceLog(dir).Write,
-		},
+		OnInit:        sb.OnInit,
+		OnCall:        sb.OnCall,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("load hooks: %w", err)

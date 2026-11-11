@@ -12,7 +12,7 @@ It can also run process-wide jobs and middleware.
 > per-plugin config, a `pocker.Main(plugins...)` entry point) is planned. It will wrap these same hooks, so code
 > written this way moves over with little change.
 
-A complete, runnable example is in [`examples/pocker-extension`](../examples/pocker-extension).
+A complete, runnable example is in [`ext/pocker/example`](../ext/pocker/example).
 
 ## Compiled in, not loaded at run time
 
@@ -172,7 +172,7 @@ ext/<name>/
 
 - **`example/main.go` is required.** Keep it as small as possible: just enough to build a binary that shows the
   feature working, with no extra harness. `go build ./example` and `go vet ./...` must pass with no warnings.
-  [`examples/pocker-extension`](../examples/pocker-extension) is the size to aim for.
+  [`ext/pocker/example`](../ext/pocker/example) and [`ext/sandbox/example`](../ext/sandbox/example) are the size to aim for.
 - **Dependencies stay in your module.** Heavy libraries go in your plugin's `go.mod`, never in core's.
 - **Single app first.** Where it makes sense, a plugin should work on one PocketBase app, and add more under the
   pocker (multitenant) host.

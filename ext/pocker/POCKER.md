@@ -2,7 +2,7 @@
 
 Pocker hosts many PocketBase instances in one process. It is PocketBase itself (this repo tracks
 [upstream PocketBase](https://ganigeorgiev.com/git/pocketbase/pocketbase) and shares its history) plus a small engine in
-[`pocker/`](pocker) and a CLI in [`cmd/pocker/`](cmd/pocker).
+this folder and a CLI in [`cmd/pocker/`](cmd/pocker).
 
 - One port, many instances. Each request's hostname maps to a canonical instance id.
 - Each instance is a normal PocketBase folder, `<pbRoot>/<id>` (`pb_data`, `pb_hooks`, `pb_migrations`, `pb_public`),
@@ -47,7 +47,7 @@ instances:
 ```
 
 Unknown hosts get 404 and no folder is ever created from a request. Ids are lowercase letters, digits, dots and dashes.
-Hosting platforms plug in their own [`InstanceSource`](pocker/instance.go) (for example a control plane streaming the
+Hosting platforms plug in their own [`InstanceSource`](instance.go) (for example a control plane streaming the
 hostname -> id map over SSE) instead of the file.
 
 Optional `pocker.yaml` (every field has a default):
@@ -174,8 +174,8 @@ private network, and `Manager.Firewall()` lets host routes in front of the Manag
 
 ## Sandbox
 
-Every instance's JS hooks and migrations run in a sandbox (`plugins/jsvm/sandbox.go`), and its SQL runs behind
-SQLite's authorizer (`pocker/sqlguard.go`). [`pocker/sandbox_test.go`](pocker/sandbox_test.go) runs one attack per
+Every instance's JS hooks and migrations run in a sandbox (the [sandbox](../sandbox/README.md) plugin), and its SQL runs behind
+SQLite's authorizer (`sqlguard.go`). [`sandbox_test.go`](sandbox_test.go) runs one attack per
 route from one instance against another instance and the host; all of these are refused:
 
 | Area | What the sandbox does |
@@ -201,15 +201,18 @@ Landlock.
 
 ## Changes to PocketBase
 
+These live in the repo root (PocketBase's own files), not in this plugin.
+
 Kept small and marked `// POCKER:` so upstream merges stay easy:
 
 - `core.BaseAppConfig.AppMigrations`: a per-app migrations list (JS migrations from `plugins/jsvm` register there
   instead of the global `core.AppMigrations`).
 - `core.BaseAppConfig.EncryptionKey`: the settings encryption key passed in directly instead of read from the process
   environment.
-- `plugins/jsvm`: `Config.Sandbox` (all sandbox code is in `sandbox.go`); `pool.go` and `jsvm.go` call it at a few
-  marked points (bindings, `require` loader, per-call time limit); `binds.go` has `HTTPSendMaxTimeout` /
-  `HTTPSendMaxBodySize` caps for `$http.send`.
+- `plugins/jsvm`: `Config.OnCall`, a generic wrapper around every call into a JS runtime (hooks, routes, cron,
+  migrations, loading a hooks file), which the sandbox uses for time limits and concurrency; `binds.go` has
+  `HTTPSendMaxTimeout` / `HTTPSendMaxBodySize` caps for `$http.send`, overridable per runtime (`HTTPSendLimits`). The
+  sandbox itself is the [sandbox](../sandbox/README.md) plugin, on `Config.OnInit` (upstream) and `Config.OnCall`.
 - `tools/mailer`: `DialContext`, when set, sends SMTP through the host's dialer (same exchange as mailyak).
 
 ## Versions
@@ -233,5 +236,5 @@ the newest PocketBase CE.
 git remote add upstream https://ganigeorgiev.com/git/pocketbase/pocketbase
 git config remote.upstream.tagOpt --no-tags
 git fetch upstream refs/tags/v0.41.2   # one release, without creating the tag here
-git merge FETCH_HEAD   # resolve conflicts in the POCKER-marked spots, rerun `go test ./pocker/... ./core/... ./plugins/jsvm/...`
+git merge FETCH_HEAD   # resolve conflicts in the POCKER-marked spots, rerun `go test ./core/... ./plugins/jsvm/...` and `go test ./...` in `ext/pocker` and `ext/sandbox`
 ```

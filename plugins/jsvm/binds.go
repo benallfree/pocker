@@ -900,6 +900,33 @@ var (
 	HTTPSendMaxBodySize int64
 )
 
+// POCKER: HTTPSendLimits overrides the process-wide caps for one runtime. A host pins it on the runtime's global
+// object under [HTTPSendLimitsKey] (e.g. from Config.OnInit); zero fields keep the process-wide value.
+type HTTPSendLimits struct {
+	Timeout int   // seconds
+	Body    int64 // bytes
+}
+
+// POCKER: HTTPSendLimitsKey is the global property $http.send reads [HTTPSendLimits] from.
+const HTTPSendLimitsKey = "__pocker_http_limits"
+
+// POCKER: httpSendLimits returns the $http.send caps for vm: its pinned [HTTPSendLimits] where set, else the
+// process-wide ones.
+func httpSendLimits(vm *goja.Runtime) (int, int64) {
+	timeout, body := HTTPSendMaxTimeout, HTTPSendMaxBodySize
+	if v := vm.GlobalObject().Get(HTTPSendLimitsKey); v != nil {
+		if l, ok := v.Export().(HTTPSendLimits); ok {
+			if l.Timeout > 0 {
+				timeout = l.Timeout
+			}
+			if l.Body > 0 {
+				body = l.Body
+			}
+		}
+	}
+	return timeout, body
+}
+
 func BindHTTP(vm *goja.Runtime) {
 	obj := vm.NewObject()
 	vm.Set("$http", obj)

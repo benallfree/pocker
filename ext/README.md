@@ -6,7 +6,7 @@ Each folder here will be one plugin, with its own Go module (`github.com/pockerb
 
 | Plugin | What it will do | Runs on |
 |---|---|---|
-| [`pocker`](pocker/README.md) | The multitenant engine: many PocketBase apps in one process, routed by hostname, each started on its first request. Instances come from a YAML file or any provider. | the multitenant host itself; the other host-level plugins register on it |
+| [`pocker`](pocker/README.md) | The multitenant engine: many PocketBase apps in one process, routed by hostname, each started on its first request. Instances come from a YAML file or any provider. | the multitenant host; the other host-level plugins register on it |
 | [`sandbox`](sandbox/README.md) | The JS sandbox for untrusted instances: file access confined to the instance folder, host primitives removed, CPU and memory caps, SQLite authorizer, public-only outbound network. | Any app; required by pocker for untrusted tenants |
 | [`pitr`](pitr/README.md) | Point-in-time restore: Litestream replication of each app's database (local or a bucket) and in-place restore from the Backups screen. | Single app, or many under pocker |
 | [`bulkmail`](bulkmail/README.md) | Bulk mail: campaigns to an app's own users with one-click unsubscribe, bounce and complaint handling, and a dashboard page. | Single app, or many under pocker |

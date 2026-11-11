@@ -4,9 +4,10 @@ The JS sandbox for untrusted instances: file access confined to the instance fol
 
 **Runs on:** Any app; required by pocker for untrusted tenants.
 
-> **Planned.** Nothing is published here yet. This folder will hold the plugin's Go module
-> (`github.com/pockerbase/pocketbase/ext/sandbox`), its tests and a minimal `example/main.go` that builds and shows the
-> feature. See [Create your own plugin](../../docs/plugins.md).
+> **Status.** Working: Go module `github.com/pockerbase/pocketbase/ext/sandbox`. It plugs into PocketBase's JS plugin
+> through two hooks, `jsvm.Config{OnInit: sb.OnInit, OnCall: sb.OnCall}`; [`example/main.go`](example/main.go) runs
+> one sandboxed app. [pocker](../pocker/README.md) uses it for every instance; its attack tests live there. The SQL
+> guard, outbound network rules and memory watch are still in pocker and move here next.
 
 ## License
 

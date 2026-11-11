@@ -1,7 +1,9 @@
-package jsvm
-
-// POCKER: this whole file is Pocker's sandbox for running many apps' JS hooks in one process.
-// It is only active when Config.Sandbox is set; upstream behaviour is unchanged otherwise.
+// Package sandbox confines one PocketBase app's JS hooks and migrations so many apps can share one process.
+//
+// It plugs into PocketBase's jsvm plugin through two hooks:
+//
+//	jsvm.Register(app, jsvm.Config{OnInit: sb.OnInit, OnCall: sb.OnCall})
+package sandbox
 
 import (
 	"errors"
@@ -17,6 +19,7 @@ import (
 
 	"ganigeorgiev.com/pocketbase/pocketbase/apis"
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
+	"ganigeorgiev.com/pocketbase/pocketbase/plugins/jsvm"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/filesystem"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/template"
 	"github.com/dop251/goja"
@@ -73,10 +76,12 @@ type Sandbox struct {
 	HTTPSendMaxTimeout int
 	HTTPSendMaxBody    int64
 
-	once    sync.Once
-	openErr error
-	dir     string
-	root    *os.Root
+	once      sync.Once
+	openErr   error
+	dir       string
+	root      *os.Root
+	templates *template.Registry // shared by the app's runtimes, like jsvm's own
+	requires  *require.Registry  // confined require(), shared by the app's runtimes
 }
 
 // ErrSandboxed is returned by bindings that are disabled in the sandbox.
@@ -85,7 +90,7 @@ var ErrSandboxed = errors.New("not available on this host (sandboxed)")
 func (s *Sandbox) open() error {
 	s.once.Do(func() {
 		if s.Dir == "" {
-			s.openErr = errors.New("jsvm sandbox: Dir is required")
+			s.openErr = errors.New("sandbox: Dir is required")
 			return
 		}
 		s.dir, s.openErr = filepath.Abs(s.Dir)
@@ -93,6 +98,8 @@ func (s *Sandbox) open() error {
 			return
 		}
 		s.root, s.openErr = os.OpenRoot(s.dir)
+		s.templates = template.NewRegistry()
+		s.requires = require.NewRegistry(require.WithLoader(s.requireLoader))
 	})
 	return s.openErr
 }
@@ -171,19 +178,14 @@ func (s *Sandbox) requireLoader(p string) ([]byte, error) {
 	return b, nil
 }
 
-// newRequireRegistry returns the registry for require(): confined to the sandbox when there is one.
-func newRequireRegistry(s *Sandbox) *require.Registry {
-	if s == nil {
-		return new(require.Registry)
-	}
-	return require.NewRegistry(require.WithLoader(s.requireLoader))
-}
-
-// apply replaces the host-reaching bindings on vm. It runs after the standard binds and before Config.OnInit.
-func (s *Sandbox) apply(vm *goja.Runtime, templates *template.Registry) {
+// OnInit replaces the host-reaching bindings on vm. Use it as (or call it from) jsvm.Config.OnInit, which runs
+// after jsvm's standard binds.
+func (s *Sandbox) OnInit(vm *goja.Runtime) {
 	if err := s.open(); err != nil {
 		panic(err)
 	}
+	templates := s.templates
+	s.requires.Enable(vm) // require() reads through the root
 
 	vm.SetFieldNameMapper(sandboxMapper{})
 
@@ -457,8 +459,8 @@ func (s *Sandbox) apply(vm *goja.Runtime, templates *template.Registry) {
 	}
 
 	// $http.send caps for this app, pinned read-only on the VM (binds.go reads them at call time)
-	_ = vm.GlobalObject().DefineDataProperty(httpLimitsKey,
-		vm.ToValue(httpLimits{Timeout: s.HTTPSendMaxTimeout, Body: s.HTTPSendMaxBody}),
+	_ = vm.GlobalObject().DefineDataProperty(jsvm.HTTPSendLimitsKey,
+		vm.ToValue(jsvm.HTTPSendLimits{Timeout: s.HTTPSendMaxTimeout, Body: s.HTTPSendMaxBody}),
 		goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_FALSE)
 
 	// sleep: capped, so a hook can't park a goroutine forever
@@ -573,7 +575,7 @@ func (s *Sandbox) capAllocations(vm *goja.Runtime) {
     wrap(Array.prototype, k, (self) => { if (lenOf(self && self.length) > MAX) throw tooBig("Array." + k); }));
 })()`, max))
 	if err != nil {
-		panic(fmt.Errorf("jsvm sandbox: allocation caps: %w", err))
+		panic(fmt.Errorf("sandbox: allocation caps: %w", err))
 	}
 }
 
@@ -631,7 +633,7 @@ func (s *Sandbox) interruptAfter(vm *goja.Runtime) func() {
 
 // sandboxMapper hides Go members that let JS reach the process instead of its own app.
 // goja does not expose a member whose mapped name is "".
-type sandboxMapper struct{ FieldMapper }
+type sandboxMapper struct{ jsvm.FieldMapper }
 
 // hiddenPackages: every field and method of types from these packages is hidden.
 var hiddenPackages = map[string]bool{
@@ -730,29 +732,6 @@ func (m sandboxMapper) MethodName(t reflect.Type, meth reflect.Method) string {
 	return m.FieldMapper.MethodName(t, meth)
 }
 
-const httpLimitsKey = "__pocker_http_limits"
-
-type httpLimits struct {
-	Timeout int
-	Body    int64
-}
-
-// httpSendLimits returns the $http.send caps for vm: the app's sandbox values where set, else the process-wide ones.
-func httpSendLimits(vm *goja.Runtime) (int, int64) {
-	timeout, body := HTTPSendMaxTimeout, HTTPSendMaxBodySize
-	if v := vm.GlobalObject().Get(httpLimitsKey); v != nil {
-		if l, ok := v.Export().(httpLimits); ok {
-			if l.Timeout > 0 {
-				timeout = l.Timeout
-			}
-			if l.Body > 0 {
-				body = l.Body
-			}
-		}
-	}
-	return timeout, body
-}
-
 // ErrTooBusy is returned when an app already runs MaxConcurrent JS calls and no slot frees up in time.
 var ErrTooBusy = errors.New("too many concurrent JS calls for this app; retry shortly")
 
@@ -774,4 +753,18 @@ func (s *Sandbox) acquire() (func(), error) {
 	case <-t.C:
 		return nil, ErrTooBusy
 	}
+}
+
+// OnCall limits one JS call: it takes a concurrency slot (MaxConcurrent) and arms the MaxExecution interrupt. Use it
+// as jsvm.Config.OnCall.
+func (s *Sandbox) OnCall(vm *goja.Runtime) (func(), error) {
+	release, err := s.acquire()
+	if err != nil {
+		return nil, err
+	}
+	stop := s.interruptAfter(vm)
+	return func() {
+		stop()
+		release()
+	}, nil
 }

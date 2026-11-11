@@ -16,7 +16,7 @@ type vmsPool struct {
 	mux     sync.RWMutex
 	factory func() *goja.Runtime
 	items   []*poolItem
-	sandbox *Sandbox // POCKER: when set, every call is interrupted after its time limit
+	onCall  func(vm *goja.Runtime) (func(), error) // POCKER: Config.OnCall
 }
 
 // newPool creates a new pool with pre-warmed vms generated from the specified factory.
@@ -77,15 +77,14 @@ func (p *vmsPool) run(call func(vm *goja.Runtime) error) error {
 	return execErr
 }
 
-// POCKER: call runs fn on vm under the sandbox time limit, if any.
+// POCKER: call runs fn on vm, wrapped by Config.OnCall when set.
 func (p *vmsPool) call(fn func(vm *goja.Runtime) error, vm *goja.Runtime) error {
-	if p.sandbox != nil {
-		release, err := p.sandbox.acquire()
+	if p.onCall != nil {
+		done, err := p.onCall(vm)
 		if err != nil {
 			return err
 		}
-		defer release()
-		defer p.sandbox.interruptAfter(vm)()
+		defer done()
 	}
 	return fn(vm)
 }
