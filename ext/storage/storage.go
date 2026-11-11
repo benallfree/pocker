@@ -1,7 +1,8 @@
 // Package storage gives every instance under a pocker server a default bucket for record uploads and backup zips
 // when the instance hasn't turned on its own S3. To the instance nothing is configured: Settings show S3 off, uploads
 // and the Backups screen work as before, and the bucket's credentials never reach its settings, env or JS. Downloads
-// stream through the server (in-process, no proxy endpoint to probe).
+// stream through the server, or, with ext/s3redirect, become signed redirects to the bucket: to s3redirect the
+// default bucket is just another S3 filesystem (no wiring).
 //
 //	srv.Plugins = append(srv.Plugins, storage.New(storage.Config{}))
 //
@@ -17,7 +18,6 @@ package storage
 import (
 	"fmt"
 	"log/slog"
-	"sync"
 
 	"gopkg.in/yaml.v3"
 
@@ -65,9 +65,6 @@ type InstanceConfig struct {
 type Plugin struct {
 	cfg Config
 	log *slog.Logger
-
-	mu        sync.Mutex
-	instances map[core.App]string // apps using the default bucket -> instance id
 }
 
 var (
@@ -82,7 +79,7 @@ func New(cfg Config) *Plugin {
 	if log == nil {
 		log = slog.Default()
 	}
-	return &Plugin{cfg: cfg, log: log.With("plugin", Name), instances: map[core.App]string{}}
+	return &Plugin{cfg: cfg, log: log.With("plugin", Name)}
 }
 
 // Name implements pocker.Plugin.
@@ -145,15 +142,6 @@ func (p *Plugin) InitApp(inst pocker.Instance, app core.App) error {
 		return nil
 	}
 	root := p.cfg.Bucket.Prefix + "instances/" + inst.ID + "/"
-	p.mu.Lock()
-	p.instances[app] = inst.ID
-	p.mu.Unlock()
-	app.OnTerminate().BindFunc(func(e *core.TerminateEvent) error {
-		p.mu.Lock()
-		delete(p.instances, e.App)
-		p.mu.Unlock()
-		return e.Next()
-	})
 	app.OnFilesystemCreate().BindFunc(func(e *core.FilesystemCreateEvent) error {
 		s := e.App.Settings()
 		switch e.Kind {
@@ -186,20 +174,4 @@ func (p *Plugin) open(prefix string) (*filesystem.System, error) {
 		return nil, err
 	}
 	return filesystem.New(prefixDriver{Driver: s3.Driver(), prefix: prefix}), nil
-}
-
-// Target is where an instance's uploads live in the bucket, for code that talks to the bucket directly (e.g.
-// ext/s3redirect's Config.Target, to sign downloads). ok is false when the instance's uploads aren't in the default
-// bucket (no bucket, plugin or uploads off, or the instance uses its own S3).
-func (p *Plugin) Target(app core.App) (b Bucket, prefix string, ok bool) {
-	if p.cfg.Bucket == nil || !on(p.cfg.Uploads) || app.Settings().S3.Enabled {
-		return Bucket{}, "", false
-	}
-	p.mu.Lock()
-	id, enabled := p.instances[app], p.instances[app] != ""
-	p.mu.Unlock()
-	if !enabled {
-		return Bucket{}, "", false
-	}
-	return *p.cfg.Bucket, p.cfg.Bucket.Prefix + "instances/" + id + "/" + core.FilesystemKindStorage + "/", true
 }

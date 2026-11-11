@@ -9,52 +9,8 @@ import (
 
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"ganigeorgiev.com/pocketbase/pocketbase/tests"
+	"ganigeorgiev.com/pocketbase/pocketbase/tools/filesystem"
 )
-
-// AWS's documented presigned URL example (IAM user guide, "Authenticating Requests: Using Query Parameters").
-func TestPresignGetAWSExample(t *testing.T) {
-	tg := &Target{
-		Endpoint:  "s3.amazonaws.com",
-		Bucket:    "examplebucket",
-		Region:    "us-east-1",
-		AccessKey: "AKIAIOSFODNN7EXAMPLE",
-		Secret:    "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
-	}
-	now := time.Date(2013, 5, 24, 0, 0, 0, 0, time.UTC)
-	got, err := tg.PresignGet("test.txt", 86400*time.Second, now, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	want := "https://examplebucket.s3.amazonaws.com/test.txt?X-Amz-Algorithm=AWS4-HMAC-SHA256" +
-		"&X-Amz-Credential=AKIAIOSFODNN7EXAMPLE%2F20130524%2Fus-east-1%2Fs3%2Faws4_request" +
-		"&X-Amz-Date=20130524T000000Z&X-Amz-Expires=86400&X-Amz-SignedHeaders=host" +
-		"&X-Amz-Signature=aeeed9bbccd4d02ee5c0109b86d86835f995330da4c265957d157751f604d404"
-	if got != want {
-		t.Fatalf("got\n%s\nwant\n%s", got, want)
-	}
-}
-
-func TestPresignGetPathStyleAndPrefix(t *testing.T) {
-	tg := &Target{Endpoint: "http://127.0.0.1:9000/", Bucket: "b", AccessKey: "k", Secret: "s", ForcePathStyle: true, Prefix: "instances/abc/storage/"}
-	got, err := tg.PresignGet("col/rec/a b+c.png", time.Minute, time.Unix(0, 0), url.Values{"response-content-disposition": {`inline; filename="a b+c.png"`}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	u, err := url.Parse(got)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if u.Scheme != "http" || u.Host != "127.0.0.1:9000" || u.EscapedPath() != "/b/instances/abc/storage/col/rec/a%20b%2Bc.png" {
-		t.Fatalf("unexpected URL %s (path %s)", got, u.EscapedPath())
-	}
-	q := u.Query()
-	if q.Get("X-Amz-Expires") != "60" || !strings.Contains(q.Get("X-Amz-Credential"), "/us-east-1/s3/aws4_request") {
-		t.Fatalf("unexpected query %v", q)
-	}
-	if q.Get("response-content-disposition") != `inline; filename="a b+c.png"` {
-		t.Fatalf("override not carried: %v", q)
-	}
-}
 
 func TestResponseHeaders(t *testing.T) {
 	cases := []struct {
@@ -186,20 +142,29 @@ func TestDownloadRedirects(t *testing.T) {
 			ExpectedContent: []string{`"data":{}`},
 		},
 		{
-			Name:   "Target overrides the app's own S3 (ext/storage)",
+			Name:   "a filesystem supplied through OnFilesystemCreate is signed for like the app's own S3 (ext/storage)",
 			Method: http.MethodGet,
 			URL:    "/api/files/docs/rec000000000001/photo_abc.png",
 			TestAppFactory: func(t testing.TB) *tests.TestApp {
-				return fileApp(t, false, Config{Target: func(core.App) *Target {
-					return &Target{Endpoint: "files.example.com", Bucket: "bkt", AccessKey: "a", Secret: "s", Prefix: "instances/x/storage/"}
-				}}, AppConfig{})
+				app := fileApp(t, false, Config{}, AppConfig{})
+				app.OnFilesystemCreate().BindFunc(func(e *core.FilesystemCreateEvent) error {
+					if e.Kind == core.FilesystemKindStorage {
+						fsys, err := filesystem.NewS3("other", "auto", "https://files.example.com", "a", "s", false)
+						if err != nil {
+							return err
+						}
+						e.Filesystem = fsys
+					}
+					return e.Next()
+				})
+				return app
 			},
 			ExpectedStatus: http.StatusFound,
 			ExpectedEvents: map[string]int{"OnFileDownloadRequest": 1},
 			AfterTestFunc: func(t testing.TB, app *tests.TestApp, res *http.Response) {
 				loc, _ := url.Parse(res.Header.Get("Location"))
-				if want := "/instances/x/storage/" + colID(app) + "/rec000000000001/photo_abc.png"; loc.Path != want {
-					t.Fatalf("path %s, want %s", loc.Path, want)
+				if loc.Host != "other.files.example.com" || loc.Path != "/"+colID(app)+"/rec000000000001/photo_abc.png" {
+					t.Fatalf("Location %s", loc)
 				}
 			},
 		},

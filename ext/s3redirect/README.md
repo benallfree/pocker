@@ -71,9 +71,10 @@ instances:
       s3redirect: { enabled: false }   # per instance: enabled, ttl
 ```
 
-Each instance signs with its own S3 settings. `Config.Target` lets Go code pick another bucket for an app (for
-example [`ext/storage`](../storage/README.md)'s operator bucket, fenced to `instances/<id>/storage/`); it can't be
-set from config files or instance data.
+Each instance signs through its own files filesystem (`app.NewFilesystem().SignedURL`): its own S3 settings, or a
+bucket another plugin supplies through PocketBase's `OnFilesystemCreate` hook (for example
+[`ext/storage`](../storage/README.md)'s default bucket, fenced to `instances/<id>/storage/`). Nothing needs wiring:
+whatever the files live on, if it can sign, downloads redirect; local disk streams as usual.
 
 ## Try it
 

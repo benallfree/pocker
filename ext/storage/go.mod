@@ -5,6 +5,7 @@ go 1.27
 require (
 	ganigeorgiev.com/pocketbase/pocketbase v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketbase/ext/pocker v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketbase/ext/s3redirect v0.0.0-00010101000000-000000000000
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -58,6 +59,7 @@ replace ganigeorgiev.com/pocketbase/pocketbase => ../..
 
 replace (
 	github.com/pockethost/pocketbase/ext/pocker => ../pocker
+	github.com/pockethost/pocketbase/ext/s3redirect => ../s3redirect
 	github.com/pockethost/pocketbase/ext/sandbox => ../sandbox
 )
 

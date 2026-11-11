@@ -2,6 +2,8 @@ package storage
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"strings"
 
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/filesystem/blob"
@@ -34,6 +36,16 @@ func (d prefixDriver) Copy(ctx context.Context, dstKey, srcKey string) error {
 
 func (d prefixDriver) Delete(ctx context.Context, key string) error {
 	return d.Driver.Delete(ctx, d.k(key))
+}
+
+// SignedURL signs the prefixed key when the wrapped driver can sign (S3), so code that signs through the filesystem
+// (ext/s3redirect) sees the fenced bucket like any other S3 mount.
+func (d prefixDriver) SignedURL(ctx context.Context, key string, opts *blob.SignedURLOptions) (string, error) {
+	s, ok := d.Driver.(blob.URLSigner)
+	if !ok {
+		return "", fmt.Errorf("signed URLs: %w", errors.ErrUnsupported)
+	}
+	return s.SignedURL(ctx, d.k(key), opts)
 }
 
 func (d prefixDriver) ListPaged(ctx context.Context, opts *blob.ListOptions) (*blob.ListPage, error) {

@@ -105,6 +105,13 @@ func (s *System) Driver() blob.Driver {
 	return s.bucket.Driver()
 }
 
+// SignedURL returns a time-limited URL to read fileKey directly from the
+// storage service (S3: a presigned GET), or an error wrapping
+// [errors.ErrUnsupported] for filesystems that can't sign (local).
+func (s *System) SignedURL(fileKey string, opts *blob.SignedURLOptions) (string, error) {
+	return s.bucket.SignedURL(s.ctx, fileKey, opts)
+}
+
 // NewLocal initializes a new local filesystem instance.
 //
 // NB! Make sure to call `Close()` after you are done working with it.

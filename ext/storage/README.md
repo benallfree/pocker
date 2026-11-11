@@ -46,9 +46,9 @@ No bucket: the plugin does nothing; files stay on local disk as in PocketBase.
   thumbs) and `<prefix>instances/<id>/backups/` (zips). An instance can't list, read, write or delete anything outside
   its folder.
 - To the instance nothing is configured: Settings show S3 off, uploads, thumbs, `$app.newFilesystem()` and the
-  Backups screen work as before. Downloads stream through the server.
-- `Plugin.Target(app)` returns the bucket and prefix of an instance's uploads, e.g. for `ext/s3redirect`'s
-  `Config.Target` so downloads become signed redirects to the bucket.
+  Backups screen work as before. Without s3redirect, downloads stream through the server.
+- With [`ext/s3redirect`](../s3redirect/README.md) on, downloads become signed redirects to the bucket. Nothing to
+  wire: the fenced filesystem signs with the prefix, so s3redirect sees it like any S3 mount.
 - When the instance turns on its own S3, PocketBase's normal code takes over with the instance's credentials. Files
   in the default bucket stay there (PocketBase's own S3 switch doesn't move files either).
 

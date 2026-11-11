@@ -4,8 +4,9 @@
 //	srv.Plugins = append(srv.Plugins, pockerplugin.New(s3redirect.Config{}))
 //
 // Process settings come from the config file's top-level `s3redirect:` key (fields set in Go win), per-instance
-// settings from the instance's `plugins: {s3redirect: {enabled, ttl}}`. Each instance signs with its own S3
-// settings (or [s3redirect.Config.Target]); nothing is shared between instances.
+// settings from the instance's `plugins: {s3redirect: {enabled, ttl}}`. Each instance signs through its own files
+// filesystem (its own S3, or a bucket another plugin supplies, like ext/storage); nothing is shared between
+// instances.
 package pockerplugin
 
 import (

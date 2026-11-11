@@ -3,6 +3,7 @@ package blob
 import (
 	"context"
 	"io"
+	"net/url"
 	"time"
 )
 
@@ -32,6 +33,26 @@ type DriverReader interface {
 // DriverWriter writes an object to the blob.
 type DriverWriter interface {
 	io.WriteCloser
+}
+
+// SignedURLOptions configures a signed URL, see [URLSigner].
+type SignedURLOptions struct {
+	// Expiry is how long the URL stays valid.
+	Expiry time.Duration
+
+	// Overrides are signed into the URL as response overrides the storage
+	// service applies when the URL is fetched (S3: response-content-disposition,
+	// response-content-type, response-cache-control, ...).
+	Overrides url.Values
+
+	// Now is the signing time (zero = time.Now()).
+	Now time.Time
+}
+
+// URLSigner is implemented by drivers that can hand out a time-limited URL
+// to read an object directly from the storage service (e.g. S3 presigned GET).
+type URLSigner interface {
+	SignedURL(ctx context.Context, key string, opts *SignedURLOptions) (string, error)
 }
 
 // Driver provides read, write and delete operations on objects within it on the

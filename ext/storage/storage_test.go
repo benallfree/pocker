@@ -184,14 +184,6 @@ func TestDefaultBucketUnderPocker(t *testing.T) {
 		t.Fatal("local file touched")
 	}
 
-	// Target: where a's uploads live, for s3redirect
-	if tb, prefix, ok := p.Target(appA); !ok || tb.Bucket != "shared" || prefix != "eu/instances/a/storage/" {
-		t.Fatalf("Target(a) = %v %q %v", tb.Bucket, prefix, ok)
-	}
-	if _, _, ok := p.Target(appC); ok {
-		t.Fatal("Target for an opted-out instance")
-	}
-
 	// fenced: b sees none of a's files and can't reach them by key
 	fsB, err := appB.NewFilesystem()
 	if err != nil {
@@ -303,7 +295,5 @@ func TestDefaultBucketUnderPocker(t *testing.T) {
 	if !exists(t, raw(t, b, "own"), "mine.txt") || exists(t, shared, "eu/instances/b/storage/mine.txt") {
 		t.Fatal("with its own S3 on, the upload didn't go to the instance's bucket")
 	}
-	if _, _, ok := p.Target(appB); ok {
-		t.Fatal("Target for an instance on its own S3")
-	}
+
 }

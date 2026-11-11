@@ -1,5 +1,9 @@
 // Package s3redirect answers PocketBase file downloads with a short-lived signed redirect to the bucket instead of
-// streaming the file through the app, when the file lives in S3.
+// streaming the file through the app, when the app's files filesystem can sign URLs (S3).
+//
+// It asks the app's own filesystem (app.NewFilesystem()) to sign, so it works the same for an app's own S3 settings
+// and for any plugin that supplies the filesystem through OnFilesystemCreate (e.g. ext/storage's default bucket):
+// whatever the app's files live on, if it can sign, downloads redirect; if not (local disk), they stream as usual.
 //
 // PocketBase still does everything up to the point of sending bytes: it finds the record, checks protected-file
 // access (file tokens, view rules), and creates thumbnails on first request. Only then, in OnFileDownloadRequest,
@@ -16,7 +20,7 @@
 package s3redirect
 
 import (
-	"fmt"
+	"errors"
 	"log/slog"
 	"mime"
 	"net/http"
@@ -27,6 +31,7 @@ import (
 	"time"
 
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
+	"ganigeorgiev.com/pocketbase/pocketbase/tools/filesystem/blob"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/hook"
 )
 
@@ -48,11 +53,6 @@ type Config struct {
 	// TTL is how long each signed URL is valid (default 5m, max 7 days). Keep it short: anyone holding the URL can
 	// fetch the file until it expires, including protected files.
 	TTL time.Duration `yaml:"ttl"`
-
-	// Target, when set, picks the bucket for an app instead of the app's own S3 settings. Return nil to stream the
-	// file as usual. ext/storage uses this to sign for its operator bucket when the app's own S3 is off. Not
-	// settable from the config file.
-	Target func(app core.App) *Target `yaml:"-"`
 
 	Logger *slog.Logger `yaml:"-"`
 
@@ -127,34 +127,10 @@ func (p *Plugin) SetupApp(app core.App, ac AppConfig) error {
 	return nil
 }
 
-// TargetFor returns the bucket downloads of app are signed for, or nil to stream as usual.
-func (p *Plugin) TargetFor(app core.App) *Target {
-	if p.cfg.Target != nil {
-		return p.cfg.Target(app)
-	}
-	s3 := app.Settings().S3
-	if !s3.Enabled {
-		return nil
-	}
-	return &Target{
-		Endpoint:       s3.Endpoint,
-		Bucket:         s3.Bucket,
-		Region:         s3.Region,
-		AccessKey:      s3.AccessKey,
-		Secret:         s3.Secret,
-		ForcePathStyle: s3.ForcePathStyle,
-	}
-}
-
 func (p *Plugin) handle(e *core.FileDownloadRequestEvent, ttl time.Duration) error {
 	if m := e.Request.Method; m != http.MethodGet && m != http.MethodHead {
 		return e.Next()
 	}
-	t := p.TargetFor(e.App)
-	if !t.Valid() {
-		return e.Next()
-	}
-
 	overrides := url.Values{}
 	disposition, contentType := responseHeaders(e.Request, e.ServedPath, e.ServedName)
 	overrides.Set("response-content-disposition", disposition)
@@ -164,7 +140,15 @@ func (p *Plugin) handle(e *core.FileDownloadRequestEvent, ttl time.Duration) err
 	// the signed URL itself is unique per signing, so the browser may keep the bytes as long as PocketBase would
 	overrides.Set("response-cache-control", "max-age=2592000, stale-while-revalidate=86400")
 
-	signed, err := t.PresignGet(e.ServedPath, ttl, p.cfg.now(), overrides)
+	fsys, err := e.App.NewFilesystem()
+	if err != nil {
+		return e.Next() // PocketBase will report it while streaming
+	}
+	signed, err := fsys.SignedURL(e.ServedPath, &blob.SignedURLOptions{Expiry: ttl, Overrides: overrides, Now: p.cfg.now()})
+	fsys.Close()
+	if errors.Is(err, errors.ErrUnsupported) {
+		return e.Next() // local disk: stream as usual
+	}
 	if err != nil {
 		p.log.Warn("s3redirect: signing failed, streaming instead", "error", err)
 		return e.Next()
@@ -237,12 +221,4 @@ func responseHeaders(r *http.Request, servedPath, name string) (disposition, con
 		contentType = forced
 	}
 	return disposition, contentType
-}
-
-// String is for logs.
-func (t *Target) String() string {
-	if t == nil {
-		return "<none>"
-	}
-	return fmt.Sprintf("%s/%s", strings.TrimRight(t.Endpoint, "/"), t.Bucket)
 }
