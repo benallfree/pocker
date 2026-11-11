@@ -92,7 +92,6 @@ checksum:
 snapshot:
   version_template: '{{ incpatch .Version }}-next'
 
-# release notes are written by hand (goreleaser release --release-notes <file>); a generated changelog would list
-# PocketBase's whole upstream history
-changelog:
-  disable: true
+# Release notes are written by hand: always run `goreleaser release --release-notes <file>` (that skips the
+# generated changelog, which would list PocketBase's whole upstream history). Don't set changelog.disable: it drops
+# the --release-notes file too. The header above is prepended to the notes.
