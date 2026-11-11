@@ -5,7 +5,7 @@ A docs site built from Markdown pages, styled with [Tailwind CSS](https://tailwi
 ```bash
 pocketbase pages create myapp --starter daisyui-docs
 cd myapp
-pocketbase serve
+pocketbase serve --dir ./pb_data
 ```
 
 Then open http://127.0.0.1:8090.

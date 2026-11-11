@@ -5,7 +5,7 @@ Multi-page app (MPA) auth with the built-in `auth` plugin: register, password, a
 ```bash
 pocketbase pages create myapp --starter auth
 cd myapp
-pocketbase serve
+pocketbase serve --dir ./pb_data
 ```
 
 Then open http://127.0.0.1:8090.

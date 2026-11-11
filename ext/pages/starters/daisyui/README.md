@@ -5,7 +5,7 @@ A layout with a responsive navbar and drawer, built with [Tailwind CSS](https://
 ```bash
 pocketbase pages create myapp --starter daisyui
 cd myapp
-pocketbase serve
+pocketbase serve --dir ./pb_data
 ```
 
 Then open http://127.0.0.1:8090.

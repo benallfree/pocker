@@ -5,7 +5,7 @@ A realtime demo with [htmx](https://htmx.org/) and the built-in `realtime` plugi
 ```bash
 pocketbase pages create myapp --starter htmx
 cd myapp
-pocketbase serve
+pocketbase serve --dir ./pb_data
 ```
 
 Then open http://127.0.0.1:8090.

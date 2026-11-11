@@ -10,7 +10,7 @@ in Go and page code in the app's JS VM.
 > `+error.ejs`, `+404.ejs`, Markdown images through `asset()`), JS plugins, `ctx.res.sse()`, the built-in `realtime` and `auth` plugins (password, OTP, anonymous,
 > register, OAuth2, email flows, cookie sessions), `ctx.pb()` (the bundled JS SDK, in-process, as the visitor) and the
 > Datastar add-on. Every starter kit and the site render. Not yet:
-> MFA in `ctx.session`, JS plugins' `handles()` and `pages create`.
+> MFA in `ctx.session` and JS plugins' `handles()`.
 
 - Under pocker: [pockerplugin](pockerplugin/pockerplugin.go), with an [example](pockerplugin/example/main.go) that
   serves many sites from one process.
@@ -52,6 +52,14 @@ bench/run.sh v1-docs 8804 /docs/overview "$(which pocketbase)" /tmp/v1-docs
 The demo in [`example/`](example) has a live speed check at `/speed`, which loads its own pages from your browser.
 
 ## Use it
+
+Start an app from a starter kit (`pocketbase pages starters` lists them):
+
+```bash
+pocketbase pages create myapp --starter daisyui-docs
+cd myapp
+pocketbase serve --dir ./pb_data
+```
 
 The standard CE binary ([`cmd/pocketbase`](../../cmd/pocketbase/main.go)) includes pages: put a `pb_pages` folder next
 to `pb_data` and run `pocketbase serve`. `--pagesDir` points it somewhere else. In your own Go build:

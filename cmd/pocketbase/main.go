@@ -124,6 +124,7 @@ func main() {
 
 	// PocketPages: serves pb_pages when the folder exists (page code runs in the jsvm above)
 	pages.MustRegister(app, pages.Config{Dir: pagesDir})
+	pages.RegisterCommand(app.RootCmd) // `pocketbase pages create <name> [--starter kit]`, `pocketbase pages starters`
 
 	// S3 redirects: with S3 file storage on, downloads redirect to a signed bucket URL after the access check
 	s3redirect.MustRegister(app, s3redirect.Config{Enabled: &s3Redirect, TTL: s3RedirectTTL})

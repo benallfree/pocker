@@ -5,7 +5,7 @@ One page styled with [MVP.css](https://andybrewer.github.io/mvp/): classless CSS
 ```bash
 pocketbase pages create myapp --starter mvp
 cd myapp
-pocketbase serve
+pocketbase serve --dir ./pb_data
 ```
 
 Then open http://127.0.0.1:8090.

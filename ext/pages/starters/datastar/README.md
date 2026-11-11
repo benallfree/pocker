@@ -5,7 +5,7 @@ A realtime chat with rooms and a live counter, built with [Datastar](https://dat
 ```bash
 pocketbase pages create myapp --starter datastar
 cd myapp
-pocketbase serve
+pocketbase serve --dir ./pb_data
 ```
 
 Then open http://127.0.0.1:8090.
