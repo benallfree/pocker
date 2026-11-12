@@ -20,16 +20,14 @@ srv := &pocker.Server{Config: cfg, Plugins: []pocker.Plugin{storage.New(storage.
 ```yaml
 # pocker.yaml (fields set in Go win)
 storage:
-  bucket:
-    endpoint: https://<account>.eu.r2.cloudflarestorage.com
-    bucket: pocketbase-eu
-    region: auto
-    access_key: ...
-    secret: ...
-    prefix: ""             # prepended to every key
-  # enabled: false         # off for every instance
-  # uploads: false         # leave record uploads on local disk
-  # backups: false         # leave backup zips on local disk
+  backends:                        # named S3-compatible destinations
+    r2-eu:   { endpoint: https://<account>.eu.r2.cloudflarestorage.com, bucket: pocketbase-eu, region: auto, access_key: ..., secret: ..., prefix: "" }
+    b2-cold: { endpoint: ..., bucket: ph-backups, region: ..., access_key: ..., secret: ... }
+  mounts:                          # filesystem kind -> backend
+    storage:    r2-eu              # record uploads
+    backups:    b2-cold            # backup zips
+    litestream: r2-eu              # PITR history (ext/pitr)
+  # enabled: false                 # off for every instance
 
 # instances.yaml (or a provider): only enabled per instance
 instances:
@@ -37,7 +35,15 @@ instances:
     plugins: { storage: { enabled: false } }
 ```
 
-No bucket: the plugin does nothing; files stay on local disk as in PocketBase.
+Each app gets `<backend prefix>instances/<id>/<kind>/` per mounted kind (a single app bound with `Bind(app, "")`:
+`<backend prefix><kind>/`) and can't reach anything outside it. Any kind a plugin asks core for
+(`app.NewFilesystemOfKind(kind, ...)`) is served when it's mounted; uploads and backups step aside when the app turned
+on its own S3. `Plugin.FS(instanceID, kind)` returns the same fenced filesystem outside a hook.
+
+The old shape (`bucket:` + `uploads:` / `backups:`) still works, with a warning: it becomes backend `default` mounted
+for storage and backups.
+
+No mounts: the plugin does nothing; files stay on local disk as in PocketBase.
 
 ## How it works
 
