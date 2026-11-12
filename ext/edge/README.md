@@ -19,7 +19,7 @@ the same way.
 | `Handler` | Health path → peer check → hostname → blocked → **remote** (forward) or **local** (pick a `Runtime`) → admit → serve. |
 | `Runtime` | Where a local instance runs: `pocker` (in-process), `docker`, `standalone` (one CE process). An instance can name one (`runtime:`); otherwise the first that serves it. |
 | `Router` | Forwards a request for an instance another edge owns over the private network: holds and retries while that edge is healthy, fails fast once it is down, never bounces a forwarded request. |
-| Edge providers | Where the other edges are. Built in: `YAMLProvider` (`edges.list`) and `MothershipProvider` (a mothership's `edges` collection, read with a superuser login from local config), combined with `MultiProvider`. Bring your own by implementing `EdgeSource`. |
+| Edge providers | Where the other edges are (`EdgeSource`). Built in: `YAMLProvider` (`edges.list`); combine several with `MultiProvider`. [ext/mothership](../mothership/README.md)'s mirror is one from a mothership; bring your own by implementing `EdgeSource`. |
 | `Serve` | Listeners: plain, TLS (a `TLSProvider` such as autotls, or a cert/key pair reloaded on change), HTTP → HTTPS redirect, graceful shutdown. |
 
 ## Config
@@ -35,16 +35,13 @@ rate_limits: { ip_hourly: 1000 }  # defaults; per instance under plugins.firewal
 
 edges:
   self: lax-1
-  list:                           # fixed entries (win over the mothership's for the same edge)
+  list:                           # fixed entries (with a mothership too, they win for the same edge)
     - { id: sgp-1, internal_url: "http://10.88.0.4:8080", region: sgp }
-  mothership:                     # or read the list from a mothership; $VARS expand from the environment
-    url: http://10.88.0.10:8090
-    email: $MOTHERSHIP_EMAIL
-    password: $MOTHERSHIP_PASSWORD
-    refresh: 30s
 ```
 
-An instance owned by another edge has `remote: edge:@sgp-1` (or `edge:<mothership record id>`).
+An instance owned by another edge has `remote: edge:@sgp-1`. Without a mothership, instances come from
+`instances.yaml`; with one (a `mothership:` section, see [ext/mothership](../mothership/README.md)), instances and
+edges both come from it.
 
 ## License
 

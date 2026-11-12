@@ -20,10 +20,10 @@ type Edge struct {
 	LastSeen    time.Time // zero when unknown
 }
 
-// EdgeSource tells the router where other edges are. Built in: [YAMLProvider] (a config file's `edges.list`) and
-// [MothershipProvider] (a mothership's `edges` collection), combined with [MultiProvider]; [EdgesFromConfig] builds
-// them from a config file. A host application can bring its own (e.g. a control plane's mirror). Instances name
-// their owner edge in [Instance.Remote].
+// EdgeSource tells the router where other edges are. Built in: [YAMLProvider] (a config file's `edges.list`),
+// combined with others through [MultiProvider]. Others come from outside this package: ext/mothership's mirror
+// follows a mothership's `edges` collection; a host application can bring its own. Instances name their owner edge
+// in [Instance.Remote].
 type EdgeSource interface {
 	// Self is this edge's id ("" when it doesn't know).
 	Self() string
@@ -33,42 +33,23 @@ type EdgeSource interface {
 	Edges() []Edge
 }
 
-// Runner is an [EdgeSource] with background work (e.g. polling a mothership). The server runs it until shutdown.
+// Runner is an [EdgeSource] with background work. The server runs it until shutdown.
 type Runner interface {
 	Run(ctx context.Context)
 }
 
-// EdgesConfig is a config file's `edges:` section: this edge's id, a fixed list, and/or a mothership to read the
-// list from. Values in the mothership block expand $VARS from the environment, so its password can live in .env.
+// EdgesConfig is a config file's `edges:` section: this edge's id and a fixed list of the others.
 //
 //	edges:
 //	  self: lax-1
 //	  list:
 //	    - { id: sgp-1, internal_url: "http://10.88.0.4:8080", region: sgp }
-//	  mothership:
-//	    url: http://10.88.0.10:8090
-//	    email: $MOTHERSHIP_EMAIL
-//	    password: $MOTHERSHIP_PASSWORD
-//	    collection: edges     # default
-//	    refresh: 30s          # default
 type EdgesConfig struct {
-	Self       string            `yaml:"self"`
-	List       []StaticEdge      `yaml:"list"`
-	Mothership *MothershipConfig `yaml:"mothership"`
+	Self string       `yaml:"self"`
+	List []StaticEdge `yaml:"list"`
 }
 
-// MothershipConfig is the `edges.mothership` block (see [MothershipProvider]).
-type MothershipConfig struct {
-	URL        string        `yaml:"url"`
-	Email      string        `yaml:"email"`
-	Password   string        `yaml:"password"`
-	Collection string        `yaml:"collection"`
-	Refresh    time.Duration `yaml:"refresh"`
-}
-
-// EdgesFromConfig builds the edge providers for an `edges:` section (node may be nil: no section, nil result). The
-// list comes first, so a YAML entry overrides the mothership's record for the same edge. A [MothershipProvider] in
-// the result is a [Runner]: run it (the server does) or call its Refresh.
+// EdgesFromConfig builds the [YAMLProvider] for an `edges:` section (node may be nil: no section, nil result).
 func EdgesFromConfig(node *yaml.Node, log *slog.Logger) (EdgeSource, error) {
 	if node == nil {
 		return nil, nil
@@ -80,31 +61,14 @@ func EdgesFromConfig(node *yaml.Node, log *slog.Logger) (EdgeSource, error) {
 	return c.Build(log)
 }
 
-// Build returns the providers c describes: a [YAMLProvider], a [MothershipProvider], or both in a [MultiProvider].
+// Build returns the [YAMLProvider] c describes.
 func (c EdgesConfig) Build(log *slog.Logger) (EdgeSource, error) {
 	for i, e := range c.List {
 		if e.ID == "" || e.InternalURL == "" {
 			return nil, fmt.Errorf("edges.list[%d] needs id and internal_url", i)
 		}
 	}
-	var out MultiProvider
-	if len(c.List) > 0 || c.Mothership == nil {
-		out = append(out, &YAMLProvider{SelfID: c.Self, List: c.List})
-	}
-	if m := c.Mothership; m != nil {
-		p := &MothershipProvider{
-			URL: os.ExpandEnv(m.URL), Email: os.ExpandEnv(m.Email), Password: os.ExpandEnv(m.Password),
-			Collection: m.Collection, Refresh: m.Refresh, SelfID: c.Self, Logger: log,
-		}
-		if p.URL == "" {
-			return nil, fmt.Errorf("edges.mothership needs url")
-		}
-		out = append(out, p)
-	}
-	if len(out) == 1 {
-		return out[0], nil
-	}
-	return out, nil
+	return &YAMLProvider{SelfID: c.Self, List: c.List}, nil
 }
 
 // LoadEdges reads the `edges:` section of a YAML config file (nil, nil when the file has none).
@@ -220,4 +184,14 @@ func (m MultiProvider) Run(ctx context.Context) {
 	for ; n > 0; n-- {
 		<-done
 	}
+}
+
+// ParsePBTime parses a PocketBase datetime ("2006-01-02 15:04:05.000Z") or RFC 3339.
+func ParsePBTime(v string) (time.Time, error) {
+	for _, f := range []string{"2006-01-02 15:04:05.000Z", "2006-01-02 15:04:05Z", time.RFC3339Nano} {
+		if t, err := time.Parse(f, v); err == nil {
+			return t, nil
+		}
+	}
+	return time.Time{}, fmt.Errorf("bad time %q", v)
 }

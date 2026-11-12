@@ -1,5 +1,5 @@
-// Forwarding to the owner  A request for an instance another edge runs ([Instance.Remote]) goes there over the
-// private network. Where other edges are comes from an [EdgeSource] (built in: [YAMLProvider], [MothershipProvider],
+// Forwarding to the owner edge. A request for an instance another edge runs ([Instance.Remote]) goes there over the
+// private network. Where other edges are comes from an [EdgeSource] (built in: [YAMLProvider]; ext/mothership's mirror;
 // combined with [MultiProvider]). Plug [Router.Forward] into [Handler.Forward].
 //
 // Any edge accepts any request (a load balancer sends visitors to the nearest one). While the owner edge is healthy

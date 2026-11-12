@@ -17,6 +17,7 @@ import (
 
 	"github.com/pockethost/pocketbase/ext/autotls"
 	"github.com/pockethost/pocketbase/ext/edge"
+	"github.com/pockethost/pocketbase/ext/mothership/mirror"
 	"github.com/pockethost/pocketbase/ext/pocker"
 	"github.com/pockethost/pocketbase/ext/servertiming"
 )
@@ -61,6 +62,20 @@ func main() {
 		servertiming.New(), // outermost, so its header includes everything below
 		autotls.New(),
 	}}
+	// a `mothership:` section: instances and the other edges come from the mothership (a config `edges.list` adds
+	// fixed edges in front)
+	if m, err := mirror.FromConfig(cfg.Doc(), slog.Default()); err != nil {
+		slog.Error("pocker: mothership", "error", err)
+		os.Exit(1)
+	} else if m != nil {
+		srv.Source, srv.Edges = m, m
+		if fixed, err := edge.EdgesFromConfig(edge.TopLevel(cfg.Doc(), "edges"), slog.Default()); err != nil {
+			slog.Error("pocker: edges", "error", err)
+			os.Exit(1)
+		} else if fixed != nil {
+			srv.Edges = edge.MultiProvider{fixed, m}
+		}
+	}
 	if err := srv.Run(ctx); err != nil {
 		slog.Error("pocker: serve", "error", err)
 		os.Exit(1)
