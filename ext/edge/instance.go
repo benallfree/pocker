@@ -1,9 +1,7 @@
-// Package pocker hosts many PocketBase apps in one process.
-//
-// Requests are routed by Host header to an instance. An instance's PocketBase app is started on its first request and
-// then kept running. Where instance information comes from is pluggable through [InstanceSource]: a YAML file for local
-// use ([YAMLSource]), or any other provider (a hosting platform's control plane, a database, ...).
-package pocker
+// Package edge is the shared front of a PocketBase CE edge: the instance model, where instances and edges come from
+// (sources), the host that listens and routes requests, and the runtime interface that runs an instance (ext/pocker
+// in-process, ext/docker in a container).
+package edge
 
 import "context"
 
@@ -102,4 +100,12 @@ type InstanceSource interface {
 
 	// Watch streams changes after the snapshot until ctx is done. Sources that never change may return a nil channel.
 	Watch(ctx context.Context) (<-chan Change, error)
+}
+
+// PluginConfig returns an instance's settings for the named plugin (its `plugins.<name>` value), or nil.
+func (i Instance) PluginConfig(name string) any {
+	if i.Plugins == nil {
+		return nil
+	}
+	return i.Plugins[name]
 }

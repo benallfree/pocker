@@ -1,4 +1,4 @@
-package pocker
+package edge
 
 import (
 	"fmt"
@@ -72,7 +72,7 @@ var DefaultQuarantine = QuarantinePolicy{
 }
 
 // merged returns q with zero fields taken from def.
-func (q QuarantinePolicy) merged(def QuarantinePolicy) QuarantinePolicy {
+func (q QuarantinePolicy) Merged(def QuarantinePolicy) QuarantinePolicy {
 	if q.Off || def.Off && q == (QuarantinePolicy{}) {
 		return QuarantinePolicy{Off: true}
 	}
@@ -95,7 +95,7 @@ func (q QuarantinePolicy) merged(def QuarantinePolicy) QuarantinePolicy {
 }
 
 // pauseFor returns the pause for the n-th quarantine (0-based): FirstPause doubling up to MaxPause.
-func (q QuarantinePolicy) pauseFor(n int) time.Duration {
+func (q QuarantinePolicy) PauseFor(n int) time.Duration {
 	d := q.FirstPause
 	for i := 0; i < n && d < q.MaxPause; i++ {
 		d *= 2
@@ -107,7 +107,7 @@ func (q QuarantinePolicy) pauseFor(n int) time.Duration {
 }
 
 // over returns l with zero fields taken from def.
-func (l Limits) over(def Limits) Limits {
+func (l Limits) Over(def Limits) Limits {
 	if l.MaxJSExecution == 0 {
 		l.MaxJSExecution = def.MaxJSExecution
 	}
@@ -134,13 +134,13 @@ func (l Limits) over(def Limits) Limits {
 	}
 	defQ := DefaultQuarantine
 	if def.Quarantine != nil {
-		defQ = def.Quarantine.merged(DefaultQuarantine)
+		defQ = def.Quarantine.Merged(DefaultQuarantine)
 	}
 	q := QuarantinePolicy{}
 	if l.Quarantine != nil {
 		q = *l.Quarantine
 	}
-	q = q.merged(defQ)
+	q = q.Merged(defQ)
 	l.Quarantine = &q
 	return l
 }

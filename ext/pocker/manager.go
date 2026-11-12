@@ -98,7 +98,7 @@ func NewManager(source InstanceSource, opts ManagerOptions) *Manager {
 	if opts.Logger == nil {
 		opts.Logger = slog.Default()
 	}
-	defaults := opts.Defaults.over(DefaultLimits())
+	defaults := opts.Defaults.Over(DefaultLimits())
 	return &Manager{
 		source:    source,
 		opts:      appOptions{PBRoot: opts.PBRoot, HooksPoolSize: opts.HooksPoolSize, ForceDev: opts.Dev, Defaults: defaults, Init: opts.Init, InitJS: opts.InitJS, Setup: opts.Setup},
@@ -537,7 +537,7 @@ func (m *Manager) Strike(id string) {
 	now := time.Now()
 	m.mu.Lock()
 	inst := m.instances[id]
-	policy := *inst.Limits.over(m.defaults).Quarantine
+	policy := *inst.Limits.Over(m.defaults).Quarantine
 	st := m.qstate[id]
 	if st == nil {
 		st = &quarantineState{}
@@ -559,7 +559,7 @@ func (m *Manager) Strike(id string) {
 	var slot *appSlot
 	var until time.Time
 	if !policy.Off && count >= policy.Strikes {
-		until = now.Add(policy.pauseFor(st.level))
+		until = now.Add(policy.PauseFor(st.level))
 		st.level++
 		st.strikes = nil
 		m.paused[id] = until

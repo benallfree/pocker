@@ -72,7 +72,7 @@ func startApp(opts appOptions, inst Instance) (r *runningApp, err error) {
 		}
 	}
 
-	lim := inst.Limits.over(opts.Defaults)
+	lim := inst.Limits.Over(opts.Defaults)
 
 	app := core.NewBaseApp(core.BaseAppConfig{
 		DBConnect:     sandbox.GuardedDBConnect(lim.MaxQueryDuration), // SQL stays inside this app's files

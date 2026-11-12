@@ -33,7 +33,7 @@ instances:
 	if err != nil {
 		t.Fatal(err)
 	}
-	shop := f.Instances[0].Limits.over(DefaultLimits())
+	shop := f.Instances[0].Limits.Over(DefaultLimits())
 	if shop.MaxJSExecution != time.Minute || shop.MaxJSAllocation != 128<<20 || shop.HTTPSendMaxBody != 1500000 {
 		t.Fatalf("shop overrides: %+v", shop)
 	}
@@ -43,7 +43,7 @@ instances:
 	if q := shop.Quarantine; q.Off || q.Strikes != 5 || q.MaxPause != time.Hour || q.FirstPause != 30*time.Second {
 		t.Fatalf("shop quarantine: %+v", *q)
 	}
-	if q := f.Instances[1].Limits.over(DefaultLimits()).Quarantine; !q.Off {
+	if q := f.Instances[1].Limits.Over(DefaultLimits()).Quarantine; !q.Off {
 		t.Fatalf("quarantine: off not applied: %+v", *q)
 	}
 
@@ -60,7 +60,7 @@ instances:
 	if cfg.MaxJSExecution != 5*time.Second || cfg.Quarantine.FirstPause != time.Minute || cfg.Quarantine.Strikes != 3 {
 		t.Fatalf("config limits: %+v / %+v", cfg.Limits, *cfg.Quarantine)
 	}
-	if got := shop.over(cfg.Limits).MaxJSExecution; got != time.Minute {
+	if got := shop.Over(cfg.Limits).MaxJSExecution; got != time.Minute {
 		t.Fatalf("instance must win over config, got %s", got)
 	}
 }

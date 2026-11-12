@@ -89,13 +89,6 @@ type Starter interface {
 	Start(ctx context.Context, m *Manager)
 }
 
-// PluginConfig returns an instance's settings for the named plugin (its `plugins.<name>` value), or nil.
-func (i Instance) PluginConfig(name string) any {
-	if i.Plugins == nil {
-		return nil
-	}
-	return i.Plugins[name]
-}
 
 // DecodePluginConfig fills out from an instance's plugin settings: a value of out's own type (or a pointer to it,
 // as a host application's instance source would set) is copied; anything else (e.g. a map from YAML) is converted

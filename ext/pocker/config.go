@@ -117,7 +117,7 @@ func LoadConfig(path string) (Config, error) {
 	if fromFile.ShutdownTimeout > 0 {
 		cfg.ShutdownTimeout = fromFile.ShutdownTimeout
 	}
-	cfg.Limits = fromFile.Limits.over(cfg.Limits)
+	cfg.Limits = fromFile.Limits.Over(cfg.Limits)
 	cfg.TLS = fromFile.TLS
 	if fromFile.EgressAllow != nil {
 		cfg.EgressAllow = fromFile.EgressAllow

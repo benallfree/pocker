@@ -3,6 +3,7 @@ module github.com/pockethost/pocketbase/ext/pitr
 go 1.27
 
 require (
+	ganigeorgiev.com/pocketbase/dbx v1.13.0
 	ganigeorgiev.com/pocketbase/pocketbase v0.0.0-00010101000000-000000000000
 	github.com/benbjohnson/litestream v0.5.18
 	github.com/pockethost/pocketbase/ext/devusers v0.0.0-00010101000000-000000000000
@@ -14,7 +15,6 @@ require (
 
 require (
 	ganigeorgiev.com/fexpr v0.7.0 // indirect
-	ganigeorgiev.com/pocketbase/dbx v1.13.0 // indirect
 	ganigeorgiev.com/pocketbase/ozzo-validation/v4 v4.4.1 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
@@ -46,6 +46,7 @@ require (
 	github.com/matttproud/golang_protobuf_extensions/v2 v2.0.0 // indirect
 	github.com/ncruces/go-strftime v1.1.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.23 // indirect
+	github.com/pockethost/pocketbase/ext/edge v0.0.0-00010101000000-000000000000 // indirect
 	github.com/pockethost/pocketbase/ext/sandbox v0.0.0-00010101000000-000000000000 // indirect
 	github.com/prometheus/client_golang v1.17.0 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
@@ -79,3 +80,5 @@ replace (
 )
 
 replace github.com/pockethost/pocketbase/ext/devusers => ../devusers
+
+replace github.com/pockethost/pocketbase/ext/edge => ../edge
