@@ -79,6 +79,7 @@ type Sandbox struct {
 	once      sync.Once
 	openErr   error
 	dir       string
+	realDir   string // dir with symlinks resolved, when different
 	root      *os.Root
 	templates *template.Registry // shared by the app's runtimes, like jsvm's own
 	requires  *require.Registry  // confined require(), shared by the app's runtimes
@@ -96,6 +97,11 @@ func (s *Sandbox) open() error {
 		s.dir, s.openErr = filepath.Abs(s.Dir)
 		if s.openErr != nil {
 			return
+		}
+		// the folder's real path, for paths that arrive with symlinks resolved (require() resolves them; on macOS
+		// /var/folders is /private/var/folders)
+		if real, err := filepath.EvalSymlinks(s.dir); err == nil && real != s.dir {
+			s.realDir = real
 		}
 		s.root, s.openErr = os.OpenRoot(s.dir)
 		s.templates = template.NewRegistry()
@@ -136,11 +142,16 @@ func (s *Sandbox) rel(p string) (string, error) {
 		return ".", nil
 	}
 	if filepath.IsAbs(p) {
-		r, err := filepath.Rel(s.dir, filepath.Clean(p))
-		if err != nil || r == ".." || strings.HasPrefix(r, ".."+string(filepath.Separator)) {
-			return "", fmt.Errorf("%s: path is outside the app folder", p)
+		clean := filepath.Clean(p)
+		for _, base := range []string{s.dir, s.realDir} {
+			if base == "" {
+				continue
+			}
+			if r, err := filepath.Rel(base, clean); err == nil && r != ".." && !strings.HasPrefix(r, ".."+string(filepath.Separator)) {
+				return r, nil
+			}
 		}
-		return r, nil
+		return "", fmt.Errorf("%s: path is outside the app folder", p)
 	}
 	return filepath.Clean(p), nil
 }
