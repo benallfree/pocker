@@ -9,6 +9,8 @@ import (
 	"runtime/debug"
 	"time"
 
+	"github.com/pockethost/pocketbase/ext/edgeroute"
+
 	"github.com/pockethost/pocketbase/ext/edge"
 	"github.com/pockethost/pocketbase/ext/sandbox"
 
@@ -37,6 +39,14 @@ type Server struct {
 
 	// Forward, if set, serves requests for instances another server runs (see [ManagerOptions.Forward]).
 	Forward func(w http.ResponseWriter, r *http.Request, inst Instance)
+
+	// Edges, when Forward is nil, forwards requests for instances other edges run ([Instance.Remote]) through
+	// ext/edgeroute: a control plane's mirror, or several sources ([edge.MultiEdges]). Without it, a config file
+	// `edges:` section ([edge.StaticEdges]) does the same. With neither, Remote is a URL and requests are proxied to it.
+	Edges edge.EdgeSource
+
+	// EdgeRoute tunes forwarding through Edges (header name, health path, timings); Edges is filled in.
+	EdgeRoute edgeroute.Config
 
 	// Plugins extend the server (see [Plugin]): settings from the config file, a request gate (e.g. the firewall
 	// plugin), TLS (e.g. the autotls plugin), handler wrappers and background work. Order matters for wrappers: the
@@ -127,6 +137,27 @@ func (s *Server) Run(ctx context.Context) error {
 			jsIniters = append(jsIniters, js)
 		}
 	}
+	forward := s.Forward
+	if forward == nil {
+		edges := s.Edges
+		if edges == nil {
+			if n := TopLevel(s.Config.Doc(), "edges"); n != nil {
+				var static edge.StaticEdges
+				if err := n.Decode(&static); err != nil {
+					return fmt.Errorf("edges: %w", err)
+				}
+				edges = &static
+			}
+		}
+		if edges != nil {
+			rc := s.EdgeRoute
+			rc.Edges = edges
+			if rc.Logger == nil {
+				rc.Logger = log
+			}
+			forward = edgeroute.New(rc).Forward
+		}
+	}
 	dir := edge.NewDirectory(log)
 	s.Manager = NewManager(source, ManagerOptions{
 		PBRoot:        s.Config.PBRoot,
@@ -139,7 +170,7 @@ func (s *Server) Run(ctx context.Context) error {
 		Init:          chainIniters(initers),
 		InitJS:        chainJSIniters(jsIniters),
 		Setup:         s.SetupApp,
-		Forward:       s.Forward,
+		Forward:       forward,
 		Directory:     dir,
 	})
 
