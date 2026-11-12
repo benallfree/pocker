@@ -1,10 +1,9 @@
 # storage
 
-A default bucket for record uploads and backup zips, per instance, when the instance hasn't turned on its own S3.
-Credentials never reach the instance.
+The operator's fall-through storage: named S3 backends, and mounts that send each filesystem kind (record uploads,
+backup zips, PITR history, any plugin's own kind) to one of them, per instance. Credentials never reach the instance.
 
-**Runs on:** many apps under [pocker](../pocker/README.md). (A single app has no use for it: its owner sets S3 in
-Settings.)
+**Runs on:** many apps under [pocker](../pocker/README.md); a single app can use it too (`Bind(app, "")`).
 
 > **Spike.** Works and is tested against MinIO; not yet deployed.
 
