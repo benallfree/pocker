@@ -44,6 +44,47 @@ func (a *appPITR) onServe(se *core.ServeEvent) error {
 		}
 		return e.JSON(http.StatusAccepted, map[string]any{"restoring": true, "at": body.At})
 	})
+	g.GET("/settings", func(e *core.RequestEvent) error {
+		s, err := LoadSettings(e.App)
+		if err != nil {
+			return e.InternalServerError("", err)
+		}
+		return e.JSON(http.StatusOK, toPublic(s))
+	})
+	g.PATCH("/settings", func(e *core.RequestEvent) error {
+		prev, err := LoadSettings(e.App)
+		if err != nil {
+			return e.InternalServerError("", err)
+		}
+		var next Settings
+		if err := e.BindBody(&next); err != nil {
+			return e.BadRequestError("Expected {\"s3\": {...}}.", err)
+		}
+		next = mergeSecret(next, prev)
+		if err := SaveSettings(e.App, next); err != nil {
+			return e.BadRequestError(err.Error(), nil)
+		}
+		// the history keeps going, now to the new destination (a fresh snapshot there)
+		if err := a.reattach(); err != nil {
+			return e.InternalServerError("Saved, but replication didn't restart: "+err.Error(), err)
+		}
+		return e.JSON(http.StatusOK, toPublic(next))
+	})
+	g.POST("/settings/test-s3", func(e *core.RequestEvent) error {
+		prev, err := LoadSettings(e.App)
+		if err != nil {
+			return e.InternalServerError("", err)
+		}
+		var body Settings
+		if err := e.BindBody(&body); err != nil {
+			return e.BadRequestError("Expected {\"s3\": {...}}.", err)
+		}
+		body = mergeSecret(body, prev)
+		if err := testS3(body.S3); err != nil {
+			return e.BadRequestError("S3 test failed: "+err.Error(), nil)
+		}
+		return e.NoContent(http.StatusNoContent)
+	})
 	se.UIExtensions = append(se.UIExtensions, core.UIExtension{Name: Name, FS: UI()})
 	return se.Next()
 }

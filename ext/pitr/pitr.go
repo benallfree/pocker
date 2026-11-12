@@ -55,24 +55,7 @@ type Config struct {
 	// since the snapshot before the chosen time, so a shorter interval makes restores faster and uses more storage.
 	SnapshotInterval time.Duration `yaml:"snapshot_interval"`
 
-	// Bucket, if set, holds the history instead of each app's pb_data/litestream/. Its credentials never reach an
-	// app's settings, env or JS. Residency is the operator's: every server in a region should use that region's
-	// bucket.
-	Bucket *Bucket `yaml:"bucket"`
-
 	Logger *slog.Logger `yaml:"-"`
-}
-
-// Bucket is an S3-compatible destination.
-type Bucket struct {
-	Endpoint       string `yaml:"endpoint"`
-	Bucket         string `yaml:"bucket"`
-	Region         string `yaml:"region"`
-	AccessKey      string `yaml:"access_key"`
-	Secret         string `yaml:"secret"`
-	Prefix         string `yaml:"prefix"`           // prepended to every key
-	ForcePathStyle bool   `yaml:"force_path_style"` // e.g. MinIO
-	Label          string `yaml:"label"`            // shown in the admin: "History stored in: <Label>"
 }
 
 // AppConfig is one app's configuration.
@@ -82,10 +65,6 @@ type AppConfig struct {
 
 	// Retention overrides [Config.Retention] when non-zero (e.g. a hosting plan's limit).
 	Retention time.Duration `yaml:"retention"`
-
-	// Key is this app's folder in the bucket, below [Bucket.Prefix]: "" for a single app, "instances/<id>/" under
-	// a multitenant host. History goes to <prefix><key>litestream/. Not settable from instance config.
-	Key string `yaml:"-"`
 }
 
 // Plugin is one process's point-in-time restore: one Litestream store per retention value, shared by every app.
@@ -95,7 +74,6 @@ type Plugin struct {
 
 	mu     sync.Mutex
 	stores map[time.Duration]*litestream.Store
-	fs     *filesystem.System // bucket, when configured
 	apps   map[core.App]*appPITR
 	closed bool
 
@@ -151,22 +129,6 @@ func (p *Plugin) store(retention time.Duration) (*litestream.Store, error) {
 	return s, nil
 }
 
-// bucketFS returns the shared bucket filesystem.
-func (p *Plugin) bucketFS() (*filesystem.System, error) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	if p.fs != nil {
-		return p.fs, nil
-	}
-	b := p.cfg.Bucket
-	fsys, err := filesystem.NewS3(b.Bucket, b.Region, b.Endpoint, b.AccessKey, b.Secret, b.ForcePathStyle)
-	if err != nil {
-		return nil, err
-	}
-	p.fs = fsys
-	return fsys, nil
-}
-
 // Close flushes and closes every store. Apps should be terminated first.
 func (p *Plugin) Close(ctx context.Context) error {
 	p.mu.Lock()
@@ -178,9 +140,6 @@ func (p *Plugin) Close(ctx context.Context) error {
 	var errs []error
 	for _, s := range p.stores {
 		errs = append(errs, s.Close(ctx))
-	}
-	if p.fs != nil {
-		errs = append(errs, p.fs.Close())
 	}
 	return errors.Join(errs...)
 }
@@ -198,16 +157,37 @@ func (p *Plugin) resolve(ac AppConfig) (enabled bool, retention time.Duration) {
 	return enabled, retention
 }
 
-// client returns the replica client for an app (local folder or its bucket folder).
-func (p *Plugin) client(dataDir, key string) (litestream.ReplicaClient, error) {
-	if p.cfg.Bucket == nil {
-		return file.NewReplicaClient(filepath.Join(dataDir, DirName, "replica")), nil
-	}
-	fsys, err := p.bucketFS()
+// destination is where an app's history goes, in order: the app's own S3 (its PITR settings), the operator's
+// fall-through storage (core filesystem kind "litestream", e.g. an ext/storage mount), else pb_data/litestream/.
+type destination struct {
+	client litestream.ReplicaClient
+	kind   string // "s3" (the app's own bucket), "storage" (the operator's) or "local"
+	label  string // shown in the admin
+	close  func() // releases the filesystem behind client
+}
+
+func (a *appPITR) destination() (*destination, error) {
+	s, err := LoadSettings(a.app)
 	if err != nil {
 		return nil, err
 	}
-	return newBucketClient(fsys, p.cfg.Bucket.Prefix+key+"litestream"), nil
+	if s.S3.Enabled {
+		fsys, err := s.S3.open()
+		if err != nil {
+			return nil, err
+		}
+		return &destination{client: newBucketClient(fsys, s.S3.prefix()), kind: "s3", label: s.S3.Bucket + "/" + s.S3.prefix(),
+			close: func() { fsys.Close() }}, nil
+	}
+	fsys, err := a.app.NewFilesystemOfKind(Kind, nil)
+	if err != nil {
+		return nil, err
+	}
+	if fsys != nil {
+		return &destination{client: newBucketClient(fsys, ""), kind: "storage", label: "server storage", close: func() { fsys.Close() }}, nil
+	}
+	return &destination{client: file.NewReplicaClient(filepath.Join(a.dataDir(), DirName, "replica")), kind: "local",
+		label: "pb_data/" + DirName, close: func() {}}, nil
 }
 
 // SetupApp adds point-in-time restore to app. Call it before the app bootstraps (pocketbase.New → before Start;
@@ -218,7 +198,7 @@ func (p *Plugin) SetupApp(app core.App, ac AppConfig) error {
 	if !enabled {
 		return nil
 	}
-	a := &appPITR{p: p, app: app, key: ac.Key, retention: retention}
+	a := &appPITR{p: p, app: app, retention: retention}
 	p.mu.Lock()
 	p.apps[app] = a
 	p.mu.Unlock()
@@ -238,12 +218,12 @@ func (p *Plugin) SetupApp(app core.App, ac AppConfig) error {
 type appPITR struct {
 	p         *Plugin
 	app       core.App
-	key       string
 	retention time.Duration
 
 	mu        sync.Mutex
 	db        *litestream.DB
 	store     *litestream.Store
+	dest      *destination // where the attached db replicates to
 	restoring bool
 }
 
@@ -327,11 +307,13 @@ func (a *appPITR) attach() error {
 	if err != nil {
 		return err
 	}
-	client, err := a.p.client(a.dataDir(), a.key)
+	dest, err := a.destination()
 	if err != nil {
 		return err
 	}
+	client := dest.client
 	if err := os.MkdirAll(a.stateDir(), 0o755); err != nil {
+		dest.close()
 		return err
 	}
 	db := litestream.NewDB(a.dbPath())
@@ -343,9 +325,10 @@ func (a *appPITR) attach() error {
 		fc.Replica = r
 	}
 	if err := store.RegisterDB(db); err != nil {
+		dest.close()
 		return fmt.Errorf("pitr: %w", err)
 	}
-	a.db, a.store = db, store
+	a.db, a.store, a.dest = db, store, dest
 	return nil
 }
 
@@ -365,7 +348,10 @@ func (a *appPITR) detach() {
 	if err := a.store.UnregisterDB(ctx, path); err != nil {
 		a.logger().Warn("pitr: unregister failed", "error", err)
 	}
-	a.db, a.store = nil, nil
+	if a.dest != nil {
+		a.dest.close()
+	}
+	a.db, a.store, a.dest = nil, nil, nil
 }
 
 // sync flushes the app's pending changes to the replica (before a restore, so the newest changes are included).
@@ -400,3 +386,10 @@ func (l levelHandler) WithAttrs(a []slog.Attr) slog.Handler {
 func (l levelHandler) WithGroup(n string) slog.Handler { return levelHandler{l.min, l.h.WithGroup(n)} }
 
 var _ io.Closer = (*filesystem.System)(nil)
+
+// reattach restarts replication against the current destination (after the app's PITR settings changed). History
+// already at the old destination stays there; Litestream starts a fresh snapshot at the new one.
+func (a *appPITR) reattach() error {
+	a.detach()
+	return a.attach()
+}

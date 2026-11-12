@@ -43,7 +43,7 @@ type Window struct {
 type Status struct {
 	Enabled     bool         `json:"enabled"`
 	Retention   string       `json:"retention"`
-	Destination string       `json:"destination"` // "local" or "bucket"
+	Destination string       `json:"destination"` // "s3" (the app's own bucket), "storage" (the server's) or "local"
 	Label       string       `json:"label,omitempty"`
 	Window      *Window      `json:"window,omitempty"` // nil until the first snapshot is written
 	Size        int64        `json:"size"`             // bytes of history
@@ -53,27 +53,27 @@ type Status struct {
 }
 
 // replica returns a database-less replica for reading the history.
-func (a *appPITR) replica() (*litestream.Replica, error) {
-	client, err := a.p.client(a.dataDir(), a.key)
+func (a *appPITR) replica() (*litestream.Replica, *destination, error) {
+	dest, err := a.destination()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	if err := client.Init(context.Background()); err != nil {
-		return nil, err
+	if err := dest.client.Init(context.Background()); err != nil {
+		dest.close()
+		return nil, nil, err
 	}
-	return litestream.NewReplicaWithClient(nil, client), nil
+	return litestream.NewReplicaWithClient(nil, dest.client), dest, nil
 }
 
 // Status reports the restorable window and history size.
 func (a *appPITR) Status(ctx context.Context) (*Status, error) {
-	st := &Status{Enabled: true, Retention: a.retention.String(), Destination: "local"}
-	if b := a.p.cfg.Bucket; b != nil {
-		st.Destination, st.Label = "bucket", b.Label
-	}
-	r, err := a.replica()
+	st := &Status{Enabled: true, Retention: a.retention.String()}
+	r, dest, err := a.replica()
 	if err != nil {
 		return nil, err
 	}
+	defer dest.close()
+	st.Destination, st.Label = dest.kind, dest.label
 	created, updated, err := r.TimeBounds(ctx)
 	if err == nil && !created.IsZero() {
 		st.Window = &Window{Earliest: created, Latest: updated}
@@ -110,10 +110,11 @@ func (a *appPITR) Stage(ctx context.Context, at time.Time) error {
 	if err := a.sync(ctx); err != nil { // include the newest changes
 		return fmt.Errorf("flush before restore: %w", err)
 	}
-	r, err := a.replica()
+	r, dest, err := a.replica()
 	if err != nil {
 		return err
 	}
+	defer dest.close()
 	created, _, err := r.TimeBounds(ctx)
 	if err != nil {
 		return err
@@ -297,10 +298,11 @@ func restoreTo(ctx context.Context, a *appPITR, at time.Time, out string) error 
 	if _, err := os.Stat(out); err == nil {
 		return fmt.Errorf("%s already exists", out)
 	}
-	r, err := a.replica()
+	r, dest, err := a.replica()
 	if err != nil {
 		return err
 	}
+	defer dest.close()
 	opt := litestream.NewRestoreOptions()
 	opt.OutputPath = out
 	opt.Timestamp = at

@@ -157,7 +157,7 @@ func TestConfigureAndInstanceConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 	c := p.Config()
-	if c.Enabled == nil || *c.Enabled || c.Retention != 48*time.Hour || c.SnapshotInterval != time.Hour || c.Bucket == nil || c.Bucket.Label != "EU" {
+	if c.Enabled == nil || *c.Enabled || c.Retention != 48*time.Hour || c.SnapshotInterval != time.Hour {
 		t.Fatalf("configured: %+v", c)
 	}
 	// Go-set values win over the file

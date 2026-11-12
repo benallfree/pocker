@@ -45,21 +45,23 @@ func (p *Plugin) Configure(doc *yaml.Node, _ pocker.Config) error {
 	if !p.intervalSet && c.SnapshotInterval > 0 {
 		p.cfg.SnapshotInterval = c.SnapshotInterval
 	}
-	if p.cfg.Bucket == nil {
-		p.cfg.Bucket = c.Bucket
+	var probe map[string]any
+	if n.Decode(&probe) == nil {
+		if _, ok := probe["bucket"]; ok {
+			p.log.Warn("pitr: `pitr.bucket` is no longer read; history goes to the app's own PITR S3 setting, else the storage plugin's `litestream` mount, else pb_data/litestream/")
+		}
 	}
 	return nil
 }
 
-// InitApp sets up an instance's app before it bootstraps. History goes to instances/<id>/ in the bucket (or the
-// instance's own pb_data/litestream/). The instance may set `enabled` and `retention`; a bucket can only come from
-// the server's config, so its credentials never sit in instance data.
+// InitApp sets up an instance's app before it bootstraps. The instance may set `enabled` and `retention`. Where its
+// history goes is decided per app: its own PITR S3 setting, else the server's storage (`litestream` kind), else its
+// pb_data/litestream/.
 func (p *Plugin) InitApp(inst pocker.Instance, app core.App) error {
 	ac, err := instanceConfig(inst)
 	if err != nil {
 		return err
 	}
-	ac.Key = "instances/" + inst.ID + "/"
 	return p.SetupApp(app, ac)
 }
 

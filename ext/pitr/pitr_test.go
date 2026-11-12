@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"ganigeorgiev.com/pocketbase/pocketbase/tools/filesystem"
 	"io"
 	"log/slog"
 	"net"
@@ -271,7 +272,10 @@ func TestDisabledAddsNothing(t *testing.T) {
 
 // ---- bucket (MinIO) ----
 
-func startMinio(t *testing.T) *Bucket {
+// minioTarget is a throwaway MinIO bucket "pitr" for the S3 tests.
+type minioTarget struct{ Endpoint, Bucket, Region, AccessKey, Secret string }
+
+func startMinio(t *testing.T) *minioTarget {
 	t.Helper()
 	bin, err := exec.LookPath("minio")
 	if err != nil {
@@ -316,31 +320,35 @@ func startMinio(t *testing.T) *Bucket {
 	}
 	run("alias", "set", "t", endpoint, "pitrtest", "pitrtest-secret")
 	run("mb", "t/pitr")
-	return &Bucket{Endpoint: endpoint, Bucket: "pitr", Region: "us-east-1", AccessKey: "pitrtest", Secret: "pitrtest-secret", ForcePathStyle: true, Prefix: "eu/", Label: "EU"}
+	return &minioTarget{Endpoint: endpoint, Bucket: "pitr", Region: "us-east-1", AccessKey: "pitrtest", Secret: "pitrtest-secret"}
 }
 
-func TestBucketDestination(t *testing.T) {
+// The app's own PITR S3 setting: two apps, same bucket, their own prefixes; nothing local; restores from S3.
+func TestS3SettingDestination(t *testing.T) {
 	b := startMinio(t)
-	p := New(Config{Bucket: b, Logger: quiet})
+	p := New(Config{Logger: quiet})
 	defer p.Close(context.Background())
 
-	// two apps with their own keys, as under a multitenant host
 	dirA, dirB := t.TempDir(), t.TempDir()
-	start := func(dir, key string) *testApp {
+	start := func(dir, prefix string) *testApp {
 		app := core.NewBaseApp(core.BaseAppConfig{DataDir: dir})
-		if err := p.SetupApp(app, AppConfig{Key: key}); err != nil {
+		if err := p.SetupApp(app, AppConfig{}); err != nil {
 			t.Fatal(err)
 		}
 		if err := app.Bootstrap(); err != nil {
 			t.Fatal(err)
 		}
 		_ = app.RunAllMigrations()
+		if err := SaveSettings(app, Settings{S3: S3Settings{Enabled: true, Bucket: b.Bucket, Region: b.Region, Endpoint: b.Endpoint,
+			AccessKey: b.AccessKey, Secret: b.Secret, ForcePathStyle: true, Prefix: prefix}}); err != nil {
+			t.Fatal(err)
+		}
 		router, _ := apis.NewRouter(app)
 		_ = app.OnServe().Trigger(&core.ServeEvent{App: app, Router: router, Server: &http.Server{}}, func(e *core.ServeEvent) error { return nil })
 		return &testApp{app: app}
 	}
-	ta := start(dirA, "instances/a/")
-	tb := start(dirB, "instances/b/")
+	ta := start(dirA, "eu/a")
+	tb := start(dirB, "eu/b")
 	defer tb.stop()
 	notesCollection(t, ta.app)
 	notesCollection(t, tb.app)
@@ -359,28 +367,34 @@ func TestBucketDestination(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// nothing local: history is in the bucket, under each app's own prefix
 	if _, err := os.Stat(filepath.Join(dirA, DirName, "replica")); err == nil {
-		t.Error("bucket mode wrote a local replica")
+		t.Error("S3 mode wrote a local replica")
 	}
-	fsys, _ := p.bucketFS()
-	objs, err := fsys.List("eu/instances/")
+	fsys, err := filesystem.NewS3(b.Bucket, b.Region, b.Endpoint, b.AccessKey, b.Secret, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer fsys.Close()
+	objs, err := fsys.List("eu/")
 	if err != nil || len(objs) == 0 {
 		t.Fatalf("bucket objects: %d %v", len(objs), err)
 	}
 	for _, o := range objs {
-		if !strings.HasPrefix(o.Key, "eu/instances/a/litestream/") && !strings.HasPrefix(o.Key, "eu/instances/b/litestream/") {
-			t.Errorf("key outside the app folders: %s", o.Key)
+		if !strings.HasPrefix(o.Key, "eu/a/") && !strings.HasPrefix(o.Key, "eu/b/") {
+			t.Errorf("key outside the apps' prefixes: %s", o.Key)
 		}
 	}
+	st, err := p.Status(context.Background(), ta.app)
+	if err != nil || st.Destination != "s3" || st.Label != "pitr/eu/a" {
+		t.Fatalf("status: %+v %v", st, err)
+	}
 
-	// timestamp restore from the bucket (uses the stored timestamps)
 	side := filepath.Join(t.TempDir(), "a.db")
 	if err := restoreTo(context.Background(), p.appFor(ta.app), t1, side); err != nil {
 		t.Fatal(err)
 	}
 	if n := countNotes(t, side); n != 20 {
-		t.Fatalf("bucket restore to t1: %d notes, want 20", n)
+		t.Fatalf("S3 restore to t1: %d notes, want 20", n)
 	}
 	sideB := filepath.Join(t.TempDir(), "b.db")
 	if err := restoreTo(context.Background(), p.appFor(tb.app), time.Now(), sideB); err != nil {
@@ -389,15 +403,92 @@ func TestBucketDestination(t *testing.T) {
 	if n := countNotes(t, sideB); n != 7 {
 		t.Fatalf("b restored %d notes, want 7 (fencing)", n)
 	}
+	ta.stop()
+}
 
-	// in place from the bucket
-	if err := p.appFor(ta.app).Stage(context.Background(), t1); err != nil {
+// The operator's storage: an OnFilesystemCreate handler serving kind "litestream" (what ext/storage does when
+// mounted) gets the history; the app's own S3 setting, once on, wins over it.
+func TestStorageKindDestination(t *testing.T) {
+	served := t.TempDir()
+	p := New(Config{Logger: quiet})
+	defer p.Close(context.Background())
+	app := core.NewBaseApp(core.BaseAppConfig{DataDir: t.TempDir()})
+	app.OnFilesystemCreate().BindFunc(func(e *core.FilesystemCreateEvent) error {
+		if e.Kind == Kind {
+			fs, err := filesystem.NewLocal(served)
+			if err != nil {
+				return err
+			}
+			e.Filesystem = fs
+		}
+		return e.Next()
+	})
+	if err := p.SetupApp(app, AppConfig{}); err != nil {
 		t.Fatal(err)
 	}
-	ta.stop()
-	ta = start(dirA, "instances/a/")
+	if err := app.Bootstrap(); err != nil {
+		t.Fatal(err)
+	}
+	_ = app.RunAllMigrations()
+	router, _ := apis.NewRouter(app)
+	_ = app.OnServe().Trigger(&core.ServeEvent{App: app, Router: router, Server: &http.Server{}}, func(e *core.ServeEvent) error { return nil })
+	ta := &testApp{app: app}
 	defer ta.stop()
-	if n, _ := ta.app.CountRecords("notes"); n != 20 {
-		t.Fatalf("in place from bucket: %d notes", n)
+	notesCollection(t, app)
+	addNotes(t, app, "s", 5)
+	if err := p.storeSync(app); err != nil {
+		t.Fatal(err)
+	}
+	st, err := p.Status(context.Background(), app)
+	if err != nil || st.Destination != "storage" {
+		t.Fatalf("status: %+v %v", st, err)
+	}
+	var files int
+	_ = filepath.Walk(served, func(_ string, info os.FileInfo, _ error) error {
+		if info != nil && !info.IsDir() {
+			files++
+		}
+		return nil
+	})
+	if files == 0 {
+		t.Fatal("nothing written to the storage-supplied filesystem")
+	}
+	if _, err := os.Stat(filepath.Join(app.DataDir(), DirName, "replica")); err == nil {
+		t.Error("storage mode wrote a local replica")
+	}
+}
+
+// Settings: the secret never comes back from the API, an update without a secret keeps it, and with an encryption
+// key it's encrypted at rest.
+func TestSettingsAPIAndEncryption(t *testing.T) {
+	t.Setenv("PITR_TEST_ENC", "0123456789abcdef0123456789abcdef")
+	app := core.NewBaseApp(core.BaseAppConfig{DataDir: t.TempDir(), EncryptionEnv: "PITR_TEST_ENC"})
+	if err := app.Bootstrap(); err != nil {
+		t.Fatal(err)
+	}
+	_ = app.RunAllMigrations()
+	in := Settings{S3: S3Settings{Enabled: true, Bucket: "b", Region: "r", Endpoint: "https://s3.example.com", AccessKey: "ak", Secret: "very-secret"}}
+	if err := SaveSettings(app, in); err != nil {
+		t.Fatal(err)
+	}
+	var raw string
+	_ = app.DB().NewQuery("SELECT value FROM _params WHERE id = 'pitr_settings'").Row(&raw)
+	if strings.Contains(raw, "very-secret") || !strings.Contains(raw, "secretEnc") {
+		t.Fatalf("secret not encrypted at rest: %s", raw)
+	}
+	got, err := LoadSettings(app)
+	if err != nil || got.S3.Secret != "very-secret" {
+		t.Fatalf("load: %+v %v", got, err)
+	}
+	pub := toPublic(got)
+	if pub.S3.Secret != "" || !pub.S3.SecretSet {
+		t.Fatalf("public settings leak or lose the secret: %+v", pub)
+	}
+	next := mergeSecret(Settings{S3: S3Settings{Enabled: true, Bucket: "b2", Region: "r", Endpoint: "https://s3.example.com", AccessKey: "ak"}}, got)
+	if next.S3.Secret != "very-secret" {
+		t.Fatal("an update without a secret dropped it")
+	}
+	if err := SaveSettings(app, Settings{S3: S3Settings{Enabled: true, Bucket: "b"}}); err == nil {
+		t.Fatal("S3 on with empty fields should be refused")
 	}
 }
