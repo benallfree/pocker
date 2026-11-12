@@ -1673,7 +1673,7 @@ func (app *BaseApp) initLogger() error {
 		// try to free up unused disk space if a lot of logs have been deleted
 		// (its racy but its ok in our use case as it is not expected to run frequently)
 		total := totalDeletedSinceVacuum.Add(max(oldCount-newCount, 0))
-		if total >= 20000 {
+		if total >= 50000 {
 			totalDeletedSinceVacuum.Store(0)
 
 			err = app.AuxVacuum()

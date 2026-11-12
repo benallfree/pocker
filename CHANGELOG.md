@@ -1,3 +1,8 @@
+## v0.42.3 (WIP)
+
+- Increased the auto `VACUUM` deleted logs threshold to 50k to avoid unnecessery running too often.
+
+
 ## v0.42.2
 
 - Fixed another UI regression causing wrong redirect page on OAuth2 success ([bugstage#14](https://ganigeorgiev.com/bugstage/discussions/14)).
