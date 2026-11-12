@@ -85,7 +85,7 @@ func TestCoveredBy(t *testing.T) {
 func TestAutoTLSIssuesOnlyForMappedHosts(t *testing.T) {
 	mapped := map[string]bool{"blog.example.com": true}
 	auto, err := newAutoTLS(context.Background(), Config{Auto: true, Email: "ops@example.com"}, false, t.TempDir(),
-		func(h string) bool { return mapped[normalizeHost(h)] })
+		func(h string) bool { return mapped[normalizeHost(h)] }, true)
 	if err != nil {
 		t.Fatal(err)
 	}

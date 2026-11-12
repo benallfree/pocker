@@ -1,8 +1,15 @@
-// Package autotls is a PocketBase CE plugin for the pocker host: automatic HTTPS certificates through ACME, with
-// CertMagic (Caddy's certificate engine). It reads its keys from pocker.yaml's `tls:` block; certificate files
-// (`tls.cert`/`tls.key`) stay a core feature.
+// Package autotls is a PocketBase CE plugin: automatic HTTPS certificates through ACME, with CertMagic (Caddy's
+// certificate engine). Two entry points:
 //
-//	srv := &pocker.Server{Config: cfg, Plugins: []pocker.Plugin{autotls.New()}}
+//   - Under pocker, [New] is a server plugin that reads pocker.yaml's `tls:` block; certificate files
+//     (`tls.cert`/`tls.key`) stay a core feature.
+//
+//     srv := &pocker.Server{Config: cfg, Plugins: []pocker.Plugin{autotls.New()}}
+//
+//   - On a single app, [NewApp] is a [ceplugin.Plugin] that replaces PocketBase's built-in autocert on
+//     `pocketbase serve example.com` (or `--https`) with CertMagic: wildcards through DNS-01, other CAs, extra domains.
+//
+//     ceplugin.MustRegister(app, autotls.NewApp(autotls.Config{Auto: true, Email: "ops@example.com"}))
 package autotls
 
 import (
@@ -24,12 +31,12 @@ import (
 
 // Config is the plugin's part of pocker.yaml's `tls:` block.
 type Config struct {
-	Auto    bool       `yaml:"auto"`
-	Email   string     `yaml:"email"`
-	CA      string     `yaml:"ca"`
-	Storage string     `yaml:"storage"`
-	Domains []string   `yaml:"domains"`
-	DNS     *DNSConfig `yaml:"dns"`
+	Auto    bool       `yaml:"auto" json:"auto"`
+	Email   string     `yaml:"email" json:"email"`
+	CA      string     `yaml:"ca" json:"ca"`
+	Storage string     `yaml:"storage" json:"storage"`
+	Domains []string   `yaml:"domains" json:"domains"`
+	DNS     *DNSConfig `yaml:"dns" json:"dns"`
 }
 
 // AutoTLS is the plugin ([pocker.Configurer], [pocker.TLSProvider]). It does nothing unless `tls.auto` is true.
@@ -70,7 +77,7 @@ func (a *AutoTLS) TLS(ctx context.Context, served func(host string) bool) (*tls.
 	if !a.Config.Auto {
 		return nil, nil, nil
 	}
-	auto, err := newAutoTLS(ctx, a.Config, a.certFiles, a.defaultStorage, served)
+	auto, err := newAutoTLS(ctx, a.Config, a.certFiles, a.defaultStorage, served, true)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -94,9 +101,9 @@ func (a *AutoTLS) TLS(ctx context.Context, served func(host string) bool) (*tls.
 //     dns: { provider: cloudflare, api_token_env: CF_API_TOKEN }
 //     http_listen: ":80"         # HTTP-01 challenges + redirect to HTTPS
 type DNSConfig struct {
-	Provider    string `yaml:"provider"`      // "cloudflare"
-	APIToken    string `yaml:"api_token"`     // prefer api_token_env so the token stays out of the file
-	APITokenEnv string `yaml:"api_token_env"` // name of the environment variable holding the token
+	Provider    string `yaml:"provider" json:"provider"`           // "cloudflare"
+	APIToken    string `yaml:"api_token" json:"api_token"`         // prefer api_token_env so the token stays out of the file
+	APITokenEnv string `yaml:"api_token_env" json:"api_token_env"` // name of the environment variable holding the token
 }
 
 // SupportedDNSProviders are the dns.provider values the plugin understands.
@@ -175,8 +182,9 @@ func validateAutoTLS(cfg Config, certFiles bool) error {
 }
 
 // newAutoTLS builds the certificate manager. allowHost decides which hostnames may get an on-demand certificate
-// (the instance source's mapped hosts), so random Host names can't trigger issuance.
-func newAutoTLS(ctx context.Context, cfg Config, certFiles bool, defaultStorage string, allowHost func(string) bool) (*autoTLS, error) {
+// (the instance source's mapped hosts), so random Host names can't trigger issuance. httpChallenge is false when
+// something else answers port 80 (a single app: PocketBase's own redirect server), leaving TLS-ALPN-01 and DNS-01.
+func newAutoTLS(ctx context.Context, cfg Config, certFiles bool, defaultStorage string, allowHost func(string) bool, httpChallenge bool) (*autoTLS, error) {
 	if err := validateAutoTLS(cfg, certFiles); err != nil {
 		return nil, err
 	}
@@ -205,7 +213,7 @@ func newAutoTLS(ctx context.Context, cfg Config, certFiles bool, defaultStorage 
 		},
 	})
 
-	tmpl := certmagic.ACMEIssuer{CA: caURL(cfg.CA), Email: cfg.Email, Agreed: true}
+	tmpl := certmagic.ACMEIssuer{CA: caURL(cfg.CA), Email: cfg.Email, Agreed: true, DisableHTTPChallenge: !httpChallenge}
 	if cfg.DNS != nil {
 		p, err := cfg.DNS.provider()
 		if err != nil {

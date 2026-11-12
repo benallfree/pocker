@@ -1,6 +1,6 @@
 // Command pocketbase is the standard PocketBase CE binary: PocketBase's examples/base plus the CE plugins that ship
 // by default (ext/pages, ext/s3redirect, ext/bulkmail, ext/tokens, ext/remotes, ext/oauth-server, ext/deploy, ext/mcp,
-// ext/pitr). It's its
+// ext/pitr, ext/autotls). It's its
 // own module so core's go.mod stays upstream's.
 package main
 
@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"ganigeorgiev.com/pocketbase/pocketbase"
@@ -21,6 +22,7 @@ import (
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/hook"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/osutils"
 	"github.com/dop251/goja"
+	"github.com/pockethost/pocketbase/ext/autotls"
 	"github.com/pockethost/pocketbase/ext/bulkmail"
 	"github.com/pockethost/pocketbase/ext/deploy"
 	"github.com/pockethost/pocketbase/ext/mcp"
@@ -142,7 +144,62 @@ func main() {
 		"how far back a point-in-time restore can go",
 	)
 
+	var autoTLS bool
+	app.RootCmd.PersistentFlags().BoolVar(
+		&autoTLS,
+		"autotls",
+		false,
+		"HTTPS certificates through CertMagic instead of the built-in autocert (with serve <domain> or --https):\nother CAs, extra domains, wildcards through DNS-01",
+	)
+
+	var autoTLSEmail string
+	app.RootCmd.PersistentFlags().StringVar(
+		&autoTLSEmail,
+		"autotlsEmail",
+		"",
+		"ACME account email for --autotls (expiry notices from the CA)",
+	)
+
+	var autoTLSCA string
+	app.RootCmd.PersistentFlags().StringVar(
+		&autoTLSCA,
+		"autotlsCA",
+		"",
+		"certificate authority for --autotls: letsencrypt (default), letsencrypt-staging, zerossl, or an ACME directory URL",
+	)
+
+	var autoTLSDomains []string
+	app.RootCmd.PersistentFlags().StringSliceVar(
+		&autoTLSDomains,
+		"autotlsDomains",
+		nil,
+		"extra domains for --autotls, obtained at start (comma separated; wildcards like *.example.com need --autotlsDNS)",
+	)
+
+	var autoTLSDNS string
+	app.RootCmd.PersistentFlags().StringVar(
+		&autoTLSDNS,
+		"autotlsDNS",
+		"",
+		"DNS provider for DNS-01 challenges with --autotls (supported: "+strings.Join(autotls.SupportedDNSProviders, ", ")+")",
+	)
+
+	var autoTLSDNSTokenEnv string
+	app.RootCmd.PersistentFlags().StringVar(
+		&autoTLSDNSTokenEnv,
+		"autotlsDNSTokenEnv",
+		"CF_API_TOKEN",
+		"environment variable holding the DNS provider's API token for --autotlsDNS",
+	)
+
 	app.RootCmd.ParseFlags(os.Args[1:])
+
+	autoTLSConfig := autotls.Config{Auto: autoTLS, Email: autoTLSEmail, CA: autoTLSCA, Domains: autoTLSDomains}
+	if autoTLSDNS != "" {
+		autoTLSConfig.DNS = &autotls.DNSConfig{Provider: autoTLSDNS, APITokenEnv: autoTLSDNSTokenEnv}
+	}
+	// Auto TLS: off unless --autotls; then CertMagic serves the HTTPS certificates of `serve <domain>`
+	cePlugins = append(cePlugins, autotls.NewApp(autoTLSConfig))
 
 	// ---------------------------------------------------------------
 	// Plugins and hooks:
