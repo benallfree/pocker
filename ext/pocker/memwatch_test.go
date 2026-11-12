@@ -3,6 +3,7 @@ package pocker
 import (
 	"context"
 	"encoding/json"
+	"github.com/pockethost/pocketbase/ext/sandbox"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -36,10 +37,10 @@ routerAdd("GET", "/ok", (e) => e.json(200, { ok: true }))
 	defer stopApp(running)
 
 	runtime.GC()
-	base := liveHeap()
+	base := sandbox.LiveHeap()
 	var mu sync.Mutex
 	var struck []string
-	watch := &MemoryWatch{
+	watch := &sandbox.MemoryWatch{
 		SoftLimit: base + 150<<20,
 		Interval:  10 * time.Millisecond,
 		MinRunAge: 50 * time.Millisecond,
@@ -69,7 +70,7 @@ routerAdd("GET", "/ok", (e) => e.json(200, { ok: true }))
 
 	// memory is released and the instance still answers
 	runtime.GC()
-	if after := liveHeap(); after > base+200<<20 {
+	if after := sandbox.LiveHeap(); after > base+200<<20 {
 		t.Errorf("heap not released: base %d MiB, after %d MiB", base>>20, after>>20)
 	}
 	w = httptest.NewRecorder()

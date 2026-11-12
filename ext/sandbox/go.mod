@@ -3,15 +3,17 @@ module github.com/pockethost/pocketbase/ext/sandbox
 go 1.27
 
 require (
+	ganigeorgiev.com/pocketbase/dbx v1.13.0
 	ganigeorgiev.com/pocketbase/pocketbase v0.0.0-00010101000000-000000000000
 	github.com/dop251/goja v0.0.0-20261023121931-6ace4dde0b29
 	github.com/dop251/goja_nodejs v0.0.0-20260212111938-1f56ff5bcf14
 	github.com/pockethost/pocketbase/ext/devusers v0.0.0-00010101000000-000000000000
+	modernc.org/libc v1.77.1
+	modernc.org/sqlite v1.60.1
 )
 
 require (
 	ganigeorgiev.com/fexpr v0.7.0 // indirect
-	ganigeorgiev.com/pocketbase/dbx v1.13.0 // indirect
 	ganigeorgiev.com/pocketbase/ozzo-validation/v4 v4.4.1 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/disintegration/imaging v1.6.2 // indirect
@@ -41,10 +43,8 @@ require (
 	golang.org/x/sync v0.24.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect
 	golang.org/x/text v0.43.0 // indirect
-	modernc.org/libc v1.77.1 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.12.1 // indirect
-	modernc.org/sqlite v1.60.1 // indirect
 )
 
 replace ganigeorgiev.com/pocketbase/pocketbase => ../..

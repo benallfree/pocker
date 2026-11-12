@@ -1,4 +1,4 @@
-package pocker
+package sandbox
 
 import (
 	"context"
@@ -8,8 +8,6 @@ import (
 	"runtime/debug"
 	"runtime/metrics"
 	"time"
-
-	"github.com/pockethost/pocketbase/ext/sandbox"
 )
 
 // MemoryWatch guards the shared heap against JS that grows memory faster than a request would. goja has no per-VM
@@ -32,7 +30,8 @@ type MemoryWatch struct {
 
 const heapMetric = "/memory/classes/heap/objects:bytes"
 
-func liveHeap() uint64 {
+// LiveHeap is the process's live heap (bytes of reachable objects), from runtime/metrics.
+func LiveHeap() uint64 {
 	s := []metrics.Sample{{Name: heapMetric}}
 	metrics.Read(s)
 	if s[0].Value.Kind() != metrics.KindUint64 {
@@ -72,13 +71,13 @@ func (w *MemoryWatch) Run(ctx context.Context) {
 			return
 		case <-t.C:
 		}
-		heap := liveHeap()
+		heap := LiveHeap()
 		var owners []string
 		switch {
 		case heap >= hard:
-			owners = sandbox.InterruptActive(0, fmt.Sprintf("memory: process heap over %d MiB", hard>>20))
+			owners = InterruptActive(0, fmt.Sprintf("memory: process heap over %d MiB", hard>>20))
 		case heap >= w.SoftLimit && heap > last:
-			owners = sandbox.InterruptActive(minAge, fmt.Sprintf("memory: process heap over %d MiB", w.SoftLimit>>20))
+			owners = InterruptActive(minAge, fmt.Sprintf("memory: process heap over %d MiB", w.SoftLimit>>20))
 		}
 		last = heap
 		if len(owners) == 0 {

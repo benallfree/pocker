@@ -198,7 +198,9 @@ private network, and `Manager.Firewall()` lets host routes in front of the Manag
 ## Sandbox
 
 Every instance's JS hooks and migrations run in a sandbox (the [sandbox](../sandbox/README.md) plugin), and its SQL runs behind
-SQLite's authorizer (`sqlguard.go`). [`sandbox_test.go`](sandbox_test.go) runs one attack per
+SQLite's authorizer ([`sandbox/sqlguard.go`](../sandbox/sqlguard.go)). The sandbox plugin also owns the egress policy
+([`sandbox/egress.go`](../sandbox/egress.go)) and the memory watch ([`sandbox/memwatch.go`](../sandbox/memwatch.go)); pocker turns
+them on for its instances. [`sandbox_test.go`](sandbox_test.go) runs one attack per
 route from one instance against another instance and the host; all of these are refused:
 
 | Area | What the sandbox does |
@@ -210,7 +212,7 @@ route from one instance against another instance and the host; all of these are 
 | Raw SQL (`$app.db().newQuery`) | Allowed. SQLite's authorizer refuses `ATTACH` (and `VACUUM INTO`) outside the instance's `pb_data`, `PRAGMA temp_store_directory/data_store_directory` and `load_extension`; the CLI-only `readfile`/`writefile`/`fsdir` don't exist in the library. Statements without a deadline get `max_query_duration`. |
 | CPU | Every JS call is interrupted after `max_js_execution`; `sleep()` is capped at 10 s. |
 | Memory, one shot | Built-ins that allocate a large result in one step refuse results over `max_js_allocation`: `String.repeat/padStart/padEnd`, `Array.join/toString`, `ArrayBuffer`, typed arrays (incl. array-likes, `.from`, and reaching the constructor through an instance), `Buffer.alloc*` / `new Buffer`, `$os.readFile`, `fileFromPath`, `readerToString`/`toBytes` limits. Recursion depth is capped (a JS stack overflow would otherwise crash the Go process). |
-| Memory, gradual | goja has no per-VM heap accounting, so `pocker/memwatch.go` watches the process heap every 50 ms. Above `memory_soft_limit` and still growing, it interrupts JS calls running longer than 100 ms and strikes their instances (above 1.4x, every JS call). With the instance's quarantine policy (default 3 strikes in 10 minutes) it is paused: its app is stopped and requests get 503 with `Retry-After`. Pauses back off (30 s, 1 m, 2 m, ... up to 15 m) and reset after an hour without strikes; `quarantine: off` only interrupts. Strikes, pauses and restarts are reported as events (`Server.OnEvent`, or an instance source implementing `EventSink`). |
+| Memory, gradual | goja has no per-VM heap accounting, so `sandbox/memwatch.go` watches the process heap every 50 ms. Above `memory_soft_limit` and still growing, it interrupts JS calls running longer than 100 ms and strikes their instances (above 1.4x, every JS call). With the instance's quarantine policy (default 3 strikes in 10 minutes) it is paused: its app is stopped and requests get 503 with `Retry-After`. Pauses back off (30 s, 1 m, 2 m, ... up to 15 m) and reset after an hour without strikes; `quarantine: off` only interrupts. Strikes, pauses and restarts are reported as events (`Server.OnEvent`, or an instance source implementing `EventSink`). |
 | Outbound network: `$http.send`, `$filesystem.fileFromURL`, S3 storage and backups, OAuth2/JWK fetches, SMTP | Public addresses only, checked on the address actually connected to (after DNS, so rebinding doesn't help): loopback, private ranges, link-local and cloud metadata, CGNAT, multicast, reserved and documentation ranges, and IPv6 equivalents/IPv4-in-IPv6 are refused unless listed in `egress_allow`. Installed process-wide on Go's default HTTP transport and PocketBase's SMTP client (`pocker/egress.go`). Host code that must reach private addresses (e.g. a control plane over a private network) uses its own `http.Client` with its own transport. `$http.send` timeouts and response bodies are capped. |
 
 **Limits of the memory controls:** the watch attributes growth to whoever is running JS at the time (usually right,

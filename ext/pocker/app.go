@@ -75,7 +75,7 @@ func startApp(opts appOptions, inst Instance) (r *runningApp, err error) {
 	lim := inst.Limits.over(opts.Defaults)
 
 	app := core.NewBaseApp(core.BaseAppConfig{
-		DBConnect:     guardedDBConnect(lim.MaxQueryDuration), // SQL stays inside this app's files
+		DBConnect:     sandbox.GuardedDBConnect(lim.MaxQueryDuration), // SQL stays inside this app's files
 		DataDir:       filepath.Join(dir, "pb_data"),
 		IsDev:         inst.Dev || opts.ForceDev,
 		EncryptionKey: inst.EncryptionKey,

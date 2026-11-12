@@ -1,4 +1,4 @@
-package pocker
+package sandbox
 
 import (
 	"context"
@@ -34,7 +34,7 @@ import (
 // same way the driver installs its own callbacks. If the driver's internals change, opening the database fails
 // (fail closed) and the tests flag it.
 
-const guardDriverName = "pocker-sqlite"
+const guardDriverName = "sandbox-sqlite"
 
 var registerGuard sync.Once
 
@@ -42,9 +42,9 @@ var registerGuard sync.Once
 // from JS has none), so a runaway query (e.g. an endless recursive CTE) is interrupted inside SQLite.
 var queryLimits sync.Map // string -> time.Duration
 
-// guardedDBConnect returns a core.DBConnectFunc like core.DefaultDBConnect, opening through the SQL guard, with
+// GuardedDBConnect returns a core.DBConnectFunc like core.DefaultDBConnect, opening through the SQL guard, with
 // maxQuery as the deadline for statements that have none (0 = none).
-func guardedDBConnect(maxQuery time.Duration) core.DBConnectFunc {
+func GuardedDBConnect(maxQuery time.Duration) core.DBConnectFunc {
 	registerGuard.Do(func() {
 		base, err := sql.Open("sqlite", ":memory:")
 		if err != nil {

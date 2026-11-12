@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"github.com/pockethost/pocketbase/ext/sandbox"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -17,25 +18,6 @@ import (
 
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/mailer"
 )
-
-func TestEgressPolicyPermits(t *testing.T) {
-	p := EgressPolicy{Allow: []netip.Prefix{netip.MustParsePrefix("10.99.0.5/32")}}
-	denied := []string{
-		"127.0.0.1", "10.88.0.10", "172.16.3.4", "192.168.1.1", "169.254.169.254", "100.64.1.1", "0.0.0.0",
-		"::1", "::ffff:127.0.0.1", "::ffff:10.88.0.10", "fd00::1", "fe80::1", "64:ff9b::a58:a", "2002:7f00:1::",
-		"224.0.0.1", "255.255.255.255",
-	}
-	for _, s := range denied {
-		if p.Permits(netip.MustParseAddr(s)) {
-			t.Errorf("%s should be denied", s)
-		}
-	}
-	for _, s := range []string{"1.1.1.1", "8.8.8.8", "2606:4700:4700::1111", "10.99.0.5"} {
-		if !p.Permits(netip.MustParseAddr(s)) {
-			t.Errorf("%s should be permitted", s)
-		}
-	}
-}
 
 // fakeSMTP accepts one message and returns it on the channel.
 func fakeSMTP(t *testing.T, addr string) (string, <-chan string) {
@@ -92,7 +74,7 @@ func fakeSMTP(t *testing.T, addr string) (string, <-chan string) {
 
 func TestEgressFromApps(t *testing.T) {
 	// 127.0.0.2 stands in for an allowed service; everything else private is denied.
-	InstallEgressPolicy(EgressPolicy{Allow: []netip.Prefix{netip.MustParsePrefix("127.0.0.2/32")}}, 5, 1024)
+	sandbox.InstallEgressPolicy(sandbox.EgressPolicy{Allow: []netip.Prefix{netip.MustParsePrefix("127.0.0.2/32")}}, 5, 1024)
 
 	denied := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte("internal secret"))

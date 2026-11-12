@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"github.com/pockethost/pocketbase/ext/sandbox"
 	"log/slog"
 	"net"
 	"net/http"
@@ -76,7 +77,7 @@ func (s *Server) Run(ctx context.Context) error {
 		}
 		allow = append(allow, pfx)
 	}
-	InstallEgressPolicy(EgressPolicy{Allow: allow}, int(s.Config.HTTPSendMaxTimeout/time.Second), int64(s.Config.HTTPSendMaxBody))
+	sandbox.InstallEgressPolicy(sandbox.EgressPolicy{Allow: allow}, int(s.Config.HTTPSendMaxTimeout/time.Second), int64(s.Config.HTTPSendMaxBody))
 	pool := 2
 	if s.Config.HooksPoolSize != nil {
 		pool = *s.Config.HooksPoolSize
@@ -173,7 +174,7 @@ func (s *Server) Run(ctx context.Context) error {
 		}
 	}
 	if soft > 0 {
-		watch := &MemoryWatch{SoftLimit: uint64(soft), OnStrike: s.Manager.Strike, Logger: log}
+		watch := &sandbox.MemoryWatch{SoftLimit: uint64(soft), OnStrike: s.Manager.Strike, Logger: log}
 		go watch.Run(runCtx)
 	}
 
