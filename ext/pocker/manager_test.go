@@ -21,12 +21,7 @@ func newTestManager(t *testing.T, dev bool, list ...Instance) *Manager {
 		Dev:    dev,
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 	})
-	m.mu.Lock()
-	for _, inst := range list {
-		m.upsertLocked(inst)
-	}
-	m.ready = true
-	m.mu.Unlock()
+	m.dir.Load(list)
 	return m
 }
 
@@ -43,53 +38,6 @@ func TestValidID(t *testing.T) {
 	for _, bad := range []string{"", "..", "a..b", "../etc", "a/b", "A", "-a", "a-", ".a", "a b", "a\\b"} {
 		if ValidID(bad) {
 			t.Errorf("%q should be invalid", bad)
-		}
-	}
-}
-
-func TestResolveProduction(t *testing.T) {
-	m := newTestManager(t, false,
-		Instance{ID: "blog", Hosts: []string{"blog.example.com", "www.blog.example.com"}},
-		Instance{ID: "shop", Hosts: []string{"shop.example.com"}},
-	)
-	cases := []struct {
-		host       string
-		wantID     string
-		wantStatus int
-	}{
-		{"blog.example.com", "blog", 0},
-		{"WWW.Blog.Example.com:443", "blog", 0},
-		{"shop.example.com", "shop", 0},
-		{"other.example.com", "", http.StatusNotFound},
-		{"../etc", "", http.StatusNotFound},
-	}
-	for _, c := range cases {
-		inst, status, _ := m.resolve(req(c.host))
-		if status != c.wantStatus || inst.ID != c.wantID {
-			t.Errorf("%s: got id=%q status=%d, want id=%q status=%d", c.host, inst.ID, status, c.wantID, c.wantStatus)
-		}
-	}
-	if _, ok := m.Lookup("other.example.com"); ok {
-		t.Fatal("production must not create instances for unknown hosts")
-	}
-}
-
-func TestResolveDev(t *testing.T) {
-	m := newTestManager(t, true, Instance{ID: "mapped", Hosts: []string{"mapped.localhost"}})
-
-	inst, status, _ := m.resolve(req("Blog.Localhost:8090"))
-	if status != 0 || inst.ID != "blog.localhost" || !inst.Dev {
-		t.Fatalf("dev host: got %+v status=%d", inst, status)
-	}
-	if again, _, _ := m.resolve(req("blog.localhost.")); again.ID != "blog.localhost" {
-		t.Fatal("same host in another form must map to the same id")
-	}
-	if mapped, _, _ := m.resolve(req("mapped.localhost")); mapped.ID != "mapped" {
-		t.Fatalf("a mapped host wins in dev too, got %q", mapped.ID)
-	}
-	for _, bad := range []string{"bad_host", "a..b", "-x.localhost"} {
-		if _, status, _ := m.resolve(req(bad)); status != http.StatusBadRequest {
-			t.Errorf("%q: got status %d, want 400", bad, status)
 		}
 	}
 }

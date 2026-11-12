@@ -273,19 +273,6 @@ func TestTLSRedirectAndReload(t *testing.T) {
 	}
 	res.Body.Close()
 
-	// renewed certificate files are picked up without a restart
-	r, err := newCertReloader(certPath, keyPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	time.Sleep(10 * time.Millisecond)
-	selfSigned(t, dir, "second.test")
-	r.lastCheck = time.Time{}
-	c, _ := r.GetCertificate(nil)
-	leaf, _ := x509.ParseCertificate(c.Certificate[0])
-	if leaf.Subject.CommonName != "second.test" {
-		t.Fatalf("reload: still %s", leaf.Subject.CommonName)
-	}
 }
 
 type initPlugin struct{ calls chan string }

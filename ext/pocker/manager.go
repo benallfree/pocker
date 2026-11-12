@@ -2,60 +2,61 @@ package pocker
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"math"
-	"net"
 	"net/http"
-	"net/http/httputil"
-	"net/url"
 	"reflect"
-	"regexp"
-	"strings"
 	"sync"
 	"time"
+
+	"github.com/pockethost/pocketbase/ext/edge"
 
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/hook"
 	"github.com/dop251/goja"
 )
 
-// HealthPath answers on any host with the engine's status.
-const HealthPath = "/_pocker/health"
+// HealthPath answers on any host with the engine's status (see [edge.DefaultHealthPath]).
+const HealthPath = edge.DefaultHealthPath
 
-var validID = regexp.MustCompile(`^[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?$`)
+// ValidID reports whether id is a safe instance id (see [edge.ValidID]).
+func ValidID(id string) bool { return edge.ValidID(id) }
 
-// ValidID reports whether id is a safe instance id: lowercase letters, digits, dots and dashes, starting and ending
-// with a letter or digit, no "..". Ids are folder names under the PocketBase root.
-func ValidID(id string) bool {
-	return validID.MatchString(id) && !strings.Contains(id, "..")
-}
+// DevID is the id dev mode gives an unmapped hostname (see [edge.DevID]).
+func DevID(host string) string { return edge.DevID(host) }
 
-// Manager keeps the instance list from an [InstanceSource] and serves each instance's app, starting it on its first
-// request and keeping it running.
+// Manager runs instances in-process: an [edge.Runtime] that starts each instance's app on its first request and
+// keeps it running. It reads instances from an [edge.Directory] (its own, fed by the source, unless one is shared in
+// [ManagerOptions.Directory]); as an http.Handler it serves the whole edge pipeline with itself as the only runtime.
 type Manager struct {
 	source InstanceSource
 	opts   appOptions
 	log    *slog.Logger
 
-	dev bool
+	dir     *edge.Directory
+	ownsDir bool
+	handler *edge.Handler
 
 	defaults Limits
 	onEvent  func(Event)
 	gate     Gate
-	forward  func(w http.ResponseWriter, r *http.Request, inst Instance)
 
 	held map[string]chan struct{} // by ID: instances under maintenance; requests wait for the channel to close
 
-	mu        sync.RWMutex
-	qstate    map[string]*quarantineState // by ID
-	paused    map[string]time.Time        // by ID: quarantined until
-	instances map[string]Instance         // by ID
-	hosts     map[string]string           // host -> ID
-	apps      map[string]*appSlot         // by ID
-	ready     bool
+	mu     sync.RWMutex
+	qstate map[string]*quarantineState // by ID
+	paused map[string]time.Time        // by ID: quarantined until
+	apps   map[string]*appSlot         // by ID
 }
+
+var (
+	_ edge.Runtime    = (*Manager)(nil)
+	_ edge.Prechecker = (*Manager)(nil)
+	_ edge.Syncer     = (*Manager)(nil)
+	_ edge.Shutdowner = (*Manager)(nil)
+	_ edge.Statser    = (*Manager)(nil)
+)
 
 // appSlot holds one app: a start in progress (done not yet closed) or a finished start (app or err set).
 type appSlot struct {
@@ -89,6 +90,9 @@ type ManagerOptions struct {
 	// Forward serves requests for instances with [Instance.Remote] set, after the firewall checks. Nil = a plain
 	// reverse proxy to Remote.
 	Forward func(w http.ResponseWriter, r *http.Request, inst Instance)
+	// Directory, when set, is shared with the rest of the edge (the host feeds it); the Manager then doesn't load
+	// the source itself and [Manager.Run] only waits.
+	Directory *edge.Directory
 	// Logger defaults to slog.Default().
 	Logger *slog.Logger
 }
@@ -99,72 +103,53 @@ func NewManager(source InstanceSource, opts ManagerOptions) *Manager {
 		opts.Logger = slog.Default()
 	}
 	defaults := opts.Defaults.Over(DefaultLimits())
-	return &Manager{
-		source:    source,
-		opts:      appOptions{PBRoot: opts.PBRoot, HooksPoolSize: opts.HooksPoolSize, ForceDev: opts.Dev, Defaults: defaults, Init: opts.Init, InitJS: opts.InitJS, Setup: opts.Setup},
-		defaults:  defaults,
-		onEvent:   opts.OnEvent,
-		gate:      opts.Gate,
-		forward:   opts.Forward,
-		qstate:    map[string]*quarantineState{},
-		paused:    map[string]time.Time{},
-		held:      map[string]chan struct{}{},
-		log:       opts.Logger,
-		dev:       opts.Dev,
-		instances: map[string]Instance{},
-		hosts:     map[string]string{},
-		apps:      map[string]*appSlot{},
+	m := &Manager{
+		source:   source,
+		opts:     appOptions{PBRoot: opts.PBRoot, HooksPoolSize: opts.HooksPoolSize, ForceDev: opts.Dev, Defaults: defaults, Init: opts.Init, InitJS: opts.InitJS, Setup: opts.Setup},
+		defaults: defaults,
+		onEvent:  opts.OnEvent,
+		gate:     opts.Gate,
+		qstate:   map[string]*quarantineState{},
+		paused:   map[string]time.Time{},
+		held:     map[string]chan struct{}{},
+		log:      opts.Logger,
+		apps:     map[string]*appSlot{},
+		dir:      opts.Directory,
 	}
+	if m.dir == nil {
+		m.dir = edge.NewDirectory(opts.Logger)
+		m.ownsDir = true
+	}
+	m.dir.Subscribe(m.Sync)
+	m.handler = &edge.Handler{Dir: m.dir, Gate: opts.Gate, Runtimes: []edge.Runtime{m}, Forward: opts.Forward, Dev: opts.Dev, Logger: opts.Logger}
+	return m
 }
 
-// Run loads the snapshot, marks the manager ready and applies changes until ctx is done.
-func (m *Manager) Run(ctx context.Context) error {
-	list, err := m.source.Snapshot(ctx)
-	if err != nil {
-		return fmt.Errorf("instance snapshot: %w", err)
-	}
-	m.mu.Lock()
-	for _, inst := range list {
-		m.upsertLocked(inst)
-	}
-	m.ready = true
-	m.mu.Unlock()
-	m.log.Info("pocker: instances loaded", "count", len(list))
+// Directory is the instance directory the Manager reads.
+func (m *Manager) Directory() *edge.Directory { return m.dir }
 
-	changes, err := m.source.Watch(ctx)
-	if err != nil {
-		return fmt.Errorf("instance watch: %w", err)
-	}
-	if changes == nil {
+// Run loads the snapshot, marks the manager ready and applies changes until ctx is done. With a shared directory
+// ([ManagerOptions.Directory]) the host feeds it and Run only waits for ctx.
+func (m *Manager) Run(ctx context.Context) error {
+	if !m.ownsDir {
 		<-ctx.Done()
 		return nil
 	}
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case c, ok := <-changes:
-			if !ok {
-				return nil
-			}
-			m.apply(c)
-		}
-	}
+	return m.dir.Run(ctx, m.source, nil)
 }
 
-func (m *Manager) apply(c Change) {
+// Sync implements [edge.Syncer]: a changed instance (env, limits, dev mode, folder) gets a fresh app on its next
+// request; a removed one is stopped.
+func (m *Manager) Sync(c Change, prev *Instance) {
 	switch c.Kind {
 	case Upsert:
-		m.mu.Lock()
-		old, existed := m.instances[c.Instance.ID]
-		m.upsertLocked(c.Instance)
 		var stale *appSlot
-		if existed && !sameRuntime(old, c.Instance) {
-			// env (secrets), limits, dev mode or folder changed: the next request starts a fresh app
+		if prev != nil && !sameRuntime(*prev, c.Instance) {
+			m.mu.Lock()
 			stale = m.apps[c.Instance.ID]
 			delete(m.apps, c.Instance.ID)
+			m.mu.Unlock()
 		}
-		m.mu.Unlock()
 		m.log.Info("pocker: instance updated", "id", c.Instance.ID)
 		if stale != nil {
 			m.emit(Event{Kind: EventRestarted, InstanceID: c.Instance.ID, Reason: "settings changed"})
@@ -173,7 +158,6 @@ func (m *Manager) apply(c Change) {
 	case Delete:
 		m.mu.Lock()
 		slot := m.apps[c.Instance.ID]
-		m.removeLocked(c.Instance.ID)
 		delete(m.apps, c.Instance.ID)
 		m.mu.Unlock()
 		m.log.Info("pocker: instance removed", "id", c.Instance.ID)
@@ -188,98 +172,14 @@ func (m *Manager) apply(c Change) {
 	}
 }
 
-// upsertLocked replaces the instance record and its host routes. A running app keeps running with the settings
-// it started with (v1: no in-place reload).
-func (m *Manager) upsertLocked(inst Instance) {
-	if !ValidID(inst.ID) {
-		m.log.Warn("pocker: ignoring instance with an unsafe id", "id", inst.ID)
-		return
-	}
-	m.removeLocked(inst.ID)
-	m.instances[inst.ID] = inst
-	for _, h := range inst.Hosts {
-		h = normalizeHost(h)
-		if other, taken := m.hosts[h]; taken && other != inst.ID {
-			m.log.Warn("pocker: host claimed by two instances; keeping the first", "host", h, "kept", other, "ignored", inst.ID)
-			continue
-		}
-		m.hosts[h] = inst.ID
-	}
-}
-
-func (m *Manager) removeLocked(id string) {
-	old, ok := m.instances[id]
-	if !ok {
-		return
-	}
-	for _, h := range old.Hosts {
-		h = normalizeHost(h)
-		if m.hosts[h] == id {
-			delete(m.hosts, h)
-		}
-	}
-	delete(m.instances, id)
-}
-
-func normalizeHost(h string) string {
-	h = strings.ToLower(strings.TrimSpace(h))
-	if host, _, err := net.SplitHostPort(h); err == nil {
-		h = host
-	}
-	return strings.TrimSuffix(h, ".")
-}
-
 // Lookup returns the instance that serves host.
-func (m *Manager) Lookup(host string) (Instance, bool) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	id, ok := m.hosts[normalizeHost(host)]
-	if !ok {
-		return Instance{}, false
-	}
-	inst, ok := m.instances[id]
-	return inst, ok
-}
+func (m *Manager) Lookup(host string) (Instance, bool) { return m.dir.Lookup(host) }
 
-// DevID is the canonical id dev mode gives a hostname the instance source doesn't map: the hostname in normal form
-// (lowercase, no port, no trailing dot). It returns "" when that isn't a safe id (see [ValidID]).
-func DevID(host string) string {
-	id := normalizeHost(host)
-	if !ValidID(id) {
-		return ""
-	}
-	return id
-}
+// Name implements [edge.Runtime].
+func (m *Manager) Name() string { return "pocker" }
 
-// resolve maps the request's Host to an instance through the source's hostname -> id map. In dev mode an unmapped
-// host becomes a new instance whose id is the hostname ([DevID]). A non-zero status means the request can't be routed.
-func (m *Manager) resolve(r *http.Request) (Instance, int, string) {
-	host := normalizeHost(r.Host)
-	if inst, ok := m.Lookup(host); ok {
-		return inst, 0, ""
-	}
-	if m.dev {
-		id := DevID(host)
-		if id == "" {
-			return Instance{}, http.StatusBadRequest, "hostname can't be used as an instance id: " + host
-		}
-		return m.devInstance(id, host), 0, ""
-	}
-	return Instance{}, http.StatusNotFound, host + " not found"
-}
-
-// devInstance registers (or returns) the dev-mode instance for host.
-func (m *Manager) devInstance(id, host string) Instance {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if inst, ok := m.instances[id]; ok {
-		return inst
-	}
-	inst := Instance{ID: id, Hosts: []string{host}, Dev: true}
-	m.upsertLocked(inst)
-	m.log.Info("pocker: dev instance", "host", host, "id", id)
-	return inst
-}
+// Serves implements [edge.Runtime]: every instance that doesn't ask for another runtime.
+func (m *Manager) Serves(inst Instance) bool { return inst.Runtime == "" || inst.Runtime == "pocker" }
 
 // app returns the instance's running app, starting it (once, shared by concurrent callers) if needed.
 // A failed start is not cached: the next request tries again.
@@ -315,66 +215,26 @@ func (m *Manager) app(inst Instance) (*runningApp, error) {
 	return slot.app, slot.err
 }
 
-// ServeHTTP routes a request to its instance by Host.
-func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path == HealthPath {
-		m.serveHealth(w)
-		return
-	}
-	if m.gate != nil && !m.gate.AllowPeer(r) {
-		http.Error(w, "forbidden: "+peerAddr(r).String(), http.StatusForbidden)
-		return
-	}
+// ServeHTTP serves the edge pipeline (resolve by Host, gates, forwarding) with the Manager as the only runtime.
+func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) { m.handler.ServeHTTP(w, r) }
 
-	m.mu.RLock()
-	ready := m.ready
-	m.mu.RUnlock()
-	if !ready {
-		http.Error(w, "starting", http.StatusServiceUnavailable)
-		return
-	}
-
-	inst, status, msg := m.resolve(r)
-	if status != 0 {
-		http.Error(w, msg, status)
-		return
-	}
-	if inst.Blocked != nil {
-		status := inst.Blocked.Status
-		if status == 0 {
-			status = http.StatusForbidden
-		}
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.WriteHeader(status)
-		_, _ = w.Write([]byte(inst.Blocked.Message))
-		return
-	}
-
-	if inst.Remote != "" {
-		m.serveRemote(w, r, inst)
-		return
-	}
-
+// Precheck implements [edge.Prechecker]: instances under maintenance or paused answer 503 before the gates.
+func (m *Manager) Precheck(w http.ResponseWriter, r *http.Request, inst Instance) bool {
 	if err := m.waitHeld(r.Context(), inst.ID); err != nil {
 		w.Header().Set("Retry-After", "5")
 		http.Error(w, "this instance is being updated; retry shortly", http.StatusServiceUnavailable)
-		return
+		return false
 	}
-
 	if until, paused := m.pausedUntil(inst.ID); paused {
 		w.Header().Set("Retry-After", fmt.Sprint(int(time.Until(until).Seconds())+1))
 		http.Error(w, "this instance is paused for using too much memory; retry later", http.StatusServiceUnavailable)
-		return
+		return false
 	}
+	return true
+}
 
-	if m.gate != nil {
-		release, ok := m.gate.Admit(w, r, inst)
-		if !ok {
-			return
-		}
-		defer release() // long-lived responses (realtime) hold their admission until they end
-	}
-
+// ServeInstance implements [edge.Runtime]: start the app on demand and serve the request.
+func (m *Manager) ServeInstance(w http.ResponseWriter, r *http.Request, inst Instance) {
 	wakeStart := time.Now()
 	app, err := m.app(inst)
 	if err != nil {
@@ -386,38 +246,6 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return []TimingEntry{{Name: "origin", Dur: time.Since(readyAt)}, {Name: "wake", Dur: readyAt.Sub(wakeStart)}}
 	})
 	app.handler.ServeHTTP(w, r)
-}
-
-// serveRemote forwards a request for an instance another server runs, after admission.
-func (m *Manager) serveRemote(w http.ResponseWriter, r *http.Request, inst Instance) {
-	if m.gate != nil {
-		release, ok := m.gate.Admit(w, r, inst)
-		if !ok {
-			return
-		}
-		defer release()
-	}
-	if m.forward != nil {
-		m.forward(w, r, inst)
-		return
-	}
-	target, err := url.Parse(inst.Remote)
-	if err != nil || target.Host == "" {
-		http.Error(w, "bad remote for "+inst.ID, http.StatusBadGateway)
-		return
-	}
-	proxy := httputil.NewSingleHostReverseProxy(target)
-	proxy.Transport = forwardTransport
-	proxy.ErrorLog = slog.NewLogLogger(m.log.Handler(), slog.LevelWarn)
-	proxy.ServeHTTP(w, r)
-}
-
-// forwardTransport is the default forwarder's own transport: http.DefaultTransport carries the JS egress policy,
-// which blocks private addresses, where other servers usually are.
-var forwardTransport = &http.Transport{
-	DialContext:         (&net.Dialer{Timeout: 5 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
-	MaxIdleConnsPerHost: 64,
-	IdleConnTimeout:     90 * time.Second,
 }
 
 // Gate returns the manager's gate (nil if none), so host code in front of the manager (e.g. its own routes) can
@@ -434,10 +262,10 @@ func (m *Manager) LogInstance(id, stream, message string) {
 	openInstanceLog(dir).Write(stream, message)
 }
 
-func (m *Manager) serveHealth(w http.ResponseWriter) {
+// RunningCount implements [edge.Statser]: apps currently running.
+func (m *Manager) RunningCount() int {
 	m.mu.RLock()
-	ready := m.ready
-	instances := len(m.instances)
+	defer m.mu.RUnlock()
 	running := 0
 	for _, s := range m.apps {
 		select {
@@ -448,17 +276,7 @@ func (m *Manager) serveHealth(w http.ResponseWriter) {
 		default:
 		}
 	}
-	m.mu.RUnlock()
-
-	status := http.StatusOK
-	body := map[string]any{"status": "ok", "instances": instances, "running": running}
-	if !ready {
-		status = http.StatusServiceUnavailable
-		body["status"] = "starting"
-	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(body)
+	return running
 }
 
 // Shutdown stops every running app.
@@ -536,7 +354,7 @@ func retire(slot *appSlot) {
 func (m *Manager) Strike(id string) {
 	now := time.Now()
 	m.mu.Lock()
-	inst := m.instances[id]
+	inst, _ := m.dir.Get(id)
 	policy := *inst.Limits.Over(m.defaults).Quarantine
 	st := m.qstate[id]
 	if st == nil {
@@ -603,7 +421,7 @@ func (m *Manager) pausedUntil(id string) (time.Time, bool) {
 // InstanceDir returns the folder of a known instance (<pbRoot>/<id> unless the instance sets Dir).
 func (m *Manager) InstanceDir(id string) (string, bool) {
 	m.mu.RLock()
-	inst, ok := m.instances[id]
+	inst, ok := m.dir.Get(id)
 	m.mu.RUnlock()
 	if !ok {
 		return "", false
@@ -617,7 +435,7 @@ func (m *Manager) InstanceDir(id string) (string, bool) {
 // starts are cut off, like stopping a process.
 func (m *Manager) WithInstanceStopped(ctx context.Context, id string, fn func(dir string) error) error {
 	m.mu.Lock()
-	inst, ok := m.instances[id]
+	inst, ok := m.dir.Get(id)
 	if !ok {
 		m.mu.Unlock()
 		return fmt.Errorf("instance %q not found", id)
@@ -652,11 +470,7 @@ func (m *Manager) WithInstanceStopped(ctx context.Context, id string, fn func(di
 }
 
 // Ready reports whether the instance list has loaded (before that, requests get 503 "starting").
-func (m *Manager) Ready() bool {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	return m.ready
-}
+func (m *Manager) Ready() bool { return m.dir.Ready() }
 
 // Running reports whether the instance's app is started (or starting).
 func (m *Manager) Running(id string) bool {
@@ -674,7 +488,7 @@ func (m *Manager) StartInstance(ctx context.Context, id string) error {
 		return err
 	}
 	m.mu.RLock()
-	inst, ok := m.instances[id]
+	inst, ok := m.dir.Get(id)
 	m.mu.RUnlock()
 	if !ok {
 		return fmt.Errorf("instance %q not found", id)

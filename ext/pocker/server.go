@@ -2,17 +2,15 @@ package pocker
 
 import (
 	"context"
-	"crypto/tls"
-	"errors"
 	"fmt"
-	"github.com/pockethost/pocketbase/ext/sandbox"
 	"log/slog"
-	"net"
 	"net/http"
 	"net/netip"
 	"runtime/debug"
-	"sync"
 	"time"
+
+	"github.com/pockethost/pocketbase/ext/edge"
+	"github.com/pockethost/pocketbase/ext/sandbox"
 
 	"ganigeorgiev.com/pocketbase/pocketbase/ceplugin"
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
@@ -129,18 +127,20 @@ func (s *Server) Run(ctx context.Context) error {
 			jsIniters = append(jsIniters, js)
 		}
 	}
-	s.Manager = NewManager(&primedSource{InstanceSource: source, first: first}, ManagerOptions{
+	dir := edge.NewDirectory(log)
+	s.Manager = NewManager(source, ManagerOptions{
 		PBRoot:        s.Config.PBRoot,
 		Dev:           s.Config.Dev,
 		HooksPoolSize: pool,
 		Logger:        log,
 		Defaults:      s.Config.Limits,
-		Gate:          chainGates(gates),
+		Gate:          edge.ChainGates(gates...),
 		OnEvent:       s.onEvent(source, log),
 		Init:          chainIniters(initers),
 		InitJS:        chainJSIniters(jsIniters),
 		Setup:         s.SetupApp,
 		Forward:       s.Forward,
+		Directory:     dir,
 	})
 
 	if s.OnStart != nil {
@@ -157,8 +157,8 @@ func (s *Server) Run(ctx context.Context) error {
 
 	runCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	managerErr := make(chan error, 1)
-	go func() { managerErr <- s.Manager.Run(runCtx) }()
+	sourceErr := make(chan error, 1)
+	go func() { sourceErr <- dir.Run(runCtx, source, first) }() // first: already loaded above (fail fast), not loaded twice
 	for _, st := range starters {
 		go st.Start(runCtx, s.Manager)
 	}
@@ -178,124 +178,33 @@ func (s *Server) Run(ctx context.Context) error {
 		go watch.Run(runCtx)
 	}
 
-	ln, err := net.Listen("tcp", s.Config.Listen)
-	if err != nil {
-		return err
-	}
-	srv := &http.Server{
-		Handler:           handler,
-		ReadHeaderTimeout: time.Minute,
-		// large uploads/downloads, like `pocketbase serve`
-		ReadTimeout:  5 * time.Minute,
-		WriteTimeout: 5 * time.Minute,
-		BaseContext:  func(net.Listener) context.Context { return runCtx },
-	}
-	serveErr := make(chan error, 1+len(s.Config.PlainListen))
-	var redirect *http.Server
-	startRedirect := func(h http.Handler) {
-		if s.Config.TLS.HTTPListen == "" {
-			return
-		}
-		redirect = &http.Server{Addr: s.Config.TLS.HTTPListen, Handler: h, ReadHeaderTimeout: time.Minute}
-		go func() {
-			if err := redirect.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-				log.Error("pocker: http listener", "error", err)
+	serveCtx, stopServe := context.WithCancel(ctx)
+	defer stopServe()
+	go func() {
+		select {
+		case <-serveCtx.Done():
+		case err := <-sourceErr:
+			if err != nil {
+				log.Error("pocker: instance source stopped", "error", err)
 			}
-		}()
-	}
-	var (
-		tlsCfg   *tls.Config
-		wrapHTTP func(http.Handler) http.Handler
-	)
-	if tlsProv != nil {
-		tlsCfg, wrapHTTP, err = tlsProv.TLS(runCtx, func(host string) bool {
-			_, ok := s.Manager.Lookup(host)
-			return ok
-		})
-		if err != nil {
-			_ = ln.Close()
-			return err
+			stopServe()
 		}
+	}()
+	served := func(host string) bool {
+		_, ok := dir.Lookup(host)
+		return ok
 	}
-	if tlsCfg != nil {
-		srv.TLSConfig = tlsCfg
-		go func() { serveErr <- srv.ServeTLS(ln, "", "") }()
-		h := httpsRedirect(handler)
-		if wrapHTTP != nil {
-			h = wrapHTTP(h)
+	listeners := edge.Listeners{Listen: s.Config.Listen, PlainListen: s.Config.PlainListen, TLS: s.Config.TLS, ShutdownTimeout: s.Config.ShutdownTimeout}
+	err = edge.Serve(serveCtx, runCtx, listeners, handler, tlsProv, served, log, func(addr string) {
+		log.Info("pocker: listening", "addr", addr, "pb_root", s.Config.PBRoot, "dev", s.Config.Dev)
+		if s.Config.Dev {
+			// instances start on their first request; start the dev mail trap now so its notice shows at startup
+			_, _ = mailer.DevTrap("Dev mode: instances without SMTP")
 		}
-		startRedirect(h)
-	} else if s.Config.TLS.Cert != "" || s.Config.TLS.Key != "" {
-		certs, err := newCertReloader(s.Config.TLS.Cert, s.Config.TLS.Key)
-		if err != nil {
-			_ = ln.Close()
-			return err
-		}
-		srv.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12, GetCertificate: certs.GetCertificate}
-		go func() { serveErr <- srv.ServeTLS(ln, "", "") }()
-		startRedirect(httpsRedirect(handler))
-	} else {
-		go func() { serveErr <- srv.Serve(ln) }()
-	}
-	log.Info("pocker: listening", "addr", ln.Addr().String(), "pb_root", s.Config.PBRoot, "dev", s.Config.Dev)
-	if s.Config.Dev {
-		// instances start on their first request; start the dev mail trap now so its notice shows at startup
-		_, _ = mailer.DevTrap("Dev mode: instances without SMTP")
-	}
-	var plain []*http.Server
-	for _, addr := range s.Config.PlainListen {
-		pln, err := net.Listen("tcp", addr)
-		if err != nil {
-			_ = srv.Close()
-			for _, p := range plain {
-				_ = p.Close()
-			}
-			s.Manager.Shutdown()
-			return fmt.Errorf("plain_listen %s: %w", addr, err)
-		}
-		p := &http.Server{
-			Handler: handler, ReadHeaderTimeout: time.Minute, ReadTimeout: 5 * time.Minute, WriteTimeout: 5 * time.Minute,
-			BaseContext: func(net.Listener) context.Context { return runCtx },
-		}
-		plain = append(plain, p)
-		go func() {
-			if err := p.Serve(pln); err != nil && !errors.Is(err, http.ErrServerClosed) {
-				serveErr <- err
-			}
-		}()
-		log.Info("pocker: listening (plain HTTP)", "addr", pln.Addr().String())
-	}
-
-	select {
-	case <-ctx.Done():
-	case err := <-managerErr:
-		if err != nil {
-			log.Error("pocker: instance source stopped", "error", err)
-		}
-	case err := <-serveErr:
-		if err != nil && !errors.Is(err, http.ErrServerClosed) {
-			cancel()
-			s.Manager.Shutdown()
-			return err
-		}
-	}
-
-	timeout := s.Config.ShutdownTimeout
-	if timeout <= 0 {
-		timeout = 10 * time.Second
-	}
-	shutdownCtx, done := context.WithTimeout(context.Background(), timeout)
-	defer done()
-	_ = srv.Shutdown(shutdownCtx)
-	if redirect != nil {
-		_ = redirect.Shutdown(shutdownCtx)
-	}
-	for _, p := range plain {
-		_ = p.Shutdown(shutdownCtx)
-	}
+	})
 	cancel() // ends long-lived requests such as realtime SSE
 	s.Manager.Shutdown()
-	return nil
+	return err
 }
 
 // EventSink is implemented by instance sources that want instance events (e.g. to notify the owner).
@@ -314,67 +223,4 @@ func (s *Server) onEvent(source InstanceSource, log *slog.Logger) func(Event) {
 			sink.InstanceEvent(e)
 		}
 	}
-}
-
-// chainGates combines gates: a peer must pass every gate, and a request is admitted only when all admit it.
-func chainGates(gates []Gate) Gate {
-	switch len(gates) {
-	case 0:
-		return nil
-	case 1:
-		return gates[0]
-	}
-	return gateChain(gates)
-}
-
-type gateChain []Gate
-
-func (c gateChain) AllowPeer(r *http.Request) bool {
-	for _, g := range c {
-		if !g.AllowPeer(r) {
-			return false
-		}
-	}
-	return true
-}
-
-func (c gateChain) Admit(w http.ResponseWriter, r *http.Request, inst Instance) (func(), bool) {
-	var releases []func()
-	releaseAll := func() {
-		for i := len(releases) - 1; i >= 0; i-- {
-			releases[i]()
-		}
-	}
-	for _, g := range c {
-		rel, ok := g.Admit(w, r, inst)
-		if !ok {
-			releaseAll()
-			return nil, false
-		}
-		releases = append(releases, rel)
-	}
-	return releaseAll, true
-}
-
-// primedSource hands the Manager the snapshot Run already loaded (to fail fast) instead of loading it a second time,
-// which for a remote source like a control-plane mirror is a second full download before the edge is ready. Later
-// Snapshot calls, if any, go to the source.
-type primedSource struct {
-	InstanceSource
-	mu    sync.Mutex
-	first []Instance
-	used  bool
-}
-
-func (p *primedSource) Snapshot(ctx context.Context) ([]Instance, error) {
-	p.mu.Lock()
-	if !p.used {
-		p.used = true
-		list := p.first
-		p.first = nil
-		p.mu.Unlock()
-		return list, nil
-	}
-	p.mu.Unlock()
-	return p.InstanceSource.Snapshot(ctx)
 }

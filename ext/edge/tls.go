@@ -1,4 +1,4 @@
-package pocker
+package edge
 
 import (
 	"crypto/tls"
@@ -72,9 +72,9 @@ func (r *certReloader) GetCertificate(*tls.ClientHelloInfo) (*tls.Certificate, e
 
 // httpsRedirect answers plain HTTP: health checks and requests already marked HTTPS by a proxy go to next, the rest
 // are redirected to https://.
-func httpsRedirect(next http.Handler) http.Handler {
+func httpsRedirect(next http.Handler, healthPath string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == HealthPath || r.Header.Get("X-Forwarded-Proto") == "https" || r.Host == "" {
+		if r.URL.Path == healthPath || r.Header.Get("X-Forwarded-Proto") == "https" || r.Host == "" {
 			next.ServeHTTP(w, r)
 			return
 		}

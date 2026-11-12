@@ -25,11 +25,7 @@ func TestAppRestartRestartsOnlyThatApp(t *testing.T) {
 			return nil
 		},
 	})
-	m.mu.Lock()
-	m.upsertLocked(a)
-	m.upsertLocked(b)
-	m.ready = true
-	m.mu.Unlock()
+	m.dir.Load([]Instance{a, b})
 	defer m.Shutdown()
 
 	ctx := context.Background()

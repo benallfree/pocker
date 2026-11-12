@@ -28,10 +28,7 @@ func TestRemoteInstanceIsForwarded(t *testing.T) {
 
 	// default: a reverse proxy to Remote; no app starts and no folder is created here
 	m := NewManager(staticSource{remote}, ManagerOptions{PBRoot: root, Logger: quiet})
-	m.mu.Lock()
-	m.upsertLocked(remote)
-	m.ready = true
-	m.mu.Unlock()
+	m.dir.Load([]Instance{remote})
 	if code, body := get(m); code != 200 || body != "upstream away.example.com/x" {
 		t.Fatalf("default forward: %d %q", code, body)
 	}
@@ -50,10 +47,7 @@ func TestRemoteInstanceIsForwarded(t *testing.T) {
 			forwarded = append(forwarded, inst.ID)
 			_, _ = io.WriteString(w, "forwarded")
 		}})
-	m.mu.Lock()
-	m.upsertLocked(limited)
-	m.ready = true
-	m.mu.Unlock()
+	m.dir.Load([]Instance{limited})
 	if code, body := get(m); code != 200 || body != "forwarded" {
 		t.Fatalf("custom forward: %d %q", code, body)
 	}
