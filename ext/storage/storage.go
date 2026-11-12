@@ -14,8 +14,9 @@
 //	    backups:    r2-eu  # backup zips (app.NewBackupsFilesystem)
 //	    litestream: r2-eu  # PITR history (app.NewFilesystemOfKind("litestream", …))
 //
-// Each app gets its own folder per kind, <backend prefix>instances/<instance id>/<kind>/ (a single app, instance id
-// "", gets <backend prefix><kind>/), and can't reach anything outside it. When an app turns on its own S3 for uploads
+// Each app gets <backend prefix><root><kind>/ per mounted kind and can't reach anything outside it. The root is the
+// caller's choice and opaque to the plugin: under pocker, InitApp passes "instances/<id>/"; a single app passes "" (or
+// any name). Several deployments sharing one bucket keep apart with their own backend prefix or roots. When an app turns on its own S3 for uploads
 // or backups, PocketBase's normal code takes over with the app's credentials. Other kinds are served whenever they're
 // mounted: the plugin asking for them (e.g. ext/pitr) checks its own app setting first. Without mounts the plugin
 // does nothing. Files already on an app's local disk are not read or moved.
@@ -28,6 +29,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sort"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 
@@ -178,9 +180,9 @@ func (p *Plugin) mounts() (map[string]*Bucket, error) {
 	return out, nil
 }
 
-// FS returns the filesystem for one app's kind, fenced to <backend prefix>instances/<instanceID>/<kind>/ (or
-// <backend prefix><kind>/ for instanceID ""). ok is false when the kind isn't mounted. Close the result when done.
-func (p *Plugin) FS(instanceID, kind string) (fsys *filesystem.System, ok bool, err error) {
+// FS returns the filesystem for kind under root, fenced to <backend prefix><root><kind>/. ok is false when the kind
+// isn't mounted. Close the result when done.
+func (p *Plugin) FS(root, kind string) (fsys *filesystem.System, ok bool, err error) {
 	mounts, err := p.mounts()
 	if err != nil {
 		return nil, false, err
@@ -189,20 +191,22 @@ func (p *Plugin) FS(instanceID, kind string) (fsys *filesystem.System, ok bool, 
 	if !ok {
 		return nil, false, nil
 	}
-	fsys, err = open(b, root(b, instanceID, kind))
+	fsys, err = open(b, keyPrefix(b, root, kind))
 	return fsys, err == nil, err
 }
 
-func root(b *Bucket, instanceID, kind string) string {
-	if instanceID == "" {
-		return b.Prefix + kind + "/"
+// keyPrefix is <backend prefix><root><kind>/, with root ending in "/" when set.
+func keyPrefix(b *Bucket, root, kind string) string {
+	if root != "" && !strings.HasSuffix(root, "/") {
+		root += "/"
 	}
-	return b.Prefix + "instances/" + instanceID + "/" + kind + "/"
+	return b.Prefix + root + kind + "/"
 }
 
-// Bind serves app's filesystems from the mounts, as instanceID ("" for a single app). Uploads and backups step aside
-// when the app turned on its own S3 for them; any other mounted kind is served whenever it's asked for.
-func (p *Plugin) Bind(app core.App, instanceID string) error {
+// Bind serves app's filesystems from the mounts under root (opaque, the caller's choice: "" for a single app,
+// "instances/<id>/" under pocker). Uploads and backups step aside when the app turned on its own S3 for them; any
+// other mounted kind is served whenever it's asked for.
+func (p *Plugin) Bind(app core.App, root string) error {
 	mounts, err := p.mounts()
 	if err != nil || len(mounts) == 0 {
 		return err
@@ -223,7 +227,7 @@ func (p *Plugin) Bind(app core.App, instanceID string) error {
 				return e.Next()
 			}
 		}
-		fsys, err := open(b, root(b, instanceID, e.Kind))
+		fsys, err := open(b, keyPrefix(b, root, e.Kind))
 		if err != nil {
 			return err
 		}
@@ -233,7 +237,7 @@ func (p *Plugin) Bind(app core.App, instanceID string) error {
 	return nil
 }
 
-// InitApp binds the instance's app to the mounts, unless the instance has the plugin off.
+// InitApp binds the instance's app to the mounts under "instances/<id>/", unless the instance has the plugin off.
 func (p *Plugin) InitApp(inst pocker.Instance, app core.App) error {
 	var ic InstanceConfig
 	if raw := inst.PluginConfig(Name); raw != nil {
@@ -256,7 +260,7 @@ func (p *Plugin) InitApp(inst pocker.Instance, app core.App) error {
 	if !enabled {
 		return nil
 	}
-	return p.Bind(app, inst.ID)
+	return p.Bind(app, "instances/"+inst.ID+"/")
 }
 
 // open returns b fenced to prefix.

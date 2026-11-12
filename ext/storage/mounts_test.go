@@ -26,8 +26,8 @@ func TestMountsPerKind(t *testing.T) {
 	defer app2.Cleanup()
 	single, _ := tests.NewTestApp()
 	defer single.Cleanup()
-	for app, id := range map[*tests.TestApp]string{app1: "inst1", app2: "inst2", single: ""} {
-		if err := p.Bind(app, id); err != nil {
+	for app, root := range map[*tests.TestApp]string{app1: "instances/inst1/", app2: "instances/inst2", single: ""} {
+		if err := p.Bind(app, root); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -104,15 +104,15 @@ func TestMountsPerKind(t *testing.T) {
 	}
 
 	// FS: the same roots for callers outside a hook
-	fsys, ok, err := p.FS("inst1", "litestream")
+	fsys, ok, err := p.FS("instances/inst1/", "litestream")
 	if err != nil || !ok {
 		t.Fatal(ok, err)
 	}
 	if !exists(t, fsys, "gen/1.ltx") {
-		t.Error("FS(inst1, litestream) doesn't see the history")
+		t.Error("FS(instances/inst1/, litestream) doesn't see the history")
 	}
 	fsys.Close()
-	if _, ok, err := p.FS("inst1", "other"); ok || err != nil {
+	if _, ok, err := p.FS("instances/inst1/", "other"); ok || err != nil {
 		t.Fatal("FS on an unmounted kind", ok, err)
 	}
 }

@@ -3,7 +3,7 @@
 The operator's fall-through storage: named S3 backends, and mounts that send each filesystem kind (record uploads,
 backup zips, PITR history, any plugin's own kind) to one of them, per instance. Credentials never reach the instance.
 
-**Runs on:** many apps under [pocker](../pocker/README.md); a single app can use it too (`Bind(app, "")`).
+**Runs on:** many apps under [pocker](../pocker/README.md); a single app can use it too (`Bind(app, "")`, or any root).
 
 > **Spike.** Works and is tested against MinIO; not yet deployed.
 
@@ -34,10 +34,11 @@ instances:
     plugins: { storage: { enabled: false } }
 ```
 
-Each app gets `<backend prefix>instances/<id>/<kind>/` per mounted kind (a single app bound with `Bind(app, "")`:
-`<backend prefix><kind>/`) and can't reach anything outside it. Any kind a plugin asks core for
+Each app gets `<backend prefix><root><kind>/` per mounted kind and can't reach anything outside it. The root is chosen
+by the caller and opaque to the plugin: under pocker it's `instances/<id>/`; a single app calls `Bind(app, "")` (or any
+name). Deployments sharing one bucket keep apart with their own backend `prefix` (or roots). Any kind a plugin asks core for
 (`app.NewFilesystemOfKind(kind, ...)`) is served when it's mounted; uploads and backups step aside when the app turned
-on its own S3. `Plugin.FS(instanceID, kind)` returns the same fenced filesystem outside a hook.
+on its own S3. `Plugin.FS(root, kind)` returns the same fenced filesystem outside a hook.
 
 The old shape (`bucket:` + `uploads:` / `backups:`) still works, with a warning: it becomes backend `default` mounted
 for storage and backups.
