@@ -32,10 +32,10 @@ choose not to use them.
 | Plugin | Description | Status |
 |---|---|---|
 | **[PITR](ext/pitr/README.md)** (Litestream) | Point-in-time restore of your database, from Settings → Backups or `pocketbase pitr restore`. On by default; `--pitr=false` turns it off. | Stable |
-| **[Auto TLS](ext/autotls/README.md)** | On-demand certificates and wildcards through ACME. | Stable under Pocker; single app: [Build it](#contribute-a-plugin) |
+| **[Auto TLS](ext/autotls/README.md)** | On-demand certificates and wildcards through ACME. | Stable under Pocker; single app: Planned |
 | **[Bulk Mail](ext/bulkmail/README.md)** | Campaigns to your app's own users, with audiences from a collection, a view or SQL. | Beta |
 | **[Pages](ext/pages/README.md)** (formerly PocketPages) | Server-rendered pages from a `pb_pages` folder. | Beta |
-| **[Vacuum](ext/vacuum/README.md)** | Scheduled SQLite VACUUM. | [Build it](#contribute-a-plugin) |
+| **[Vacuum](ext/vacuum/README.md)** | Scheduled SQLite VACUUM. | Planned |
 | **[MCP](ext/mcp/README.md)** | An MCP endpoint at `/mcp` so agents can manage your app and call its tools. | Beta |
 | **[OAuth Server](ext/oauth-server/README.md)** | Your app as an OAuth provider; `pocketbase login` and MCP sign-in use it. | Beta |
 | **[S3 Redirect](ext/s3redirect/README.md)** | File downloads as short-lived signed S3 redirects. | Beta |
@@ -53,8 +53,8 @@ own custom PocketBase experience.
 | Plugin | Description | Status |
 |---|---|---|
 | **[Pocker](ext/pocker/README.md)** | Hundreds of PocketBase instances in one Go process, routed by hostname. | Stable |
-| **[Schedules](ext/schedules/README.md)** | Scheduled webhooks that wake sleeping instances (headed into Pocker). | [Build it](#contribute-a-plugin) |
-| **[Mothership](ext/mothership/README.md)** | A control plane and its edges, across regions. Needs Pocker. | [Build it](#contribute-a-plugin) |
+| **[Schedules](ext/schedules/README.md)** | Scheduled webhooks that wake sleeping instances (headed into Pocker). | Planned |
+| **[Mothership](ext/mothership/README.md)** | A control plane and its edges, across regions. Needs Pocker. | Planned |
 | **[Sandbox](ext/sandbox/README.md)** | Confines untrusted JS hooks, SQL and outbound network ([how is this safe?](ext/sandbox/README.md#how-is-this-safe)). Required for Multitenant. | Stable |
 | **[Firewall](ext/firewall/README.md)** | Peer allow-lists, trusted proxies and rate limits. | Stable |
 
@@ -70,9 +70,9 @@ own custom PocketBase experience.
 
 | Plugin | Description | Status |
 |---|---|---|
-| **[Multitenant](ext/tenants/README.md)** | Accounts that own instances: quotas, owner logins, tokens, and the API for your own dashboard. | [Build it](#contribute-a-plugin) |
-| **[Multitenant Billing](ext/tenant-billing/README.md)** | Plans, quotas and the billing provider hook for Multitenant. | [Build it](#contribute-a-plugin) |
-| **[Multitenant Billing LemonSqueezy Adapter](ext/tenant-billing-ls/README.md)** | Lemon Squeezy as the billing provider. | [Build it](#contribute-a-plugin) |
+| **[Multitenant](ext/tenants/README.md)** | Accounts that own instances: quotas, owner logins, tokens, and the API for your own dashboard. | Planned |
+| **[Multitenant Billing](ext/tenant-billing/README.md)** | Plans, quotas and the billing provider hook for Multitenant. | Planned |
+| **[Multitenant Billing LemonSqueezy Adapter](ext/tenant-billing-ls/README.md)** | Lemon Squeezy as the billing provider. | Planned |
 
 **For plugin authors**
 
@@ -81,7 +81,7 @@ own custom PocketBase experience.
 | **[Dev Users](ext/devusers/devusers.go)** | Local testing only: a superuser and a user with password `password`. Every plugin's `example/` uses it. | Stable |
 
 **Stable** runs in PocketHost production · **Beta** complete and tested, not yet in production · **Alpha** working
-code, still changing · **Build it** a plan and a README so far: [contribute it](#contribute-a-plugin).
+code, still changing · **Planned** a plan and a README so far.
 
 ## Contribute a plugin
 
