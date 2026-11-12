@@ -12,7 +12,7 @@ get API tokens for the CLI and deploys; and an API your own tenant dashboard tal
 - **Mothership:** adds an `owner` to instances and an accounts table through the mothership's schema hooks, and adds
   owner-derived values (superusers, blocked status, plugin settings) to what edges receive through its feed hooks.
 - **Settings for other plugins:** written into each instance's `plugins:` block, e.g. an owner's trusted IPs for the
-  [firewall](../firewall/README.md) or a plan's retention for [pitr](../pitr/README.md). Those plugins don't know
+  [firewall](../edge/README.md) or a plan's retention for [pitr](../pitr/README.md). Those plugins don't know
   tenants exist.
 - **Deploy:** supplies the tenant-token backend for the [deploy](../deploy/README.md) API.
 - **Billing:** a billing provider hook; [tenant-billing-ls](../tenant-billing-ls/README.md) is the Lemon Squeezy one.

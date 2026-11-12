@@ -6,9 +6,10 @@ Many PocketBase instances in one process (like Docker, but for PocketBase), rout
 register on it.
 
 > **Status.** Working: this folder is the Go module `github.com/pockethost/pocketbase/ext/pocker` (CLI in
-> [`cmd/pocker`](cmd/pocker), runnable [`example/`](example), configuration and API in [POCKER.md](POCKER.md)).  The
-> firewall, auto TLS and Server-Timing are plugins of their own ([firewall](../firewall/README.md),
-> [autotls](../autotls/README.md), [servertiming](../servertiming/README.md)); the `pocker` command bundles them.
+> [`cmd/pocker`](cmd/pocker), runnable [`example/`](example), configuration and API in [POCKER.md](POCKER.md)).  Routing,
+> the firewall and forwarding to other edges come from [ext/edge](../edge/README.md); auto TLS and Server-Timing are
+> plugins of their own ([autotls](../autotls/README.md), [servertiming](../servertiming/README.md)); the `pocker`
+> command bundles them.
 
 ## Untrusted instances
 

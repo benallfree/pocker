@@ -1,4 +1,4 @@
-package edgeroute
+package edge
 
 import (
 	"net/http"

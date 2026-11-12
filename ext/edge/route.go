@@ -1,12 +1,11 @@
-// Package edgeroute forwards a request for an instance another edge runs to that edge, over the private network.
-// Where other edges are comes from an [edge.EdgeSource]: a YAML `edges:` section ([edge.StaticEdges]), a control
-// plane's mirror, or several ([edge.MultiEdges]). Plug [Router.Forward] into [edge.Handler.Forward].
+// Forwarding to the owner  A request for an instance another edge runs ([Instance.Remote]) goes there over the
+// private network. Where other edges are comes from an [EdgeSource] (built in: [YAMLProvider], [MothershipProvider],
+// combined with [MultiProvider]). Plug [Router.Forward] into [Handler.Forward].
 //
-// Any edge accepts any request (a load balancer sends visitors to the nearest one). Each instance runs on exactly one
-// edge, named by [edge.Instance.Remote]. While the owner edge is healthy (heard from within HealthyWindow, or, when
-// the source has no heartbeat data, answering its health path) a request it can't take right now is held and retried;
-// once it is down or shut down, requests fail fast with a 503.
-package edgeroute
+// Any edge accepts any request (a load balancer sends visitors to the nearest one). While the owner edge is healthy
+// (heard from within HealthyWindow, or, when the provider has no heartbeat data, answering its health path) a request
+// it can't take right now is held and retried; once it is down or shut down, requests fail fast with a 503.
+package edge
 
 import (
 	"context"
@@ -22,20 +21,18 @@ import (
 	"sync"
 	"syscall"
 	"time"
-
-	"github.com/pockethost/pocketbase/ext/edge"
 )
 
-// Config configures a [Router].
-type Config struct {
+// RouterConfig configures a [Router].
+type RouterConfig struct {
 	// Edges resolves an instance's Remote to its owner edge (required).
-	Edges edge.EdgeSource
+	Edges EdgeSource
 
 	// ForwardedByHeader marks a request forwarded by another edge; such a request is never forwarded again
 	// (default "X-Edge-Forwarded-By").
 	ForwardedByHeader string
 	// HealthPath is probed on the owner (GET <internal_url><HealthPath>, 200 {"status":"ok"}); default
-	// [edge.DefaultHealthPath].
+	// [DefaultHealthPath].
 	HealthPath string
 	// HealthyWindow: an edge heard from more recently than this is healthy without a probe (default 30s).
 	HealthyWindow time.Duration
@@ -58,7 +55,7 @@ const (
 
 // Router forwards requests to owner edges.
 type Router struct {
-	cfg       Config
+	cfg       RouterConfig
 	log       *slog.Logger
 	transport *http.Transport
 	probe     func(ctx context.Context, internalURL string, timeout time.Duration) bool
@@ -76,12 +73,12 @@ type probeEntry struct {
 }
 
 // New returns a Router for cfg, filling defaults.
-func New(cfg Config) *Router {
+func NewRouter(cfg RouterConfig) *Router {
 	if cfg.ForwardedByHeader == "" {
 		cfg.ForwardedByHeader = "X-Edge-Forwarded-By"
 	}
 	if cfg.HealthPath == "" {
-		cfg.HealthPath = edge.DefaultHealthPath
+		cfg.HealthPath = DefaultHealthPath
 	}
 	if cfg.HealthyWindow <= 0 {
 		cfg.HealthyWindow = 30 * time.Second
@@ -145,7 +142,7 @@ func (rt *Router) reachable(ctx context.Context, internalURL string, timeout tim
 }
 
 // healthy: not offline and heard from within the window (an edge with no heartbeat data is never healthy here).
-func (rt *Router) healthy(e edge.Edge) bool {
+func (rt *Router) healthy(e Edge) bool {
 	if e.Status == "offline" || e.LastSeen.IsZero() {
 		return false
 	}
@@ -153,7 +150,7 @@ func (rt *Router) healthy(e edge.Edge) bool {
 }
 
 // alive: healthy per the source, or silent there (but not shut down) and answering its own health check.
-func (rt *Router) alive(ctx context.Context, e edge.Edge) bool {
+func (rt *Router) alive(ctx context.Context, e Edge) bool {
 	if rt.healthy(e) {
 		return true
 	}
@@ -162,13 +159,13 @@ func (rt *Router) alive(ctx context.Context, e edge.Edge) bool {
 	}
 	ok := rt.cachedProbe(ctx, e)
 	if ok && !e.LastSeen.IsZero() {
-		rt.log.Debug("edgeroute: edge is stale in its source but answers its health check", "edge", e.ID)
+		rt.log.Debug("edge: edge is stale in its source but answers its health check", "edge", e.ID)
 	}
 	return ok
 }
 
 // cachedProbe shares one in-flight probe per edge and reuses its result for staleProbeTTL.
-func (rt *Router) cachedProbe(ctx context.Context, e edge.Edge) bool {
+func (rt *Router) cachedProbe(ctx context.Context, e Edge) bool {
 	rt.mu.Lock()
 	p := rt.probes[e.ID]
 	if p == nil || rt.now().Sub(p.at) >= staleProbeTTL {
@@ -206,7 +203,7 @@ func (rt *Router) holdFor(r *http.Request, remote string) bool {
 			return true
 		}
 		if !logged {
-			rt.log.Info("edgeroute: edge unreachable; holding requests while it is within its healthy window", "edge", e.ID)
+			rt.log.Info("edge: edge unreachable; holding requests while it is within its healthy window", "edge", e.ID)
 			logged = true
 		}
 		select {
@@ -237,9 +234,9 @@ func isUnreachable(err error) bool {
 
 var idempotent = map[string]bool{http.MethodGet: true, http.MethodHead: true, http.MethodOptions: true}
 
-// Forward serves a request for an instance another edge runs (plug into [edge.Handler.Forward]).
-func (rt *Router) Forward(w http.ResponseWriter, r *http.Request, inst edge.Instance) {
-	host := edge.NormalizeHost(r.Host)
+// Forward serves a request for an instance another edge runs (plug into [Handler.Forward]).
+func (rt *Router) Forward(w http.ResponseWriter, r *http.Request, inst Instance) {
+	host := NormalizeHost(r.Host)
 	if r.Header.Get(rt.cfg.ForwardedByHeader) != "" {
 		// the forwarding edge says it's ours, we say it isn't: answer, don't bounce it back
 		http.Error(w, host+" "+rt.cfg.MisdirectedSuffix, http.StatusMisdirectedRequest)
@@ -247,7 +244,7 @@ func (rt *Router) Forward(w http.ResponseWriter, r *http.Request, inst edge.Inst
 	}
 	owner, ok := rt.cfg.Edges.Resolve(inst.Remote)
 	if !ok || owner.InternalURL == "" || !rt.alive(r.Context(), owner) {
-		rt.log.Debug("edgeroute: owner edge unavailable", "host", host, "remote", inst.Remote, "known", ok)
+		rt.log.Debug("edge: owner edge unavailable", "host", host, "remote", inst.Remote, "known", ok)
 		rt.unavailable(w)
 		return
 	}
@@ -278,7 +275,7 @@ func (rt *Router) Forward(w http.ResponseWriter, r *http.Request, inst edge.Inst
 		}
 		target, err := url.Parse(strings.TrimRight(e.InternalURL, "/"))
 		if err != nil || target.Host == "" {
-			rt.log.Warn("edgeroute: bad internal_url", "edge", e.ID, "url", e.InternalURL)
+			rt.log.Warn("edge: bad internal_url", "edge", e.ID, "url", e.InternalURL)
 			rt.unavailable(w)
 			return
 		}
@@ -313,7 +310,7 @@ func (rt *Router) Forward(w http.ResponseWriter, r *http.Request, inst edge.Inst
 			return // client went away
 		}
 		if !isUnreachable(failed) {
-			rt.log.Warn("edgeroute: edge proxy error", "edge", e.ID, "host", host, "error", failed)
+			rt.log.Warn("edge: edge proxy error", "edge", e.ID, "host", host, "error", failed)
 			http.Error(w, "Bad gateway", http.StatusBadGateway)
 			return
 		}

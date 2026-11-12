@@ -4,7 +4,7 @@ go 1.27
 
 require (
 	github.com/pockethost/pocketbase/ext/autotls v0.0.0-00010101000000-000000000000
-	github.com/pockethost/pocketbase/ext/firewall v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketbase/ext/edge v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketbase/ext/pocker v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketbase/ext/servertiming v0.0.0-00010101000000-000000000000
 )
@@ -66,8 +66,9 @@ require (
 replace (
 	ganigeorgiev.com/pocketbase/pocketbase => ../../../..
 	github.com/pockethost/pocketbase/ext/autotls => ../../../autotls
-	github.com/pockethost/pocketbase/ext/firewall => ../../../firewall
 	github.com/pockethost/pocketbase/ext/pocker => ../..
 	github.com/pockethost/pocketbase/ext/sandbox => ../../../sandbox
 	github.com/pockethost/pocketbase/ext/servertiming => ../../../servertiming
 )
+
+replace github.com/pockethost/pocketbase/ext/edge => ../../../edge

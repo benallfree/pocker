@@ -1,7 +1,9 @@
 package edge
 
 import (
+	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 	"time"
@@ -18,8 +20,10 @@ type Edge struct {
 	LastSeen    time.Time // zero when unknown
 }
 
-// EdgeSource tells the router where other edges are. Providers: [StaticEdges] (a YAML `edges:` section) or a control
-// plane's mirror (e.g. PocketHost's mothership feed). Instances name their owner edge in [Instance.Remote].
+// EdgeSource tells the router where other edges are. Built in: [YAMLProvider] (a config file's `edges.list`) and
+// [MothershipProvider] (a mothership's `edges` collection), combined with [MultiProvider]; [EdgesFromConfig] builds
+// them from a config file. A host application can bring its own (e.g. a control plane's mirror). Instances name
+// their owner edge in [Instance.Remote].
 type EdgeSource interface {
 	// Self is this edge's id ("" when it doesn't know).
 	Self() string
@@ -29,33 +33,118 @@ type EdgeSource interface {
 	Edges() []Edge
 }
 
-// StaticEdges is a fixed list of edges, e.g. from a YAML `edges:` section. An instance's Remote names its owner as
-// "edge:@<id>" or just "<id>"; health is learned by probing (Status stays "").
+// Runner is an [EdgeSource] with background work (e.g. polling a mothership). The server runs it until shutdown.
+type Runner interface {
+	Run(ctx context.Context)
+}
+
+// EdgesConfig is a config file's `edges:` section: this edge's id, a fixed list, and/or a mothership to read the
+// list from. Values in the mothership block expand $VARS from the environment, so its password can live in .env.
 //
 //	edges:
 //	  self: lax-1
 //	  list:
 //	    - { id: sgp-1, internal_url: "http://10.88.0.4:8080", region: sgp }
-//	    - { id: ams-1, internal_url: "http://10.88.0.3:8080", region: ams }
-type StaticEdges struct {
+//	  mothership:
+//	    url: http://10.88.0.10:8090
+//	    email: $MOTHERSHIP_EMAIL
+//	    password: $MOTHERSHIP_PASSWORD
+//	    collection: edges     # default
+//	    refresh: 30s          # default
+type EdgesConfig struct {
+	Self       string            `yaml:"self"`
+	List       []StaticEdge      `yaml:"list"`
+	Mothership *MothershipConfig `yaml:"mothership"`
+}
+
+// MothershipConfig is the `edges.mothership` block (see [MothershipProvider]).
+type MothershipConfig struct {
+	URL        string        `yaml:"url"`
+	Email      string        `yaml:"email"`
+	Password   string        `yaml:"password"`
+	Collection string        `yaml:"collection"`
+	Refresh    time.Duration `yaml:"refresh"`
+}
+
+// EdgesFromConfig builds the edge providers for an `edges:` section (node may be nil: no section, nil result). The
+// list comes first, so a YAML entry overrides the mothership's record for the same edge. A [MothershipProvider] in
+// the result is a [Runner]: run it (the server does) or call its Refresh.
+func EdgesFromConfig(node *yaml.Node, log *slog.Logger) (EdgeSource, error) {
+	if node == nil {
+		return nil, nil
+	}
+	var c EdgesConfig
+	if err := node.Decode(&c); err != nil {
+		return nil, fmt.Errorf("edges: %w", err)
+	}
+	return c.Build(log)
+}
+
+// Build returns the providers c describes: a [YAMLProvider], a [MothershipProvider], or both in a [MultiProvider].
+func (c EdgesConfig) Build(log *slog.Logger) (EdgeSource, error) {
+	for i, e := range c.List {
+		if e.ID == "" || e.InternalURL == "" {
+			return nil, fmt.Errorf("edges.list[%d] needs id and internal_url", i)
+		}
+	}
+	var out MultiProvider
+	if len(c.List) > 0 || c.Mothership == nil {
+		out = append(out, &YAMLProvider{SelfID: c.Self, List: c.List})
+	}
+	if m := c.Mothership; m != nil {
+		p := &MothershipProvider{
+			URL: os.ExpandEnv(m.URL), Email: os.ExpandEnv(m.Email), Password: os.ExpandEnv(m.Password),
+			Collection: m.Collection, Refresh: m.Refresh, SelfID: c.Self, Logger: log,
+		}
+		if p.URL == "" {
+			return nil, fmt.Errorf("edges.mothership needs url")
+		}
+		out = append(out, p)
+	}
+	if len(out) == 1 {
+		return out[0], nil
+	}
+	return out, nil
+}
+
+// LoadEdges reads the `edges:` section of a YAML config file (nil, nil when the file has none).
+func LoadEdges(path string, log *slog.Logger) (EdgeSource, error) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var doc yaml.Node
+	if err := yaml.Unmarshal(b, &doc); err != nil {
+		return nil, fmt.Errorf("%s: %w", path, err)
+	}
+	src, err := EdgesFromConfig(TopLevel(&doc, "edges"), log)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", path, err)
+	}
+	return src, nil
+}
+
+// YAMLProvider is a fixed list of edges, e.g. a config file's `edges.list`. An instance's Remote names its owner as
+// "edge:@<id>", "edge:<id>" or just "<id>"; health is learned by probing (Status stays "").
+type YAMLProvider struct {
 	SelfID string       `yaml:"self"`
 	List   []StaticEdge `yaml:"list"`
 }
 
-// StaticEdge is one entry of [StaticEdges].
+// StaticEdge is one entry of [YAMLProvider].
 type StaticEdge struct {
 	ID          string `yaml:"id"`
 	InternalURL string `yaml:"internal_url"`
 	Region      string `yaml:"region"`
 }
 
-var _ EdgeSource = (*StaticEdges)(nil)
+var _ EdgeSource = (*YAMLProvider)(nil)
 
 // Self implements [EdgeSource].
-func (s *StaticEdges) Self() string { return s.SelfID }
+func (s *YAMLProvider) Self() string { return s.SelfID }
 
 // Resolve implements [EdgeSource].
-func (s *StaticEdges) Resolve(remote string) (Edge, bool) {
+func (s *YAMLProvider) Resolve(remote string) (Edge, bool) {
 	id := strings.TrimPrefix(strings.TrimPrefix(remote, "edge:"), "@")
 	for _, e := range s.List {
 		if e.ID == id {
@@ -66,7 +155,7 @@ func (s *StaticEdges) Resolve(remote string) (Edge, bool) {
 }
 
 // Edges implements [EdgeSource].
-func (s *StaticEdges) Edges() []Edge {
+func (s *YAMLProvider) Edges() []Edge {
 	out := make([]Edge, 0, len(s.List))
 	for _, e := range s.List {
 		out = append(out, Edge{ID: e.ID, InternalURL: e.InternalURL, Region: e.Region})
@@ -74,36 +163,17 @@ func (s *StaticEdges) Edges() []Edge {
 	return out
 }
 
-// LoadStaticEdges reads the `edges:` section of a YAML config file (nil, nil when the file has none).
-func LoadStaticEdges(path string) (*StaticEdges, error) {
-	b, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	var doc struct {
-		Edges *StaticEdges `yaml:"edges"`
-	}
-	if err := yaml.Unmarshal(b, &doc); err != nil {
-		return nil, fmt.Errorf("%s: %w", path, err)
-	}
-	if doc.Edges == nil {
-		return nil, nil
-	}
-	for i, e := range doc.Edges.List {
-		if e.ID == "" || e.InternalURL == "" {
-			return nil, fmt.Errorf("%s: edges.list[%d] needs id and internal_url", path, i)
-		}
-	}
-	return doc.Edges, nil
-}
+// MultiProvider asks each source in turn: the first that resolves a Remote wins; Self is the first non-empty one.
+// It runs every source that is a [Runner].
+type MultiProvider []EdgeSource
 
-// MultiEdges asks each source in turn: the first that resolves a Remote wins; Self is the first non-empty one.
-type MultiEdges []EdgeSource
-
-var _ EdgeSource = MultiEdges(nil)
+var (
+	_ EdgeSource = MultiProvider(nil)
+	_ Runner     = MultiProvider(nil)
+)
 
 // Self implements [EdgeSource].
-func (m MultiEdges) Self() string {
+func (m MultiProvider) Self() string {
 	for _, s := range m {
 		if id := s.Self(); id != "" {
 			return id
@@ -113,7 +183,7 @@ func (m MultiEdges) Self() string {
 }
 
 // Resolve implements [EdgeSource].
-func (m MultiEdges) Resolve(remote string) (Edge, bool) {
+func (m MultiProvider) Resolve(remote string) (Edge, bool) {
 	for _, s := range m {
 		if e, ok := s.Resolve(remote); ok {
 			return e, true
@@ -123,7 +193,7 @@ func (m MultiEdges) Resolve(remote string) (Edge, bool) {
 }
 
 // Edges implements [EdgeSource].
-func (m MultiEdges) Edges() []Edge {
+func (m MultiProvider) Edges() []Edge {
 	var out []Edge
 	seen := map[string]bool{}
 	for _, s := range m {
@@ -135,4 +205,19 @@ func (m MultiEdges) Edges() []Edge {
 		}
 	}
 	return out
+}
+
+// Run implements [Runner]: it runs each source that is a Runner, until ctx is done.
+func (m MultiProvider) Run(ctx context.Context) {
+	done := make(chan struct{})
+	n := 0
+	for _, s := range m {
+		if r, ok := s.(Runner); ok {
+			n++
+			go func() { r.Run(ctx); done <- struct{}{} }()
+		}
+	}
+	for ; n > 0; n-- {
+		<-done
+	}
 }

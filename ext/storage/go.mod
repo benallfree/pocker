@@ -34,7 +34,6 @@ require (
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/ncruces/go-strftime v1.1.0 // indirect
 	github.com/pockethost/pocketbase/ext/edge v0.0.0-00010101000000-000000000000 // indirect
-	github.com/pockethost/pocketbase/ext/edgeroute v0.0.0-00010101000000-000000000000 // indirect
 	github.com/pockethost/pocketbase/ext/sandbox v0.0.0-00010101000000-000000000000 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/rogpeppe/go-internal v1.10.0 // indirect
@@ -68,5 +67,3 @@ replace (
 replace github.com/pockethost/pocketbase/ext/devusers => ../devusers
 
 replace github.com/pockethost/pocketbase/ext/edge => ../edge
-
-replace github.com/pockethost/pocketbase/ext/edgeroute => ../edgeroute

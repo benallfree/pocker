@@ -365,7 +365,7 @@ func TestServerSnapshotsOnce(t *testing.T) {
 	}
 }
 
-// A config file's `edges:` section routes instances owned by another edge through ext/edgeroute.
+// A config file's `edges:` section routes instances owned by another edge through an edge.Router.
 func TestServerEdgesFromYAML(t *testing.T) {
 	root := t.TempDir()
 	ownerSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

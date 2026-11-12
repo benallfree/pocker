@@ -9,8 +9,6 @@ import (
 	"runtime/debug"
 	"time"
 
-	"github.com/pockethost/pocketbase/ext/edgeroute"
-
 	"github.com/pockethost/pocketbase/ext/edge"
 	"github.com/pockethost/pocketbase/ext/sandbox"
 
@@ -40,13 +38,19 @@ type Server struct {
 	// Forward, if set, serves requests for instances another server runs (see [ManagerOptions.Forward]).
 	Forward func(w http.ResponseWriter, r *http.Request, inst Instance)
 
-	// Edges, when Forward is nil, forwards requests for instances other edges run ([Instance.Remote]) through
-	// ext/edgeroute: a control plane's mirror, or several sources ([edge.MultiEdges]). Without it, a config file
-	// `edges:` section ([edge.StaticEdges]) does the same. With neither, Remote is a URL and requests are proxied to it.
+	// Edges, when Forward is nil, forwards requests for instances other edges run ([Instance.Remote]) through an
+	// [edge.Router]: a host application's provider, or several ([edge.MultiProvider]). Without it, a config file
+	// `edges:` section does the same ([edge.EdgesFromConfig]: a fixed list and/or a mothership). With neither, Remote
+	// is a URL and requests are proxied to it. A provider that is an [edge.Runner] runs until shutdown.
 	Edges edge.EdgeSource
 
 	// EdgeRoute tunes forwarding through Edges (header name, health path, timings); Edges is filled in.
-	EdgeRoute edgeroute.Config
+	EdgeRoute edge.RouterConfig
+
+	// Firewall is the edge firewall ([edge.Firewall]): allowed peers, client IPs and rate limits, the first gate every
+	// request passes. When nil, one is created if the config file has a `firewall:` or `rate_limits:` section. Either
+	// way the config file's sections are applied ([edge.Firewall.Configure]).
+	Firewall *edge.Firewall
 
 	// Plugins extend the server (see [Plugin]): settings from the config file, a request gate (e.g. the firewall
 	// plugin), TLS (e.g. the autotls plugin), handler wrappers and background work. Order matters for wrappers: the
@@ -98,6 +102,17 @@ func (s *Server) Run(ctx context.Context) error {
 		initers   []AppIniter
 		jsIniters []JSIniter
 	)
+	fw := s.Firewall
+	if fw == nil && (TopLevel(s.Config.Doc(), "firewall") != nil || TopLevel(s.Config.Doc(), "rate_limits") != nil) {
+		fw = &edge.Firewall{}
+		s.Firewall = fw
+	}
+	if fw != nil {
+		if err := fw.Configure(s.Config.Doc(), s.Config.Dev); err != nil {
+			return err
+		}
+		gates = append(gates, fw)
+	}
 	for _, p := range s.Plugins {
 		if c, ok := p.(Configurer); ok {
 			if err := c.Configure(s.Config.Doc(), s.Config); err != nil {
@@ -138,15 +153,12 @@ func (s *Server) Run(ctx context.Context) error {
 		}
 	}
 	forward := s.Forward
+	var edgeRunner edge.Runner
 	if forward == nil {
 		edges := s.Edges
 		if edges == nil {
-			if n := TopLevel(s.Config.Doc(), "edges"); n != nil {
-				var static edge.StaticEdges
-				if err := n.Decode(&static); err != nil {
-					return fmt.Errorf("edges: %w", err)
-				}
-				edges = &static
+			if edges, err = edge.EdgesFromConfig(TopLevel(s.Config.Doc(), "edges"), log); err != nil {
+				return err
 			}
 		}
 		if edges != nil {
@@ -155,7 +167,8 @@ func (s *Server) Run(ctx context.Context) error {
 			if rc.Logger == nil {
 				rc.Logger = log
 			}
-			forward = edgeroute.New(rc).Forward
+			forward = edge.NewRouter(rc).Forward
+			edgeRunner, _ = edges.(edge.Runner)
 		}
 	}
 	dir := edge.NewDirectory(log)
@@ -190,6 +203,9 @@ func (s *Server) Run(ctx context.Context) error {
 	defer cancel()
 	sourceErr := make(chan error, 1)
 	go func() { sourceErr <- dir.Run(runCtx, source, first) }() // first: already loaded above (fail fast), not loaded twice
+	if edgeRunner != nil {
+		go edgeRunner.Run(runCtx)
+	}
 	for _, st := range starters {
 		go st.Start(runCtx, s.Manager)
 	}
