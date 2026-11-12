@@ -4,6 +4,7 @@ go 1.27
 
 require (
 	github.com/pockethost/pocketbase/ext/autotls v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketbase/ext/docker v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketbase/ext/edge v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketbase/ext/mothership v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketbase/ext/pocker v0.0.0-00010101000000-000000000000
@@ -15,6 +16,7 @@ require (
 	ganigeorgiev.com/pocketbase/dbx v1.13.0 // indirect
 	ganigeorgiev.com/pocketbase/ozzo-validation/v4 v4.4.1 // indirect
 	ganigeorgiev.com/pocketbase/pocketbase v0.0.0-00010101000000-000000000000 // indirect
+	github.com/Masterminds/semver/v3 v3.5.0 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/caddyserver/certmagic v0.25.6 // indirect
 	github.com/caddyserver/zerossl v0.1.6 // indirect
@@ -75,3 +77,5 @@ replace (
 replace github.com/pockethost/pocketbase/ext/edge => ../../../edge
 
 replace github.com/pockethost/pocketbase/ext/mothership => ../../../mothership
+
+replace github.com/pockethost/pocketbase/ext/docker => ../../../docker

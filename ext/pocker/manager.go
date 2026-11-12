@@ -37,6 +37,7 @@ type Manager struct {
 	dir     *edge.Directory
 	ownsDir bool
 	handler *edge.Handler
+	serves  func(Instance) bool
 
 	defaults Limits
 	onEvent  func(Event)
@@ -93,6 +94,12 @@ type ManagerOptions struct {
 	// Directory, when set, is shared with the rest of the edge (the host feeds it); the Manager then doesn't load
 	// the source itself and [Manager.Run] only waits.
 	Directory *edge.Directory
+	// Runtimes are more runtimes after pocker itself (e.g. ext/docker), tried in order for instances pocker doesn't
+	// serve (see Serves). Their Sync hooks follow the directory.
+	Runtimes []edge.Runtime
+	// Serves, if set, picks the instances pocker runs in-process (default: those with no Runtime or "pocker"), e.g.
+	// by PocketBase version so the rest go to a container runtime.
+	Serves func(inst Instance) bool
 	// Logger defaults to slog.Default().
 	Logger *slog.Logger
 }
@@ -121,7 +128,14 @@ func NewManager(source InstanceSource, opts ManagerOptions) *Manager {
 		m.ownsDir = true
 	}
 	m.dir.Subscribe(m.Sync)
-	m.handler = &edge.Handler{Dir: m.dir, Gate: opts.Gate, Runtimes: []edge.Runtime{m}, Forward: opts.Forward, Dev: opts.Dev, Logger: opts.Logger}
+	m.serves = opts.Serves
+	runtimes := append([]edge.Runtime{m}, opts.Runtimes...)
+	for _, rt := range opts.Runtimes {
+		if s, ok := rt.(edge.Syncer); ok {
+			m.dir.Subscribe(s.Sync)
+		}
+	}
+	m.handler = &edge.Handler{Dir: m.dir, Gate: opts.Gate, Runtimes: runtimes, Forward: opts.Forward, Dev: opts.Dev, Logger: opts.Logger}
 	return m
 }
 
@@ -179,7 +193,15 @@ func (m *Manager) Lookup(host string) (Instance, bool) { return m.dir.Lookup(hos
 func (m *Manager) Name() string { return "pocker" }
 
 // Serves implements [edge.Runtime]: every instance that doesn't ask for another runtime.
-func (m *Manager) Serves(inst Instance) bool { return inst.Runtime == "" || inst.Runtime == "pocker" }
+func (m *Manager) Serves(inst Instance) bool {
+	if inst.Runtime != "" {
+		return inst.Runtime == "pocker"
+	}
+	if m.serves != nil {
+		return m.serves(inst)
+	}
+	return true
+}
 
 // app returns the instance's running app, starting it (once, shared by concurrent callers) if needed.
 // A failed start is not cached: the next request tries again.

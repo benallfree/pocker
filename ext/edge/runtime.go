@@ -1,6 +1,7 @@
 package edge
 
 import (
+	"context"
 	"net/http"
 )
 
@@ -54,4 +55,10 @@ func pick(runtimes []Runtime, inst Instance) Runtime {
 		}
 	}
 	return nil
+}
+
+// RuntimeStarter is an optional runtime hook the host calls once before serving, e.g. to adopt containers that kept
+// running across an edge restart. An error stops the edge from starting.
+type RuntimeStarter interface {
+	Start(ctx context.Context) error
 }

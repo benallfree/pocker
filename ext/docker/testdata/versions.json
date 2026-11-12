@@ -1,0 +1,22 @@
+{
+ "hosts": {
+  "gani": "https://ganigeorgiev.com/meta/pocketbase/pocketbase/download/v{version}/{file}",
+  "github": "https://github.com/pocketbase/pocketbase/releases/download/v{version}/{file}"
+ },
+ "versions": {
+  "0.36.9": {
+   "host": "github",
+   "sha256": {
+    "linux_amd64": "514441ad69eeba4e5da6e4728dae7483c6e5328b109fed9c67f66909a006fb5a",
+    "linux_arm64": "97f8f2337a1041b54153d63c4eea02df1bca4b4e68907052c0ab9ce89a0df855"
+   }
+  },
+  "0.22.58": {
+   "host": "gani",
+   "sha256": {
+    "linux_amd64": "2b2fe6fd92c2565780863addb5398f197b95fa3d79917836e30b9eb59a3770e4",
+    "linux_arm64": "8703f50823010cbd3299b10336fedcbe053c1eba6f7e7823bda7d1509826a3fa"
+   }
+  }
+ }
+}

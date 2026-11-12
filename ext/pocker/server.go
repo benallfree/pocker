@@ -52,6 +52,12 @@ type Server struct {
 	// way the config file's sections are applied ([edge.Firewall.Configure]).
 	Firewall *edge.Firewall
 
+	// Runtimes run instances pocker doesn't run in-process (e.g. ext/docker for other PocketBase versions), tried in
+	// order after pocker; ServesInProcess picks pocker's instances (default: every instance with no Runtime). The
+	// server starts them ([edge.RuntimeStarter]) before listening and shuts them down after.
+	Runtimes        []edge.Runtime
+	ServesInProcess func(inst Instance) bool
+
 	// Plugins extend the server (see [Plugin]): settings from the config file, a request gate (e.g. the firewall
 	// plugin), TLS (e.g. the autotls plugin), handler wrappers and background work. Order matters for wrappers: the
 	// first listed is the outermost.
@@ -185,6 +191,8 @@ func (s *Server) Run(ctx context.Context) error {
 		Setup:         s.SetupApp,
 		Forward:       forward,
 		Directory:     dir,
+		Runtimes:      s.Runtimes,
+		Serves:        s.ServesInProcess,
 	})
 
 	if s.OnStart != nil {
@@ -208,6 +216,13 @@ func (s *Server) Run(ctx context.Context) error {
 	}
 	for _, st := range starters {
 		go st.Start(runCtx, s.Manager)
+	}
+	for _, rt := range s.Runtimes {
+		if st, ok := rt.(edge.RuntimeStarter); ok {
+			if err := st.Start(runCtx); err != nil {
+				return fmt.Errorf("runtime %s: %w", rt.Name(), err)
+			}
+		}
 	}
 
 	if s.Config.MemoryLimit > 0 {
@@ -251,6 +266,11 @@ func (s *Server) Run(ctx context.Context) error {
 	})
 	cancel() // ends long-lived requests such as realtime SSE
 	s.Manager.Shutdown()
+	for _, rt := range s.Runtimes {
+		if sd, ok := rt.(edge.Shutdowner); ok {
+			sd.Shutdown()
+		}
+	}
 	return err
 }
 

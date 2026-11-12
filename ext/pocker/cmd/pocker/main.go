@@ -16,6 +16,7 @@ import (
 	"syscall"
 
 	"github.com/pockethost/pocketbase/ext/autotls"
+	"github.com/pockethost/pocketbase/ext/docker"
 	"github.com/pockethost/pocketbase/ext/edge"
 	"github.com/pockethost/pocketbase/ext/mothership/mirror"
 	"github.com/pockethost/pocketbase/ext/pocker"
@@ -75,6 +76,18 @@ func main() {
 		} else if fixed != nil {
 			srv.Edges = edge.MultiProvider{fixed, m}
 		}
+	}
+	// a `docker:` section: instances asking for runtime "docker" run in containers (any PocketBase version)
+	if dc, ok, err := docker.FromConfig(cfg.Doc(), cfg.PBRoot, slog.Default()); err != nil {
+		slog.Error("pocker: docker", "error", err)
+		os.Exit(1)
+	} else if ok {
+		rt, err := docker.New(dc)
+		if err != nil {
+			slog.Error("pocker: docker", "error", err)
+			os.Exit(1)
+		}
+		srv.Runtimes = append(srv.Runtimes, rt)
 	}
 	if err := srv.Run(ctx); err != nil {
 		slog.Error("pocker: serve", "error", err)
