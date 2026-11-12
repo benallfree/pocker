@@ -43,6 +43,9 @@ type Config struct {
 	Retry time.Duration
 	// UnavailableMessage is the 503 body (default "This instance is temporarily unavailable. Please retry shortly.").
 	UnavailableMessage string
+	// MisdirectedSuffix ends the 421 body for a request another edge already forwarded here: "<host> " + it
+	// (default "is served by another edge").
+	MisdirectedSuffix string
 
 	Logger *slog.Logger
 }
@@ -85,6 +88,9 @@ func New(cfg Config) *Router {
 	}
 	if cfg.Retry <= 0 {
 		cfg.Retry = 250 * time.Millisecond
+	}
+	if cfg.MisdirectedSuffix == "" {
+		cfg.MisdirectedSuffix = "is served by another edge"
 	}
 	if cfg.UnavailableMessage == "" {
 		cfg.UnavailableMessage = "This instance is temporarily unavailable. Please retry shortly."
@@ -236,7 +242,7 @@ func (rt *Router) Forward(w http.ResponseWriter, r *http.Request, inst edge.Inst
 	host := edge.NormalizeHost(r.Host)
 	if r.Header.Get(rt.cfg.ForwardedByHeader) != "" {
 		// the forwarding edge says it's ours, we say it isn't: answer, don't bounce it back
-		http.Error(w, host+" is served by another edge", http.StatusMisdirectedRequest)
+		http.Error(w, host+" "+rt.cfg.MisdirectedSuffix, http.StatusMisdirectedRequest)
 		return
 	}
 	owner, ok := rt.cfg.Edges.Resolve(inst.Remote)
