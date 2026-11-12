@@ -477,15 +477,14 @@ module.exports = (config) => ({
   name: 'my-plugin',
   onRequest(ctx) {},                       // before middleware
   extendContext(ctx) { ctx.hello = () => 'hi' },
-  handles(file) { return file.endsWith('.txt.ejs') }, // treat extra files as EJS pages
   transform({ html, ctx, file }) { return html },     // after each page or layout renders (not partials)
 })
 ```
 
 - `config` is the plugin's entry in `+config.js` when it's an object (`{ factory, ...options }`), else `{}`.
 - `name` is required and unique.
-- A file a plugin `handles` is an EJS page whose URL drops only its last extension (`robots.txt.ejs` →
-  `/robots.txt`).
+- There's no hook for treating other kinds of files as pages: a page's inner extension already does that
+  (`robots.txt.ejs` serves `/robots.txt` as `text/plain`, 4.5).
 - Hooks run in config order. Every hook is optional.
 - JS plugins run with the same permissions as the rest of the app's JS (sandboxed in a multitenant host).
 

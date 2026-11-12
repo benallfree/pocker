@@ -1,6 +1,6 @@
 ---
 title: Plugin Authoring Guide
-description: 'Write a JS plugin for PocketPages v1, a factory that returns onRequest, extendContext, handles and transform hooks.'
+description: 'Write a JS plugin for PocketPages v1, a factory that returns onRequest, extendContext and transform hooks.'
 ---
 
 # Plugin Authoring Guide
@@ -13,7 +13,6 @@ module.exports = (config) => ({
   name: 'my-plugin',
   onRequest(ctx) {},                                   // before middleware
   extendContext(ctx) { ctx.hello = () => 'hi' },
-  handles(file) { return file.endsWith('.txt.ejs') },  // treat extra files as pages
   transform({ html, ctx, file }) { return html },      // after each template or layout renders
 })
 ```
@@ -55,7 +54,6 @@ Every hook is optional. Hooks run in the order plugins are listed in `+config.js
 | `name` | The plugin's name. |
 | `onRequest(ctx)` | At the start of each request, before middleware. |
 | `extendContext(ctx)` | Add members to `ctx`. |
-| `handles(file)` | Return `true` to treat an extra kind of file as a page. |
 | `transform({ html, ctx, file })` | After each template or layout renders. Return the new HTML. |
 
 ## Example: a context helper
