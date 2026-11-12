@@ -880,6 +880,15 @@ func (app *BaseApp) NewBackupsFilesystem() (*filesystem.System, error) {
 	return app.createFilesystem(FilesystemKindBackups, app.defaultBackupsFilesystem)
 }
 
+// CE: NewFilesystemOfKind asks the OnFilesystemCreate handlers for a filesystem of any kind; def is the fallback
+// (nil def = none: returns nil, nil). See [App.NewFilesystemOfKind].
+func (app *BaseApp) NewFilesystemOfKind(kind string, def func() (*filesystem.System, error)) (*filesystem.System, error) {
+	if def == nil {
+		def = func() (*filesystem.System, error) { return nil, nil }
+	}
+	return app.createFilesystem(kind, def)
+}
+
 func (app *BaseApp) defaultBackupsFilesystem() (*filesystem.System, error) {
 	if app.settings != nil && app.settings.Backups.S3.Enabled {
 		return filesystem.NewS3(

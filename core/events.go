@@ -215,7 +215,8 @@ const (
 	FilesystemKindBackups = "backups" // app.NewBackupsFilesystem(): backup zips
 )
 
-// FilesystemCreateEvent is triggered by app.NewFilesystem() and app.NewBackupsFilesystem().
+// FilesystemCreateEvent is triggered by app.NewFilesystem(), app.NewBackupsFilesystem() and (CE)
+// app.NewFilesystemOfKind(kind, ...), which plugins use for their own kinds (e.g. "litestream").
 // A handler may set Filesystem (e.g. a default bucket when the app's own S3 is off);
 // otherwise the default one from the app settings (S3 or local) is created.
 type FilesystemCreateEvent struct {
@@ -223,7 +224,7 @@ type FilesystemCreateEvent struct {
 
 	App App
 
-	// Kind is [FilesystemKindStorage] or [FilesystemKindBackups].
+	// Kind is [FilesystemKindStorage], [FilesystemKindBackups] or a plugin's own kind (CE: NewFilesystemOfKind).
 	Kind string
 
 	// Filesystem is the result. Left nil, the default one is created after the handlers.
