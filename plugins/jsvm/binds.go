@@ -892,7 +892,7 @@ func BindApis(vm *goja.Runtime) {
 // for sending HTTP requests.
 //
 // See https://pocketbase.io/jsvm/modules/_http.html.
-// POCKER: process-wide caps for $http.send (0 = upstream behaviour: 120s default timeout, unbounded body).
+// CE: process-wide caps for $http.send (0 = upstream behaviour: 120s default timeout, unbounded body).
 var (
 	// HTTPSendMaxTimeout caps the timeout (in seconds) a JS caller can request.
 	HTTPSendMaxTimeout int
@@ -900,17 +900,17 @@ var (
 	HTTPSendMaxBodySize int64
 )
 
-// POCKER: HTTPSendLimits overrides the process-wide caps for one runtime. A host pins it on the runtime's global
+// CE: HTTPSendLimits overrides the process-wide caps for one runtime. A host pins it on the runtime's global
 // object under [HTTPSendLimitsKey] (e.g. from Config.OnInit); zero fields keep the process-wide value.
 type HTTPSendLimits struct {
 	Timeout int   // seconds
 	Body    int64 // bytes
 }
 
-// POCKER: HTTPSendLimitsKey is the global property $http.send reads [HTTPSendLimits] from.
+// CE: HTTPSendLimitsKey is the global property $http.send reads [HTTPSendLimits] from.
 const HTTPSendLimitsKey = "__pocker_http_limits"
 
-// POCKER: httpSendLimits returns the $http.send caps for vm: its pinned [HTTPSendLimits] where set, else the
+// CE: httpSendLimits returns the $http.send caps for vm: its pinned [HTTPSendLimits] where set, else the
 // process-wide ones.
 func httpSendLimits(vm *goja.Runtime) (int, int64) {
 	timeout, body := HTTPSendMaxTimeout, HTTPSendMaxBodySize
@@ -995,7 +995,7 @@ func BindHTTP(vm *goja.Runtime) {
 		if config.Timeout <= 0 {
 			config.Timeout = 120
 		}
-		maxTimeout, maxBody := httpSendLimits(vm) // POCKER: per-app (sandbox) or process-wide caps
+		maxTimeout, maxBody := httpSendLimits(vm) // CE: per-app (sandbox) or process-wide caps
 		if maxTimeout > 0 && config.Timeout > maxTimeout {
 			config.Timeout = maxTimeout
 		}
@@ -1052,7 +1052,7 @@ func BindHTTP(vm *goja.Runtime) {
 		defer res.Body.Close()
 
 		var bodyRaw []byte
-		if maxBody > 0 { // POCKER: bounded response body
+		if maxBody > 0 { // CE: bounded response body
 			bodyRaw, _ = io.ReadAll(io.LimitReader(res.Body, maxBody+1))
 			if int64(len(bodyRaw)) > maxBody {
 				return nil, errors.New("$http.send: response body larger than the allowed size")

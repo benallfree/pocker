@@ -1,6 +1,6 @@
 package core_test
 
-// POCKER: dev mode sends to the dev mail trap instead of sendmail.
+// CE: dev mode sends to the dev mail trap instead of sendmail.
 
 import (
 	"net"

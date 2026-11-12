@@ -163,18 +163,18 @@ func (c *SMTPClient) send(m *Message) error {
 		}
 	}
 
-	if DialContext != nil { // POCKER: send through the host's dialer (egress policy)
+	if DialContext != nil { // CE: send through the host's dialer (egress policy)
 		return sendWithDialer(c, m, yak, smtpAuth)
 	}
 
 	return yak.Send()
 }
 
-// POCKER: DialContext, when set, is used for every SMTP connection instead of mailyak's own net.Dial/tls.Dial,
+// CE: DialContext, when set, is used for every SMTP connection instead of mailyak's own net.Dial/tls.Dial,
 // so a host running many apps can enforce an egress policy on mail too. Upstream behaviour is unchanged when nil.
 var DialContext func(ctx context.Context, network, address string) (net.Conn, error)
 
-// POCKER: sendWithDialer performs the same SMTP exchange as mailyak (implicit TLS, or STARTTLS when offered,
+// CE: sendWithDialer performs the same SMTP exchange as mailyak (implicit TLS, or STARTTLS when offered,
 // then AUTH, MAIL, RCPT, DATA) over a connection from DialContext.
 func sendWithDialer(c *SMTPClient, m *Message, yak *mailyak.MailYak, auth smtp.Auth) error {
 	mime, err := yak.MimeBuf()

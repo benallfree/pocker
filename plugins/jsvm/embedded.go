@@ -1,6 +1,6 @@
 package jsvm
 
-// POCKER: embedded mode (Config.HooksFS / Config.MigrationsFS). Hooks and migrations are read from an fs.FS, and
+// CE: embedded mode (Config.HooksFS / Config.MigrationsFS). Hooks and migrations are read from an fs.FS, and
 // require() under __hooks resolves inside a sealed virtual namespace that is never looked up on disk.
 
 import (

@@ -16,11 +16,11 @@ type vmsPool struct {
 	mux     sync.RWMutex
 	factory func() *goja.Runtime
 	items   []*poolItem
-	onCall  func(vm *goja.Runtime) (func(), error) // POCKER: Config.OnCall
-	max     int                                    // POCKER: newLazyPool grows up to max items
+	onCall  func(vm *goja.Runtime) (func(), error) // CE: Config.OnCall
+	max     int                                    // CE: newLazyPool grows up to max items
 }
 
-// POCKER: newLazyPool creates a pool that starts empty and keeps up to max vms, created on demand.
+// CE: newLazyPool creates a pool that starts empty and keeps up to max vms, created on demand.
 func newLazyPool(max int, factory func() *goja.Runtime) *vmsPool {
 	if max < 1 {
 		max = 1
@@ -72,7 +72,7 @@ func (p *vmsPool) run(call func(vm *goja.Runtime) error) error {
 	//
 	// note: if turned out not efficient we may change this in the future
 	// by adding the created item in the pool with some timer for removal
-	// POCKER: a lazy pool keeps the new vm
+	// CE: a lazy pool keeps the new vm
 	if freeItem == nil && p.max > 0 {
 		p.mux.Lock()
 		if len(p.items) < p.max {
@@ -96,7 +96,7 @@ func (p *vmsPool) run(call func(vm *goja.Runtime) error) error {
 	return execErr
 }
 
-// POCKER: call runs fn on vm, wrapped by Config.OnCall when set.
+// CE: call runs fn on vm, wrapped by Config.OnCall when set.
 func (p *vmsPool) call(fn func(vm *goja.Runtime) error, vm *goja.Runtime) error {
 	if p.onCall != nil {
 		done, err := p.onCall(vm)

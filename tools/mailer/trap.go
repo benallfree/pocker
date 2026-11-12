@@ -1,6 +1,6 @@
 package mailer
 
-// POCKER: this whole file. A development mail catcher (like MailDev or Mailpit) built into PocketBase CE: in dev mode,
+// CE: this whole file. A development mail catcher (like MailDev or Mailpit) built into PocketBase CE: in dev mode,
 // an app whose SMTP is off sends to it instead of the host's sendmail (see core.BaseApp.NewMailClient).
 
 import (

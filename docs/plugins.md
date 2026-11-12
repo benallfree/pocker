@@ -186,7 +186,7 @@ core doesn't offer yet:
   is registered.
 - **Make it generic.** Name it for what it allows ("storage backend for an app"), not for your plugin. Assume someone
   else's plugin will use it too, and that we'll offer it to upstream PocketBase.
-- **Mark every changed line** in PocketBase's own files with `// POCKER:` and a few words on why, so the next upstream
+- **Mark every changed line** in PocketBase's own files with `// CE:` and a few words on why, so the next upstream
   merge knows what to keep.
 - **Keep it separate:** the core change goes in its own commit, with a test, ahead of the plugin.
 - **Prefer what exists:** jsvm `OnInit`, `OnServe`, the record and request hooks, `BaseAppConfig.DBConnect`,

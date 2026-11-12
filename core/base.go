@@ -71,7 +71,7 @@ type BaseAppConfig struct {
 	AuxMaxIdleConns  int
 	IsDev            bool
 
-	// POCKER: per-app settings so several apps can share one process.
+	// CE: per-app settings so several apps can share one process.
 
 	// EncryptionKey, when set, is used instead of reading the EncryptionEnv variable from the process environment.
 	EncryptionKey string
@@ -471,7 +471,7 @@ func (app *BaseApp) Bootstrap() error {
 		app.Logger().Warn("OnBootstrap hook didn't fail but the app is still not bootstrapped - maybe missing e.Next()?")
 	}
 
-	// POCKER: in dev mode with no SMTP, start the dev mail trap now so its notice shows at startup
+	// CE: in dev mode with no SMTP, start the dev mail trap now so its notice shows at startup
 	if err == nil && app.IsBootstrapped() && app.IsDev() && !app.Settings().SMTP.Enabled {
 		_, _ = mailer.DevTrap("No SMTP configured")
 	}
@@ -633,7 +633,7 @@ func (app *BaseApp) DataDir() string {
 	return app.config.DataDir
 }
 
-// POCKER: AppMigrationsList returns the app's own migrations list when configured, otherwise the global [AppMigrations].
+// CE: AppMigrationsList returns the app's own migrations list when configured, otherwise the global [AppMigrations].
 func (app *BaseApp) AppMigrationsList() *MigrationsList {
 	if app.config.AppMigrations != nil {
 		return app.config.AppMigrations
@@ -641,7 +641,7 @@ func (app *BaseApp) AppMigrationsList() *MigrationsList {
 	return &AppMigrations
 }
 
-// POCKER: EncryptionKey returns the configured app encryption key, falling back to the EncryptionEnv variable.
+// CE: EncryptionKey returns the configured app encryption key, falling back to the EncryptionEnv variable.
 func (app *BaseApp) EncryptionKey() string {
 	if app.config.EncryptionKey != "" {
 		return app.config.EncryptionKey
@@ -699,7 +699,7 @@ func (app *BaseApp) NewMailClient() mailer.Mailer {
 			LocalName:  app.Settings().SMTP.LocalName,
 		}
 	} else if app.IsDev() {
-		// POCKER: dev mode never runs the host's sendmail; mail is caught by the dev mail trap (see tools/mailer/trap.go)
+		// CE: dev mode never runs the host's sendmail; mail is caught by the dev mail trap (see tools/mailer/trap.go)
 		t, _ := mailer.DevTrap("No SMTP configured")
 		client = &mailer.TrapClient{Trap: t, Label: app.Settings().Meta.AppName}
 	} else {
@@ -935,7 +935,7 @@ func (app *BaseApp) RunSystemMigrations() error {
 
 // RunAppMigrations applies all new migrations registered in the [core.AppMigrations] list.
 func (app *BaseApp) RunAppMigrations() error {
-	_, err := NewMigrationsRunner(app, *app.AppMigrationsList()).Up() // POCKER: per-app list
+	_, err := NewMigrationsRunner(app, *app.AppMigrationsList()).Up() // CE: per-app list
 	return err
 }
 
@@ -944,7 +944,7 @@ func (app *BaseApp) RunAppMigrations() error {
 func (app *BaseApp) RunAllMigrations() error {
 	list := MigrationsList{}
 	list.Copy(SystemMigrations)
-	list.Copy(*app.AppMigrationsList()) // POCKER: per-app list
+	list.Copy(*app.AppMigrationsList()) // CE: per-app list
 	_, err := NewMigrationsRunner(app, list).Up()
 	return err
 }

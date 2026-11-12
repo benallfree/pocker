@@ -64,18 +64,18 @@ type Config struct {
 	// attach custom Go variables and functions.
 	OnInit func(vm *goja.Runtime)
 
-	// POCKER: OnCall is an optional function that wraps every call into a JS runtime: hook, route and cron
+	// CE: OnCall is an optional function that wraps every call into a JS runtime: hook, route and cron
 	// handlers, migrations and loading a hooks file. A non-nil error refuses the call; otherwise done runs when the
 	// call ends. Use it for per-call time limits, concurrency caps or tracing.
 	OnCall func(vm *goja.Runtime) (done func(), err error)
 
-	// POCKER: HooksFS, if set, is the only source of JS app hooks (embedded mode): .pb.js files come from its root,
+	// CE: HooksFS, if set, is the only source of JS app hooks (embedded mode): .pb.js files come from its root,
 	// HooksDir is ignored (with a warning) even if it has files, nothing is written to disk and HooksWatch is off.
 	// __hooks is the virtual root EmbeddedHooksDir, and require() under it (in hooks and migrations) is served from
 	// HooksFS and never touches the disk; anything outside it is "module not found".
 	HooksFS fs.FS
 
-	// POCKER: MigrationsFS, if set, is the only source of JS migrations (files at its root); MigrationsDir is
+	// CE: MigrationsFS, if set, is the only source of JS migrations (files at its root); MigrationsDir is
 	// ignored.
 	MigrationsFS fs.FS
 
@@ -144,7 +144,7 @@ func MustRegister(app core.App, config Config) {
 func Register(app core.App, config Config) error {
 	p := &plugin{app: app, config: config}
 
-	// POCKER: embedded mode ignores the on-disk dirs and the watcher
+	// CE: embedded mode ignores the on-disk dirs and the watcher
 	if p.config.HooksFS != nil {
 		if p.config.HooksDir != "" {
 			color.Yellow("jsvm: HooksFS is set, ignoring HooksDir %q", p.config.HooksDir)
@@ -212,12 +212,12 @@ type plugin struct {
 // registerMigrations registers the JS migrations loader.
 func (p *plugin) registerMigrations() error {
 	// fetch all js migrations sorted by their filename
-	files, err := p.migrationFiles() // POCKER: MigrationsFS
+	files, err := p.migrationFiles() // CE: MigrationsFS
 	if err != nil {
 		return err
 	}
 
-	absHooksDir, registry, err := p.hooksRequire() // POCKER: HooksFS; the registry can be shared by multiple runtimes
+	absHooksDir, registry, err := p.hooksRequire() // CE: HooksFS; the registry can be shared by multiple runtimes
 	if err != nil {
 		return err
 	}
@@ -295,7 +295,7 @@ func (p *plugin) registerMigrations() error {
 // registerHooks registers the JS app hooks loader.
 func (p *plugin) registerHooks() error {
 	// fetch all js hooks sorted by their filename
-	files, err := p.hookFiles() // POCKER: HooksFS
+	files, err := p.hookFiles() // CE: HooksFS
 	if err != nil {
 		return err
 	}
@@ -307,7 +307,7 @@ func (p *plugin) registerHooks() error {
 	// restart on newly created file
 	for name, content := range files {
 		if p.config.HooksFS != nil {
-			break // POCKER: embedded mode never writes to disk
+			break // CE: embedded mode never writes to disk
 		}
 		if len(content) != 0 {
 			// skip non-empty files for now to prevent accidental overwrite
@@ -327,12 +327,12 @@ func (p *plugin) registerHooks() error {
 		}
 	}
 
-	absHooksDir, requireRegistry, err := p.hooksRequire() // POCKER: HooksFS; safe to be shared across multiple vms
+	absHooksDir, requireRegistry, err := p.hooksRequire() // CE: HooksFS; safe to be shared across multiple vms
 	if err != nil {
 		return err
 	}
 
-	if len(files) > 0 { // POCKER: without hook files, only the (lazy) executors below are set up, for Run
+	if len(files) > 0 { // CE: without hook files, only the (lazy) executors below are set up, for Run
 		p.app.OnServe().BindFunc(func(e *core.ServeEvent) error {
 			e.Router.BindFunc(p.normalizeServeExceptions)
 
@@ -374,7 +374,7 @@ func (p *plugin) registerHooks() error {
 		sharedBinds(executor)
 		return executor
 	}
-	// POCKER: with no hook files the vms are only created when Run first needs them
+	// CE: with no hook files the vms are only created when Run first needs them
 	var executors *vmsPool
 	if len(files) > 0 {
 		executors = newPool(p.config.HooksPoolSize, executorFactory)
@@ -382,7 +382,7 @@ func (p *plugin) registerHooks() error {
 		executors = newLazyPool(p.config.HooksPoolSize, executorFactory)
 	}
 	executors.onCall = p.config.OnCall              // POCKER
-	p.app.Store().Set(executorsStoreKey, executors) // POCKER: for Run
+	p.app.Store().Set(executorsStoreKey, executors) // CE: for Run
 
 	if len(files) == 0 {
 		// no need to register the hooks since there are no entrypoint files anyway
@@ -645,7 +645,7 @@ func filesContent(dirPath string, pattern string) (map[string][]byte, error) {
 	return result, nil
 }
 
-// POCKER: appMigrations returns the app's own migrations list when it has one (several apps in one process),
+// CE: appMigrations returns the app's own migrations list when it has one (several apps in one process),
 // otherwise the global [core.AppMigrations].
 func appMigrations(app core.App) *core.MigrationsList {
 	if l, ok := app.UnsafeWithoutHooks().(interface{ AppMigrationsList() *core.MigrationsList }); ok {
@@ -654,7 +654,7 @@ func appMigrations(app core.App) *core.MigrationsList {
 	return &core.AppMigrations
 }
 
-// POCKER: onCall runs Config.OnCall for one call into vm, if set.
+// CE: onCall runs Config.OnCall for one call into vm, if set.
 func (p *plugin) onCall(vm *goja.Runtime) (func(), error) {
 	if p.config.OnCall == nil {
 		return func() {}, nil
@@ -662,7 +662,7 @@ func (p *plugin) onCall(vm *goja.Runtime) (func(), error) {
 	return p.config.OnCall(vm)
 }
 
-// POCKER: hookFiles returns the .pb.js files from HooksFS in embedded mode, otherwise from HooksDir.
+// CE: hookFiles returns the .pb.js files from HooksFS in embedded mode, otherwise from HooksDir.
 func (p *plugin) hookFiles() (map[string][]byte, error) {
 	if p.config.HooksFS != nil {
 		return fsFilesContent(p.config.HooksFS, p.config.HooksFilesPattern)
@@ -670,7 +670,7 @@ func (p *plugin) hookFiles() (map[string][]byte, error) {
 	return filesContent(p.config.HooksDir, p.config.HooksFilesPattern)
 }
 
-// POCKER: migrationFiles returns the migration files from MigrationsFS when set, otherwise from MigrationsDir.
+// CE: migrationFiles returns the migration files from MigrationsFS when set, otherwise from MigrationsDir.
 func (p *plugin) migrationFiles() (map[string][]byte, error) {
 	if p.config.MigrationsFS != nil {
 		return fsFilesContent(p.config.MigrationsFS, p.config.MigrationsFilesPattern)
@@ -678,7 +678,7 @@ func (p *plugin) migrationFiles() (map[string][]byte, error) {
 	return filesContent(p.config.MigrationsDir, p.config.MigrationsFilesPattern)
 }
 
-// POCKER: hooksRequire returns the __hooks value and a require registry: the sealed virtual namespace over HooksFS
+// CE: hooksRequire returns the __hooks value and a require registry: the sealed virtual namespace over HooksFS
 // in embedded mode, otherwise the absolute HooksDir and the default (disk) registry.
 func (p *plugin) hooksRequire() (string, *require.Registry, error) {
 	if p.config.HooksFS != nil {
