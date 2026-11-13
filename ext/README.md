@@ -29,6 +29,7 @@ Each folder here will be one plugin, with its own Go module (`github.com/pocketh
 | [`edge`](edge/README.md) | The fleet layer: forwarding to the owner edge, edges from YAML or a mothership. | On a host (pocker or docker) |
 | [`autotls`](autotls/README.md) | Automatic certificates through ACME: on demand for every served hostname, wildcards through DNS-01, more CAs. | Single app, or many under pocker |
 | [`servertiming`](servertiming/README.md) | `Server-Timing` headers with timings for each step of a request (and each hop under pocker). | Single app, or many under pocker |
+| [`jsembed`](jsembed/README.md) | JS hooks and migrations from an `fs.FS` (e.g. embedded in the binary) instead of `pb_hooks`/`pb_migrations`, with `require()` sealed to the embedded files. | Single app |
 | [`mailtrap`](mailtrap/README.md) | Dev mail catcher: in dev mode, an app with SMTP off sends to an inbox at http://127.0.0.1:8025 instead of the host's `sendmail`; under pocker, one inbox for every dev instance. | Single app, or many under pocker |
 | [`devusers`](devusers/devusers.go) | Local testing only: on bootstrap, upserts superuser admin@example.com and user user@example.com (verified, in `users`), both with password `password`. Every plugin's `example/` registers it; production builds never do. | Example and test builds |
 | [`schedules`](schedules/README.md) | Scheduled webhooks per instance, called in-process even while the instance sleeps, with a catch-up run after downtime. | pocker |

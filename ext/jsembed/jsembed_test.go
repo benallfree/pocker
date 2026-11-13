@@ -1,4 +1,4 @@
-package jsvm
+package jsembed
 
 import (
 	"net/http/httptest"
@@ -12,6 +12,7 @@ import (
 
 	"ganigeorgiev.com/pocketbase/pocketbase/apis"
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
+	"ganigeorgiev.com/pocketbase/pocketbase/plugins/jsvm"
 	"ganigeorgiev.com/pocketbase/pocketbase/tests"
 	"github.com/dop251/goja"
 )
@@ -67,8 +68,8 @@ func mapFS(files map[string]string) fstest.MapFS {
 func evalOnPool(t *testing.T, app core.App, code string) string {
 	t.Helper()
 	var out string
-	err := Run(app, func(vm *goja.Runtime) error {
-		v, err := vm.RunScript(defaultScriptPath, code)
+	err := jsvm.Run(app, func(vm *goja.Runtime) error {
+		v, err := vm.RunScript("pb.js", code)
 		if err != nil {
 			return err
 		}
@@ -121,7 +122,7 @@ func TestEmbeddedNilKeepsDiskBehavior(t *testing.T) {
 	})
 
 	rec := &recorder{}
-	if err := Register(app, Config{HooksDir: hooksDir, MigrationsDir: migrationsDir, OnInit: rec.onInit}); err != nil {
+	if err := jsvm.Register(app, Config(nil, nil, jsvm.Config{HooksDir: hooksDir, MigrationsDir: migrationsDir, OnInit: rec.onInit})); err != nil {
 		t.Fatal(err)
 	}
 
@@ -173,20 +174,18 @@ func TestEmbeddedHooksAndMigrationsFromFS(t *testing.T) {
 	})
 
 	rec := &recorder{}
-	err := Register(app, Config{
-		HooksFS:       hooksFS,
-		MigrationsFS:  migrationsFS,
+	err := jsvm.Register(app, Config(hooksFS, migrationsFS, jsvm.Config{
 		HooksDir:      hooksDir,
 		MigrationsDir: migrationsDir,
 		HooksWatch:    true,
 		HooksPoolSize: 2,
 		OnInit:        rec.onInit,
-	})
+	}))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	for _, want := range []string{"hook:abc", "rel:c", "hooks=" + EmbeddedHooksDir, "migration:atop"} {
+	for _, want := range []string{"hook:abc", "rel:c", "hooks=" + Root, "migration:atop"} {
 		if !rec.has(want) {
 			t.Fatalf("missing %q in %v", want, rec.list())
 		}
@@ -229,7 +228,7 @@ func TestEmbeddedRequireIsSealed(t *testing.T) {
 		"lib/escape.js":              `module.exports = require("../../x.js");`,
 	}))
 	// no hook files: the lazy executors still use the sealed registry
-	if err := Register(app, Config{HooksFS: hooksFS, OnInit: (&recorder{}).onInit}); err != nil {
+	if err := jsvm.Register(app, Config(hooksFS, nil, jsvm.Config{OnInit: (&recorder{}).onInit})); err != nil {
 		t.Fatal(err)
 	}
 
@@ -264,14 +263,14 @@ func TestEmbeddedRealDirAtVirtualRootIsIgnored(t *testing.T) {
 		"only-on-disk.js": `module.exports = { name: "disk" };`,
 		"top.js":          `module.exports = { name: "disk top" };`,
 	})
-	old := embeddedHooksDir
-	embeddedHooksDir = filepath.ToSlash(realRoot)
-	defer func() { embeddedHooksDir = old }()
+	old := root
+	root = filepath.ToSlash(realRoot)
+	defer func() { root = old }()
 
 	app, _ := tests.NewTestApp()
 	defer app.Cleanup()
 
-	if err := Register(app, Config{HooksFS: mapFS(embeddedLib)}); err != nil {
+	if err := jsvm.Register(app, Config(mapFS(embeddedLib), nil, jsvm.Config{})); err != nil {
 		t.Fatal(err)
 	}
 
@@ -301,7 +300,7 @@ func TestEmbeddedRouteAndCronRun(t *testing.T) {
 	})
 
 	rec := &recorder{}
-	if err := Register(app, Config{HooksFS: hooksFS, OnInit: rec.onInit}); err != nil {
+	if err := jsvm.Register(app, Config(hooksFS, nil, jsvm.Config{OnInit: rec.onInit})); err != nil {
 		t.Fatal(err)
 	}
 
