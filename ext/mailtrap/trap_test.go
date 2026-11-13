@@ -1,4 +1,4 @@
-package mailer
+package mailtrap
 
 import (
 	"context"
@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"ganigeorgiev.com/pocketbase/pocketbase/tools/mailer"
 )
 
 func freeAddr(t *testing.T) string {
@@ -30,8 +32,8 @@ func startTrap(t *testing.T) *Trap {
 	return tr
 }
 
-func testMessage() *Message {
-	return &Message{
+func testMessage() *mailer.Message {
+	return &mailer.Message{
 		From:    mail.Address{Name: "Support", Address: "support@example.com"},
 		To:      []mail.Address{{Address: "user@example.com"}},
 		Bcc:     []mail.Address{{Address: "hidden@example.com"}},
@@ -40,18 +42,14 @@ func testMessage() *Message {
 	}
 }
 
-func TestTrapClientInProcess(t *testing.T) {
+func TestTrapAddMessage(t *testing.T) {
 	tr := startTrap(t)
-	c := &TrapClient{Trap: tr, Label: "Acme"}
-	hooked := false
-	c.OnSend().BindFunc(func(e *SendEvent) error { hooked = true; return e.Next() })
-
-	if err := c.Send(testMessage()); err != nil {
+	if _, err := tr.AddMessage(testMessage(), "Acme"); err != nil {
 		t.Fatal(err)
 	}
 	got := tr.Messages()
-	if len(got) != 1 || !hooked {
-		t.Fatalf("messages = %d, hook ran = %v", len(got), hooked)
+	if len(got) != 1 {
+		t.Fatalf("messages = %d", len(got))
 	}
 	m := got[0]
 	if m.Instance != "Acme" || m.Subject != "Reset your password" || !strings.Contains(m.HTML, "Click") || !strings.Contains(m.Text, "Click") {
@@ -63,7 +61,7 @@ func TestTrapClientInProcess(t *testing.T) {
 
 	msg := testMessage()
 	msg.Headers = map[string]string{InstanceHeader: "blog.localhost"}
-	_ = c.Send(msg)
+	_, _ = tr.AddMessage(msg, "Acme")
 	if got := tr.Messages()[0].Instance; got != "blog.localhost" {
 		t.Fatalf("instance header ignored: %q", got)
 	}
@@ -73,7 +71,7 @@ func TestTrapOverSMTP(t *testing.T) {
 	tr := startTrap(t)
 	host, port, _ := net.SplitHostPort(tr.SMTPAddr)
 	p, _ := strconv.Atoi(port)
-	if err := (&SMTPClient{Host: host, Port: p}).Send(testMessage()); err != nil {
+	if err := (&mailer.SMTPClient{Host: host, Port: p}).Send(testMessage()); err != nil {
 		t.Fatal(err)
 	}
 	got := tr.Messages()

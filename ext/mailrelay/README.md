@@ -70,7 +70,7 @@ plugins:
 
 ## Try it: `example/` with the dev mail trap
 
-PocketBase CE has a dev mail trap built in (`serve --dev`, see the [README](../../README.md#install)): an in-process mail
+The dev mail trap ([`ext/mailtrap`](../mailtrap/README.md), in the standard binary for `serve --dev`) is an in-process mail
 catcher, like MailDev or Mailpit, with an SMTP port and a web inbox. The example points the relay's upstream at its
 SMTP port, so relayed mail goes through the real SMTP path and lands in the inbox:
 
@@ -91,7 +91,7 @@ curl -X POST http://beta.localhost:8090/api/collections/users/request-password-r
 - Each instance's dashboard shows the relay on Settings → Mail. The example's logins are the shared test accounts
   ([`ext/devusers`](../devusers)): `admin@example.com` / `password`, and the user `user@example.com` / `password`.
 - `--listen` changes the instances' port. `PB_MAILTRAP_HTTP` and `PB_MAILTRAP_SMTP` change the trap's.
-- Without mailrelay, `pocker serve --dev` already sends every instance's SMTP-less mail to the same trap, as is, with
-  no relay rules.
+- Without mailrelay, `pocker serve --dev` (which includes `mailtrap`) already sends every instance's SMTP-less mail to
+  the same trap, as is, with no relay rules.
 
 The trap only runs in dev mode. It accepts mail from anyone who can reach its port, so never expose it.

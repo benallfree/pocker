@@ -15,12 +15,14 @@ import (
 	_ "ganigeorgiev.com/pocketbase/pocketbase/migrations" // registers PocketBase's system migrations, as pocketbase.go does
 	"ganigeorgiev.com/pocketbase/pocketbase/plugins/jsvm"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/hook"
-	"ganigeorgiev.com/pocketbase/pocketbase/tools/mailer"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/security"
 	"ganigeorgiev.com/pocketbase/pocketbase/ui"
 	"github.com/dop251/goja"
 	"github.com/pockethost/pocketbase/ext/sandbox"
 )
+
+// InstanceHeader names the instance on every message it sends (the dev mail trap and relays show and filter by it).
+const InstanceHeader = "X-Pocker-Instance"
 
 // runningApp is a bootstrapped PocketBase app and the HTTP handler that serves it.
 type runningApp struct {
@@ -90,7 +92,7 @@ func startApp(opts appOptions, inst Instance) (r *runningApp, err error) {
 			if e.Message.Headers == nil {
 				e.Message.Headers = map[string]string{}
 			}
-			e.Message.Headers[mailer.InstanceHeader] = inst.ID
+			e.Message.Headers[InstanceHeader] = inst.ID
 			return e.Next()
 		},
 	})

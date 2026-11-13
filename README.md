@@ -22,7 +22,7 @@ pocketbase serve
 Start a site from a starter kit with `pocketbase pages create myapp` ([pages](ext/pages/README.md)).
 
 In dev mode (`serve --dev`), an app without SMTP doesn't use the host's `sendmail`: its mail is caught in-process and
-you read it at http://127.0.0.1:8025.
+you read it at http://127.0.0.1:8025 ([mailtrap](ext/mailtrap/README.md)).
 
 ## Core Extensions
 
@@ -80,6 +80,7 @@ own custom PocketBase experience.
 
 | Plugin | Description | Status |
 |---|---|---|
+| **[Mail Trap](ext/mailtrap/README.md)** | Dev mode: an app without SMTP sends to a built-in inbox at http://127.0.0.1:8025 instead of `sendmail`. | Beta |
 | **[Dev Users](ext/devusers/devusers.go)** | Local testing only: a superuser and a user with password `password`. Every plugin's `example/` uses it. | Stable |
 
 **Stable** runs in PocketHost production · **Beta** complete and tested, not yet in production · **Alpha** working

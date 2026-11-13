@@ -27,6 +27,7 @@ import (
 	"github.com/pockethost/pocketbase/ext/bulkmail"
 	"github.com/pockethost/pocketbase/ext/config"
 	"github.com/pockethost/pocketbase/ext/deploy"
+	"github.com/pockethost/pocketbase/ext/mailtrap"
 	"github.com/pockethost/pocketbase/ext/mcp"
 	oauthserver "github.com/pockethost/pocketbase/ext/oauth-server"
 	"github.com/pockethost/pocketbase/ext/pages"
@@ -67,6 +68,7 @@ func main() {
 	// mail on Settings > Mail); nothing happens until someone starts a campaign. Defaults: 5/s, 5,000/day.
 	cePlugins := []ceplugin.Plugin{
 		bulkmail.New(bulkmail.Config{}),
+		mailtrap.New(), // dev mode with SMTP off: mail goes to the inbox at http://127.0.0.1:8025, never sendmail
 	}
 
 	// ---------------------------------------------------------------

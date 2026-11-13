@@ -20,3 +20,7 @@ CHANGELOG.html
 CHANGELOG_22_39.html
 CHANGELOG_16_22.html
 CHANGELOG_8_15.html
+
+# binaries built inside a module folder (go build ./... in a single-main module)
+/cmd/pocketbase/pocketbase
+/ext/pocker/cmd/pocker/pocker

@@ -18,6 +18,7 @@ import (
 	"github.com/pockethost/pocketbase/ext/autotls"
 	"github.com/pockethost/pocketbase/ext/edge"
 	"github.com/pockethost/pocketbase/ext/firewall"
+	"github.com/pockethost/pocketbase/ext/mailtrap"
 	"github.com/pockethost/pocketbase/ext/mothership/mirror"
 	"github.com/pockethost/pocketbase/ext/pocker"
 	"github.com/pockethost/pocketbase/ext/servertiming"
@@ -62,6 +63,7 @@ func main() {
 	srv := &pocker.Server{Config: cfg, Firewall: &firewall.Firewall{}, Plugins: []pocker.Plugin{
 		servertiming.New(), // outermost, so its header includes everything below
 		autotls.New(),
+		mailtrap.New(), // dev instances with SMTP off: mail goes to the inbox at http://127.0.0.1:8025
 	}}
 	// the fleet: an `edges:` section and/or a `mothership:` section (instances and the other edges from the
 	// mothership; fixed edges.list entries go in front) route instances other edges own through edge.Router

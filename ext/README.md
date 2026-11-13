@@ -10,7 +10,7 @@ Each folder here will be one plugin, with its own Go module (`github.com/pocketh
 | [`sandbox`](sandbox/README.md) | The JS sandbox for untrusted instances: file access confined to the instance folder, host primitives removed, CPU and memory caps, SQLite authorizer, public-only outbound network. | Any app; required by pocker for untrusted tenants |
 | [`pitr`](pitr/README.md) | Point-in-time restore: Litestream replication of each app's database (local or a bucket) and in-place restore from the Backups screen. | Single app, or many under pocker |
 | [`bulkmail`](bulkmail/README.md) | Bulk mail: campaigns to an app's own users (audiences from a collection, a view or SQL) with one-click unsubscribe, bounce and complaint handling, and a dashboard page. In the standard binary. | Single app, or many under pocker |
-| [`mailrelay`](mailrelay/README.md) | Outgoing mail for instances without their own SMTP: sent through the operator's relay as `<instance>@<domain>` with per-instance limits, instead of the host's `sendmail`. In dev mode it relays into PocketBase CE's built-in dev mail trap. | pocker |
+| [`mailrelay`](mailrelay/README.md) | Outgoing mail for instances without their own SMTP: sent through the operator's relay as `<instance>@<domain>` with per-instance limits, instead of the host's `sendmail`. In dev mode it relays into the dev mail trap ([`mailtrap`](mailtrap/README.md)). | pocker |
 | [`mcp`](mcp/README.md) | An MCP endpoint at `/mcp` for agents (Claude connectors, Claude Code): built-in `pb_*` tools, tools from other plugins and `$mcp.addTool`, OAuth discovery for sign-in through `oauth-server`. | Single app, or many under pocker |
 | [`pages`](pages/README.md) | Server-rendered multi-page apps from a `pb_pages` folder, PocketPages-compatible, with routing and templates in Go. | Single app, or many under pocker |
 | [`storage`](storage/README.md) | A default storage and backups backend per app (for example an operator bucket) when the app's own S3 is off. Credentials never reach the app. | Single app, or many under pocker |
@@ -29,6 +29,7 @@ Each folder here will be one plugin, with its own Go module (`github.com/pocketh
 | [`edge`](edge/README.md) | The fleet layer: forwarding to the owner edge, edges from YAML or a mothership. | On a host (pocker or docker) |
 | [`autotls`](autotls/README.md) | Automatic certificates through ACME: on demand for every served hostname, wildcards through DNS-01, more CAs. | Single app, or many under pocker |
 | [`servertiming`](servertiming/README.md) | `Server-Timing` headers with timings for each step of a request (and each hop under pocker). | Single app, or many under pocker |
+| [`mailtrap`](mailtrap/README.md) | Dev mail catcher: in dev mode, an app with SMTP off sends to an inbox at http://127.0.0.1:8025 instead of the host's `sendmail`; under pocker, one inbox for every dev instance. | Single app, or many under pocker |
 | [`devusers`](devusers/devusers.go) | Local testing only: on bootstrap, upserts superuser admin@example.com and user user@example.com (verified, in `users`), both with password `password`. Every plugin's `example/` registers it; production builds never do. | Example and test builds |
 | [`schedules`](schedules/README.md) | Scheduled webhooks per instance, called in-process even while the instance sleeps, with a catch-up run after downtime. | pocker |
 

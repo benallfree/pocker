@@ -12,6 +12,7 @@ import (
 
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/mailer"
+	"github.com/pockethost/pocketbase/ext/mailtrap"
 	"github.com/pockethost/pocketbase/ext/pocker"
 )
 
@@ -183,7 +184,7 @@ func TestTrapCatchesEveryInstance(t *testing.T) {
 	smtpLn.Close()
 	httpLn.Close()
 
-	tr := &mailer.Trap{SMTPAddr: smtpAddr, HTTPAddr: httpAddr}
+	tr := &mailtrap.Trap{SMTPAddr: smtpAddr, HTTPAddr: httpAddr}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	if err := tr.Start(ctx); err != nil {

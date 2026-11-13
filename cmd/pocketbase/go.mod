@@ -9,6 +9,7 @@ require (
 	github.com/pockethost/pocketbase/ext/bulkmail v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketbase/ext/config v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketbase/ext/deploy v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketbase/ext/mailtrap v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketbase/ext/mcp v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketbase/ext/oauth-server v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketbase/ext/pages v0.0.0-00010101000000-000000000000
@@ -129,3 +130,5 @@ replace github.com/pockethost/pocketbase/ext/config => ../../ext/config
 replace github.com/pockethost/pocketbase/ext/edge => ../../ext/edge
 
 replace github.com/pockethost/pocketbase/ext/host => ../../ext/host
+
+replace github.com/pockethost/pocketbase/ext/mailtrap => ../../ext/mailtrap

@@ -6,6 +6,7 @@ require (
 	github.com/pockethost/pocketbase/ext/autotls v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketbase/ext/edge v0.0.0-20261113092039-67b21912ae84
 	github.com/pockethost/pocketbase/ext/firewall v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketbase/ext/mailtrap v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketbase/ext/mothership v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketbase/ext/pocker v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketbase/ext/servertiming v0.0.0-00010101000000-000000000000
@@ -81,3 +82,5 @@ replace github.com/pockethost/pocketbase/ext/mothership => ../../../mothership
 replace github.com/pockethost/pocketbase/ext/host => ../../../host
 
 replace github.com/pockethost/pocketbase/ext/firewall => ../../../firewall
+
+replace github.com/pockethost/pocketbase/ext/mailtrap => ../../../mailtrap

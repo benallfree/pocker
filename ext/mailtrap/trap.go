@@ -1,7 +1,7 @@
-package mailer
+package mailtrap
 
-// CE: this whole file. A development mail catcher (like MailDev or Mailpit) built into PocketBase CE: in dev mode,
-// an app whose SMTP is off sends to it instead of the host's sendmail (see core.BaseApp.NewMailClient).
+// The trap itself: a development mail catcher (like MailDev or Mailpit) that accepts mail over SMTP or in-process
+// and shows it in a small web inbox. The plugin that routes an app's mail here is in mailtrap.go.
 
 import (
 	"bufio"
@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"io"
 	"mime"
 	"mime/multipart"
@@ -21,14 +22,16 @@ import (
 	"net/mail"
 	"net/textproto"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"ganigeorgiev.com/pocketbase/pocketbase/tools/hook"
+	"ganigeorgiev.com/pocketbase/pocketbase/tools/mailer"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/security"
 	"github.com/domodwyer/mailyak/v3"
+	"github.com/gabriel-vasile/mimetype"
 )
 
 // Where the dev mail trap listens. Set them before the first app bootstraps, or with the environment variables
@@ -40,7 +43,7 @@ var (
 
 // InstanceHeader names the app that sent a message when several apps share a process (e.g. under pocker). The trap
 // shows and filters by it.
-const InstanceHeader = "X-Pocker-Instance"
+const InstanceHeader = "X-Pocker-Instance" // same header pocker.InstanceHeader sets
 
 var (
 	devTrapOnce sync.Once
@@ -48,10 +51,10 @@ var (
 	devTrapErr  error
 )
 
-// DevTrap returns the process-wide dev mail trap, starting it on first use and printing reason with the inbox
+// Default returns the process-wide dev mail trap, starting it on first use and printing reason with the inbox
 // address. It listens until the process exits. If its ports are taken it still catches mail in memory and prints each
 // message to stderr; err says why the inbox isn't served.
-func DevTrap(reason string) (t *Trap, err error) {
+func Default(reason string) (t *Trap, err error) {
 	devTrapOnce.Do(func() {
 		devTrap = &Trap{SMTPAddr: envOr("PB_MAILTRAP_SMTP", DevTrapSMTPAddr), HTTPAddr: envOr("PB_MAILTRAP_HTTP", DevTrapHTTPAddr)}
 		devTrapErr = devTrap.Start(context.Background())
@@ -72,7 +75,7 @@ func envOr(k, def string) string {
 }
 
 // Trap catches mail in memory: over SMTP (it accepts everything and delivers nothing) and in-process through
-// [TrapClient]. Never expose it: anyone who can reach its ports can read the mail.
+// [Trap.AddMessage]. Never expose it: anyone who can reach its ports can read the mail.
 type Trap struct {
 	// SMTPAddr and HTTPAddr are where it listens (defaults 127.0.0.1:1025 and 127.0.0.1:8025).
 	SMTPAddr string
@@ -203,54 +206,65 @@ func (t *Trap) get(id int) *TrapMessage {
 	return nil
 }
 
-// TrapClient is a [Mailer] that hands every message to a [Trap] in-process.
-type TrapClient struct {
-	Trap *Trap
-
-	// Label names the sending app in the inbox when the message has no [InstanceHeader] (e.g. the app name).
-	Label string
-
-	onSend *hook.Hook[*SendEvent]
-}
-
-// OnSend implements [SendInterceptor], so OnMailerSend hooks run as with the other clients.
-func (c *TrapClient) OnSend() *hook.Hook[*SendEvent] {
-	if c.onSend == nil {
-		c.onSend = &hook.Hook[*SendEvent]{}
-	}
-	return c.onSend
-}
-
-// Send implements [Mailer].
-func (c *TrapClient) Send(m *Message) error {
-	if c.onSend != nil {
-		return c.onSend.Trigger(&SendEvent{Message: m}, func(e *SendEvent) error {
-			return c.send(e.Message)
-		})
-	}
-	return c.send(m)
-}
-
-func (c *TrapClient) send(m *Message) error {
+// AddMessage encodes m the way PocketBase's SMTP client does and stores it, with To + Cc + Bcc as the envelope (Bcc
+// stays out of the headers). label names the sender when m has no [InstanceHeader]. Each catch is printed to stderr.
+func (t *Trap) AddMessage(m *mailer.Message, label string) (*TrapMessage, error) {
 	raw, err := encodeForTrap(m)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	var rcpts []string
 	for _, list := range [][]mail.Address{m.To, m.Cc, m.Bcc} {
-		rcpts = append(rcpts, addressesToStrings(list, false)...)
+		rcpts = append(rcpts, addressList(list, false)...)
 	}
-	tm := c.Trap.Add(m.From.Address, rcpts, raw, c.Label)
+	tm := t.Add(m.From.Address, rcpts, raw, label)
 	who := ""
 	if tm.Instance != "" {
 		who = " [" + tm.Instance + "]"
 	}
-	fmt.Fprintf(os.Stderr, "Mail trap caught #%d%s from %s to %s: %q (http://%s)\n", tm.ID, who, m.From.Address, strings.Join(rcpts, ", "), m.Subject, c.Trap.HTTPAddr)
-	return nil
+	fmt.Fprintf(os.Stderr, "Mail trap caught #%d%s from %s to %s: %q (http://%s)\n", tm.ID, who, m.From.Address, strings.Join(rcpts, ", "), m.Subject, t.HTTPAddr)
+	return tm, nil
+}
+
+// addressList serializes addresses (RFC 5322 with names, or bare addresses for an envelope).
+func addressList(list []mail.Address, withName bool) []string {
+	out := make([]string, 0, len(list))
+	for _, a := range list {
+		if a.Address == "" {
+			continue
+		}
+		if withName && a.Name != "" {
+			out = append(out, a.String())
+		} else {
+			out = append(out, a.Address)
+		}
+	}
+	return out
+}
+
+var (
+	tagRe   = regexp.MustCompile(`(?s)<(script|style)[^>]*>.*?</(script|style)>|<[^>]+>`)
+	blankRe = regexp.MustCompile(`[ \t]*\n[ \t\n]*`)
+)
+
+// htmlToText is a plain-text fallback for HTML-only mail: tags dropped, entities decoded, blank runs collapsed.
+func htmlToText(s string) string {
+	s = regexp.MustCompile(`(?i)<br\s*/?>|</p>|</div>|</h[1-6]>|</li>`).ReplaceAllString(s, "\n")
+	s = html.UnescapeString(tagRe.ReplaceAllString(s, ""))
+	return strings.TrimSpace(blankRe.ReplaceAllString(s, "\n"))
+}
+
+func attachmentType(r io.Reader) (io.Reader, string, error) {
+	var head bytes.Buffer
+	mt, err := mimetype.DetectReader(io.TeeReader(r, &head))
+	if err != nil {
+		return nil, "", err
+	}
+	return io.MultiReader(&head, r), mt.String(), nil
 }
 
 // encodeForTrap builds the message the way [SMTPClient] does.
-func encodeForTrap(m *Message) ([]byte, error) {
+func encodeForTrap(m *mailer.Message) ([]byte, error) {
 	yak := mailyak.New("", nil)
 	if m.From.Name != "" {
 		yak.FromName(m.From.Name)
@@ -262,24 +276,24 @@ func encodeForTrap(m *Message) ([]byte, error) {
 	}
 	if m.Text != "" {
 		yak.Plain().Set(m.Text)
-	} else if plain, err := html2Text(m.HTML); err == nil && plain != "" {
+	} else if plain := htmlToText(m.HTML); plain != "" {
 		yak.Plain().Set(plain)
 	}
 	if len(m.To) > 0 {
-		yak.To(addressesToStrings(m.To, true)...)
+		yak.To(addressList(m.To, true)...)
 	}
 	if len(m.Cc) > 0 {
-		yak.Cc(addressesToStrings(m.Cc, true)...)
+		yak.Cc(addressList(m.Cc, true)...)
 	}
 	for name, data := range m.Attachments {
-		r, mt, err := detectReaderMimeType(data)
+		r, mt, err := attachmentType(data)
 		if err != nil {
 			return nil, err
 		}
 		yak.AttachWithMimeType(name, r, mt)
 	}
 	for name, data := range m.InlineAttachments {
-		r, mt, err := detectReaderMimeType(data)
+		r, mt, err := attachmentType(data)
 		if err != nil {
 			return nil, err
 		}

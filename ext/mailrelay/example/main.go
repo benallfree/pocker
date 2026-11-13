@@ -22,9 +22,9 @@ import (
 	"os/signal"
 
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
-	"ganigeorgiev.com/pocketbase/pocketbase/tools/mailer"
 	"github.com/pockethost/pocketbase/ext/devusers"
 	"github.com/pockethost/pocketbase/ext/mailrelay"
+	"github.com/pockethost/pocketbase/ext/mailtrap"
 	"github.com/pockethost/pocketbase/ext/pocker"
 )
 
@@ -45,8 +45,8 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 
-	// PocketBase CE's dev mail trap stands in for the operator's real relay (SES, a provider's SMTP, ...)
-	inbox, err := mailer.DevTrap("mailrelay example: the relay sends to the trap")
+	// The dev mail trap (ext/mailtrap) stands in for the operator's real relay (SES, a provider's SMTP, ...)
+	inbox, err := mailtrap.Default("mailrelay example: the relay sends to the trap")
 	if err != nil {
 		log.Fatal(err)
 	}

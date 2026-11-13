@@ -440,7 +440,7 @@ func encode(m *mailer.Message, from mail.Address, reply, instanceID string) ([]b
 	hasID := false
 	for k, v := range m.Headers {
 		switch strings.ToLower(k) {
-		case "from", "sender", "return-path", "reply-to", "bcc", strings.ToLower(mailer.InstanceHeader):
+		case "from", "sender", "return-path", "reply-to", "bcc", strings.ToLower(pocker.InstanceHeader):
 			continue // ours (set below), or envelope-only
 		case "message-id":
 			hasID = true
@@ -450,7 +450,7 @@ func encode(m *mailer.Message, from mail.Address, reply, instanceID string) ([]b
 	if !hasID {
 		yak.AddHeader("Message-ID", fmt.Sprintf("<%s@%s>", security.PseudorandomString(15), from.Address[strings.LastIndexByte(from.Address, '@')+1:]))
 	}
-	yak.AddHeader(mailer.InstanceHeader, instanceID)
+	yak.AddHeader(pocker.InstanceHeader, instanceID)
 
 	buf, err := yak.MimeBuf()
 	if err != nil {

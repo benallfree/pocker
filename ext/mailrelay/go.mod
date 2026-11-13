@@ -7,6 +7,7 @@ require (
 	github.com/domodwyer/mailyak/v3 v3.6.2
 	github.com/gabriel-vasile/mimetype v1.4.15
 	github.com/pockethost/pocketbase/ext/devusers v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketbase/ext/mailtrap v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketbase/ext/pocker v0.0.0-00010101000000-000000000000
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -62,3 +63,5 @@ replace (
 replace github.com/pockethost/pocketbase/ext/edge => ../edge
 
 replace github.com/pockethost/pocketbase/ext/host => ../host
+
+replace github.com/pockethost/pocketbase/ext/mailtrap => ../mailtrap
