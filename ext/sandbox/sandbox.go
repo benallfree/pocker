@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"net/http"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -71,10 +72,12 @@ type Sandbox struct {
 	// instead of the process's stdout/stderr, so each app's output stays its own.
 	Console func(stream, message string)
 
-	// HTTPSendMaxTimeout (seconds) and HTTPSendMaxBody (bytes) cap $http.send for this app; 0 = the process-wide
-	// HTTPSendMaxTimeout / HTTPSendMaxBodySize.
+	// HTTPSendMaxTimeout (seconds) and HTTPSendMaxBody (bytes) cap $http.send for this app; 0 = no cap
+	// (upstream: the caller's timeout, default 120 s, and any body size).
 	HTTPSendMaxTimeout int
 	HTTPSendMaxBody    int64
+	clientOnce         sync.Once
+	client             *http.Client
 
 	once      sync.Once
 	openErr   error
@@ -469,9 +472,8 @@ func (s *Sandbox) OnInit(vm *goja.Runtime) {
 		vm.Set("console", con)
 	}
 
-	// $http.send caps for this app, pinned read-only on the VM (binds.go reads them at call time)
-	_ = vm.GlobalObject().DefineDataProperty(jsvm.HTTPSendLimitsKey,
-		vm.ToValue(jsvm.HTTPSendLimits{Timeout: s.HTTPSendMaxTimeout, Body: s.HTTPSendMaxBody}),
+	// $http.send uses this app's client (timeout and body caps), pinned read-only on the VM (jsvm.HTTPClientKey)
+	_ = vm.GlobalObject().DefineDataProperty(jsvm.HTTPClientKey, vm.ToValue(s.httpClient()),
 		goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_FALSE)
 
 	// sleep: capped, so a hook can't park a goroutine forever

@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/netip"
 	"runtime/debug"
-	"time"
 
 	"github.com/pockethost/pocketbase/ext/host"
 	"github.com/pockethost/pocketbase/ext/sandbox"
@@ -82,7 +81,7 @@ func (s *Server) Run(ctx context.Context) error {
 		}
 		allow = append(allow, pfx)
 	}
-	sandbox.InstallEgressPolicy(sandbox.EgressPolicy{Allow: allow}, int(s.Config.HTTPSendMaxTimeout/time.Second), int64(s.Config.HTTPSendMaxBody))
+	sandbox.InstallEgressPolicy(sandbox.EgressPolicy{Allow: allow})
 	pool := 2
 	if s.Config.HooksPoolSize != nil {
 		pool = *s.Config.HooksPoolSize

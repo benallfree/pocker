@@ -74,7 +74,7 @@ func fakeSMTP(t *testing.T, addr string) (string, <-chan string) {
 
 func TestEgressFromApps(t *testing.T) {
 	// 127.0.0.2 stands in for an allowed service; everything else private is denied.
-	sandbox.InstallEgressPolicy(sandbox.EgressPolicy{Allow: []netip.Prefix{netip.MustParsePrefix("127.0.0.2/32")}}, 5, 1024)
+	sandbox.InstallEgressPolicy(sandbox.EgressPolicy{Allow: []netip.Prefix{netip.MustParsePrefix("127.0.0.2/32")}})
 
 	denied := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte("internal secret"))
@@ -128,7 +128,7 @@ func TestEgressFromApps(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	running, err := startApp(appOptions{PBRoot: root}, Instance{ID: "a"})
+	running, err := startApp(appOptions{PBRoot: root, Defaults: Limits{HTTPSendMaxTimeout: 5 * time.Second, HTTPSendMaxBody: 1024}}, Instance{ID: "a"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,13 +155,15 @@ func TestEgressFromApps(t *testing.T) {
 		t.Errorf("allowedBig: expected the body cap, got %+v", res)
 	}
 
-	// SMTP goes through the same dialer: denied on loopback, delivered on the allowed address
+	// The app's own SMTP goes through the same dialer (sandbox.BindMail): denied on loopback, delivered on the
+	// allowed address
 	send := func(addr string) error {
 		host, port, _ := net.SplitHostPort(addr)
 		var p int
 		fmt.Sscanf(port, "%d", &p)
-		c := &mailer.SMTPClient{Host: host, Port: p}
-		return c.Send(&mailer.Message{
+		smtpCfg := &running.app.Settings().SMTP
+		smtpCfg.Enabled, smtpCfg.Host, smtpCfg.Port = true, host, p
+		return running.app.NewMailClient().Send(&mailer.Message{
 			From:    mail.Address{Address: "app@example.com"},
 			To:      []mail.Address{{Address: "user@example.com"}},
 			Bcc:     []mail.Address{{Address: "hidden@example.com"}},

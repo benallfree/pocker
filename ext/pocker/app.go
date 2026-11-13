@@ -96,6 +96,7 @@ func startApp(opts appOptions, inst Instance) (r *runningApp, err error) {
 			return e.Next()
 		},
 	})
+	sandbox.BindMail(app) // the app's own SMTP goes through the egress policy
 	if opts.Init != nil {
 		if err := opts.Init(inst, app); err != nil {
 			return nil, fmt.Errorf("init: %w", err)

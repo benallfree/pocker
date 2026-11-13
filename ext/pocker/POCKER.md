@@ -236,9 +236,10 @@ Kept small and marked `// CE:` so upstream merges stay easy:
   environment.
 - `plugins/jsvm`: `Config.OnCall`, a generic wrapper around every call into a JS runtime (hooks, routes, cron,
   migrations, loading a hooks file), which the sandbox uses for time limits and concurrency; `binds.go` has
-  `HTTPSendMaxTimeout` / `HTTPSendMaxBodySize` caps for `$http.send`, overridable per runtime (`HTTPSendLimits`). The
-  sandbox itself is the [sandbox](../sandbox/README.md) plugin, on `Config.OnInit` (upstream) and `Config.OnCall`.
-- `tools/mailer`: `DialContext`, when set, sends SMTP through the host's dialer (same exchange as mailyak).
+  `HTTPClientKey`, a runtime's own `*http.Client` for `$http.send` (the sandbox's applies its timeout and body caps).
+  The sandbox itself is the [sandbox](../sandbox/README.md) plugin, on `Config.OnInit` (upstream) and `Config.OnCall`.
+- Mail needs no core change: the sandbox sends an app's own SMTP through the egress policy on `OnMailerSend`
+  (`sandbox.BindMail`).
 
 ## Versions
 

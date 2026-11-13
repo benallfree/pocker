@@ -10,17 +10,14 @@ import (
 	"sync/atomic"
 	"syscall"
 	"time"
-
-	"ganigeorgiev.com/pocketbase/pocketbase/plugins/jsvm"
-	"ganigeorgiev.com/pocketbase/pocketbase/tools/mailer"
 )
 
 // Egress policy: every outbound connection an app can cause (JS $http.send and $filesystem.fileFromURL, S3 storage
 // and backups, OAuth2 and JWK fetches, SMTP) may only reach public addresses. The check runs in the dialer's Control
 // hook, on the address actually being connected to after DNS resolution, so DNS rebinding can't get around it.
 //
-// Pocker installs it process-wide: Go's default HTTP transport (used by PocketBase's HTTP clients) and PocketBase's
-// SMTP client dial through it. Defence in depth for anything else is an OS firewall on Pocker's user.
+// Pocker installs it process-wide: Go's default HTTP transport (used by PocketBase's HTTP clients) dials through it,
+// and [BindMail] sends each app's SMTP through it. Defence in depth for anything else is an OS firewall on Pocker's user.
 
 // blockedPrefixes are never reachable unless listed in an allow list.
 var blockedPrefixes = func() []netip.Prefix {
@@ -90,20 +87,24 @@ var (
 	wireEgress   sync.Once
 )
 
-// InstallEgressPolicy routes Go's default HTTP transport and PocketBase's SMTP client through the policy, and caps
-// $http.send. It applies to the whole process; calling it again replaces the policy (e.g. on a config reload).
-func InstallEgressPolicy(p EgressPolicy, httpMaxTimeoutSec int, httpMaxBody int64) {
+// InstallEgressPolicy routes Go's default HTTP transport through the policy (PocketBase's own HTTP clients, and
+// $http.send via the sandbox's client); [BindMail] sends an app's SMTP through it. It applies to the whole process;
+// calling it again replaces the policy (e.g. on a config reload).
+func InstallEgressPolicy(p EgressPolicy) {
 	activeEgress.Store(&p)
-	jsvm.HTTPSendMaxTimeout = httpMaxTimeoutSec
-	jsvm.HTTPSendMaxBodySize = httpMaxBody
 	wireEgress.Do(func() {
 		d := policyDialer(func() EgressPolicy { return *activeEgress.Load() })
 		if t, ok := http.DefaultTransport.(*http.Transport); ok {
 			t.DialContext = d.DialContext
 			t.Proxy = nil // a proxy from the environment would bypass the per-address check
 		}
-		mailer.DialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
-			return d.DialContext(ctx, network, address)
-		}
 	})
+}
+
+// egressDialContext dials through the installed policy, or returns nil when none is installed.
+func egressDialContext() func(ctx context.Context, network, address string) (net.Conn, error) {
+	if activeEgress.Load() == nil {
+		return nil
+	}
+	return policyDialer(func() EgressPolicy { return *activeEgress.Load() }).DialContext
 }

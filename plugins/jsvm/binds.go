@@ -891,39 +891,17 @@ func BindApis(vm *goja.Runtime) {
 // for sending HTTP requests.
 //
 // See https://pocketbase.io/jsvm/modules/_http.html.
-// CE: process-wide caps for $http.send (0 = upstream behaviour: 120s default timeout, unbounded body).
-var (
-	// HTTPSendMaxTimeout caps the timeout (in seconds) a JS caller can request.
-	HTTPSendMaxTimeout int
-	// HTTPSendMaxBodySize caps the response body size in bytes; larger responses fail.
-	HTTPSendMaxBodySize int64
-)
+// CE: HTTPClientKey is the global property $http.send takes its *http.Client from, when set (e.g. by a sandbox in
+// Config.OnInit, to cap timeouts and response sizes for that app). Without it, http.DefaultClient is used.
+const HTTPClientKey = "__jsvm_http_client"
 
-// CE: HTTPSendLimits overrides the process-wide caps for one runtime. A host pins it on the runtime's global
-// object under [HTTPSendLimitsKey] (e.g. from Config.OnInit); zero fields keep the process-wide value.
-type HTTPSendLimits struct {
-	Timeout int   // seconds
-	Body    int64 // bytes
-}
-
-// CE: HTTPSendLimitsKey is the global property $http.send reads [HTTPSendLimits] from.
-const HTTPSendLimitsKey = "__pocker_http_limits"
-
-// CE: httpSendLimits returns the $http.send caps for vm: its pinned [HTTPSendLimits] where set, else the
-// process-wide ones.
-func httpSendLimits(vm *goja.Runtime) (int, int64) {
-	timeout, body := HTTPSendMaxTimeout, HTTPSendMaxBodySize
-	if v := vm.GlobalObject().Get(HTTPSendLimitsKey); v != nil {
-		if l, ok := v.Export().(HTTPSendLimits); ok {
-			if l.Timeout > 0 {
-				timeout = l.Timeout
-			}
-			if l.Body > 0 {
-				body = l.Body
-			}
+func httpClient(vm *goja.Runtime) *http.Client {
+	if v := vm.GlobalObject().Get(HTTPClientKey); v != nil {
+		if c, ok := v.Export().(*http.Client); ok && c != nil {
+			return c
 		}
 	}
-	return timeout, body
+	return http.DefaultClient
 }
 
 func BindHTTP(vm *goja.Runtime) {
@@ -994,10 +972,6 @@ func BindHTTP(vm *goja.Runtime) {
 		if config.Timeout <= 0 {
 			config.Timeout = 120
 		}
-		maxTimeout, maxBody := httpSendLimits(vm) // CE: per-app (sandbox) or process-wide caps
-		if maxTimeout > 0 && config.Timeout > maxTimeout {
-			config.Timeout = maxTimeout
-		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(config.Timeout)*time.Second)
 		defer cancel()
@@ -1044,21 +1018,13 @@ func BindHTTP(vm *goja.Runtime) {
 			req.Header.Set("content-type", contentType)
 		}
 
-		res, err := http.DefaultClient.Do(req)
+		res, err := httpClient(vm).Do(req) // CE: the app's client when set (HTTPClientKey)
 		if err != nil {
 			return nil, err
 		}
 		defer res.Body.Close()
 
-		var bodyRaw []byte
-		if maxBody > 0 { // CE: bounded response body
-			bodyRaw, _ = io.ReadAll(io.LimitReader(res.Body, maxBody+1))
-			if int64(len(bodyRaw)) > maxBody {
-				return nil, errors.New("$http.send: response body larger than the allowed size")
-			}
-		} else {
-			bodyRaw, _ = io.ReadAll(res.Body)
-		}
+		bodyRaw, _ := io.ReadAll(res.Body)
 
 		result := &sendResult{
 			StatusCode: res.StatusCode,

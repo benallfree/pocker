@@ -1,16 +1,12 @@
 package mailer
 
 import (
-	"context"
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"net"
-	"net/mail"
 	"net/smtp"
 	"strconv"
 	"strings"
-	"time"
 
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/hook"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/security"
@@ -163,88 +159,7 @@ func (c *SMTPClient) send(m *Message) error {
 		}
 	}
 
-	if DialContext != nil { // CE: send through the host's dialer (egress policy)
-		return sendWithDialer(c, m, yak, smtpAuth)
-	}
-
 	return yak.Send()
-}
-
-// CE: DialContext, when set, is used for every SMTP connection instead of mailyak's own net.Dial/tls.Dial,
-// so a host running many apps can enforce an egress policy on mail too. Upstream behaviour is unchanged when nil.
-var DialContext func(ctx context.Context, network, address string) (net.Conn, error)
-
-// CE: sendWithDialer performs the same SMTP exchange as mailyak (implicit TLS, or STARTTLS when offered,
-// then AUTH, MAIL, RCPT, DATA) over a connection from DialContext.
-func sendWithDialer(c *SMTPClient, m *Message, yak *mailyak.MailYak, auth smtp.Auth) error {
-	mime, err := yak.MimeBuf()
-	if err != nil {
-		return err
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-	defer cancel()
-
-	hostWithPort := net.JoinHostPort(c.Host, strconv.Itoa(c.Port))
-	conn, err := DialContext(ctx, "tcp", hostWithPort)
-	if err != nil {
-		return err
-	}
-	if deadline, ok := ctx.Deadline(); ok {
-		_ = conn.SetDeadline(deadline)
-	}
-	if c.TLS {
-		tlsConn := tls.Client(conn, &tls.Config{ServerName: c.Host})
-		if err := tlsConn.HandshakeContext(ctx); err != nil {
-			_ = conn.Close()
-			return err
-		}
-		conn = tlsConn
-	}
-
-	client, err := smtp.NewClient(conn, c.Host)
-	if err != nil {
-		_ = conn.Close()
-		return err
-	}
-	defer func() { _ = client.Quit() }()
-
-	if c.LocalName != "" {
-		if err := client.Hello(c.LocalName); err != nil {
-			return err
-		}
-	}
-	if !c.TLS {
-		if ok, _ := client.Extension("STARTTLS"); ok {
-			if err := client.StartTLS(&tls.Config{ServerName: c.Host}); err != nil {
-				return err
-			}
-		}
-	}
-	if auth != nil {
-		if err := client.Auth(auth); err != nil {
-			return err
-		}
-	}
-	if err := client.Mail(m.From.Address); err != nil {
-		return err
-	}
-	for _, list := range [][]mail.Address{m.To, m.Cc, m.Bcc} {
-		for _, a := range list {
-			if err := client.Rcpt(a.Address); err != nil {
-				return err
-			}
-		}
-	}
-	w, err := client.Data()
-	if err != nil {
-		return err
-	}
-	if _, err := w.Write(mime.Bytes()); err != nil {
-		_ = w.Close()
-		return err
-	}
-	return w.Close()
 }
 
 // -------------------------------------------------------------------
