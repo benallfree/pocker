@@ -15,6 +15,7 @@ import (
 	"ganigeorgiev.com/pocketbase/pocketbase"
 	"ganigeorgiev.com/pocketbase/pocketbase/apis"
 	"ganigeorgiev.com/pocketbase/pocketbase/ceplugin"
+	"ganigeorgiev.com/pocketbase/pocketbase/cmd"
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"ganigeorgiev.com/pocketbase/pocketbase/plugins/ghupdate"
 	"ganigeorgiev.com/pocketbase/pocketbase/plugins/jsvm"
@@ -24,6 +25,7 @@ import (
 	"github.com/dop251/goja"
 	"github.com/pockethost/pocketbase/ext/autotls"
 	"github.com/pockethost/pocketbase/ext/bulkmail"
+	"github.com/pockethost/pocketbase/ext/config"
 	"github.com/pockethost/pocketbase/ext/deploy"
 	"github.com/pockethost/pocketbase/ext/mcp"
 	oauthserver "github.com/pockethost/pocketbase/ext/oauth-server"
@@ -35,7 +37,30 @@ import (
 )
 
 func main() {
-	app := pocketbase.New()
+	// pocketbase.yaml (and the .env beside it): each plugin's section, defaults for the flags below (flags win)
+	cfgOpts := config.FromArgs(os.Args[1:])
+	cfg, err := config.Load(cfgOpts)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if p, _ := config.Provider.Get(); p != "" {
+		log.Fatalf("provider %q: %v (it serves a single app; omit provider:)", p, config.ErrNoProvider)
+	}
+	appCfg, _ := config.App.Get()
+	if err := cfg.AllowEnv(appCfg.EnvAllow); err != nil { // only the .env names the app may read
+		log.Fatal(err)
+	}
+
+	app := pocketbase.NewWithConfig(pocketbase.Config{
+		DefaultDev:           or(appCfg.Dev, osutils.IsProbablyGoRun()),
+		DefaultDataDir:       cfg.ResolvePath(appCfg.Dir),
+		DefaultEncryptionEnv: appCfg.EncryptionEnv,
+		DefaultQueryTimeout:  appCfg.QueryTimeout,
+	})
+	var cfgPath, envPath string
+	app.RootCmd.PersistentFlags().StringVar(&cfgPath, "config", "", "the config file (default ./pocketbase.yaml, else next to the executable)")
+	app.RootCmd.PersistentFlags().StringVar(&envPath, "env-file", "", "secrets for $VAR references in the config file (default .env beside it); never passed to the app")
+	app.RootCmd.AddCommand(config.NewCommand(func() config.Options { return cfgOpts }))
 
 	// PocketBase CE plugins that ship in the standard binary and follow the plugin contract (ceplugin): Register
 	// here, and BindJS in the jsvm below. Bulk mail: campaigns to the app's own users (Mail in the dashboard, Bulk
@@ -52,7 +77,7 @@ func main() {
 	app.RootCmd.PersistentFlags().StringVar(
 		&hooksDir,
 		"hooksDir",
-		"",
+		cfg.ResolvePath(appCfg.HooksDir),
 		"the directory with the JS app hooks",
 	)
 
@@ -60,7 +85,7 @@ func main() {
 	app.RootCmd.PersistentFlags().BoolVar(
 		&hooksWatch,
 		"hooksWatch",
-		true,
+		or(appCfg.HooksWatch, true),
 		"auto restart the app on pb_hooks file change; it has no effect on Windows",
 	)
 
@@ -68,7 +93,7 @@ func main() {
 	app.RootCmd.PersistentFlags().IntVar(
 		&hooksPool,
 		"hooksPool",
-		15,
+		orInt(appCfg.HooksPool, 15),
 		"the total prewarm goja.Runtime instances for the JS app hooks execution",
 	)
 
@@ -76,7 +101,7 @@ func main() {
 	app.RootCmd.PersistentFlags().StringVar(
 		&migrationsDir,
 		"migrationsDir",
-		"",
+		cfg.ResolvePath(appCfg.MigrationsDir),
 		"the directory with the user defined migrations",
 	)
 
@@ -84,7 +109,7 @@ func main() {
 	app.RootCmd.PersistentFlags().BoolVar(
 		&automigrate,
 		"automigrate",
-		true,
+		or(appCfg.Automigrate, true),
 		"enable/disable auto migrations",
 	)
 
@@ -92,7 +117,7 @@ func main() {
 	app.RootCmd.PersistentFlags().StringVar(
 		&publicDir,
 		"publicDir",
-		defaultPublicDir(),
+		orStr(cfg.ResolvePath(appCfg.PublicDir), defaultPublicDir()),
 		"the directory to serve static files",
 	)
 
@@ -100,7 +125,7 @@ func main() {
 	app.RootCmd.PersistentFlags().BoolVar(
 		&indexFallback,
 		"indexFallback",
-		true,
+		or(appCfg.IndexFallback, true),
 		"fallback the request to index.html on missing static path, e.g. when pretty urls are used with SPA",
 	)
 
@@ -268,9 +293,41 @@ func main() {
 		Priority: 999, // execute as latest as possible to allow users to provide their own route
 	})
 
-	if err := app.Start(); err != nil {
+	// system commands (what app.Start registers), with the server section as the serve command's defaults
+	serveCmd := cmd.NewServeCommand(app, true)
+	srv, _ := config.Server.Get()
+	for flag, v := range map[string]string{"http": srv.HTTP, "https": srv.HTTPS, "origins": strings.Join(srv.Origins, ",")} {
+		if v != "" {
+			if err := serveCmd.PersistentFlags().Set(flag, v); err != nil {
+				log.Fatalf("server.%s: %v", flag, err)
+			}
+		}
+	}
+	app.RootCmd.AddCommand(cmd.NewSuperuserCommand(app), serveCmd)
+	if err := app.Execute(); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func or(v *bool, def bool) bool {
+	if v != nil {
+		return *v
+	}
+	return def
+}
+
+func orInt(v, def int) int {
+	if v != 0 {
+		return v
+	}
+	return def
+}
+
+func orStr(v, def string) string {
+	if v != "" {
+		return v
+	}
+	return def
 }
 
 // the default pb_public dir location is relative to the executable

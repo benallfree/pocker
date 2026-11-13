@@ -7,6 +7,7 @@ require (
 	github.com/dop251/goja v0.0.0-20261023121931-6ace4dde0b29
 	github.com/pockethost/pocketbase/ext/autotls v0.0.0-20261112000927-b078fd50496e
 	github.com/pockethost/pocketbase/ext/bulkmail v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketbase/ext/config v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketbase/ext/deploy v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketbase/ext/mcp v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketbase/ext/oauth-server v0.0.0-00010101000000-000000000000
@@ -122,5 +123,7 @@ replace (
 	github.com/pockethost/pocketbase/ext/mcp => ../../ext/mcp
 	github.com/pockethost/pocketbase/ext/pitr => ../../ext/pitr
 )
+
+replace github.com/pockethost/pocketbase/ext/config => ../../ext/config
 
 replace github.com/pockethost/pocketbase/ext/edge => ../../ext/edge
