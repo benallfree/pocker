@@ -21,20 +21,48 @@ import (
 	"github.com/Masterminds/semver/v3"
 )
 
-// Manifest lists the PocketBase releases an edge may download: where each is hosted and the sha256 of its zips.
-// Same format as PocketHost's versions.json:
+// Manifest lists the releases an edge may download: where each is hosted and the sha256 of its zips. Two release
+// lines: "versions" are upstream PocketBase (PocketHost's versions.json is a valid manifest as is), "ce" are PBCE
+// releases, which have their own version numbers and note the upstream version they are based on.
 //
-//	{"hosts": {"github": "https://github.com/pocketbase/pocketbase/releases/download/v{version}/{file}"},
-//	 "versions": {"0.22.21": {"host": "github", "sha256": {"linux_amd64": "…", "linux_arm64": "…"}}}}
+//	{"hosts": {"github": "https://github.com/pocketbase/pocketbase/releases/download/v{version}/{file}",
+//	           "pbce": "https://github.com/pockethost/pocketbase/releases/download/v{version}/{file}"},
+//	 "versions": {"0.36.9": {"host": "github", "sha256": {"linux_amd64": "…", "linux_arm64": "…"}}},
+//	 "ce": {"0.0.1": {"host": "pbce", "base": "0.41.1", "sha256": {"linux_amd64": "…"}}}}
 type Manifest struct {
 	Hosts    map[string]string        `json:"hosts"`
 	Versions map[string]ManifestEntry `json:"versions"`
+	CE       map[string]ManifestEntry `json:"ce"`
 }
 
 // ManifestEntry is one release in a [Manifest].
 type ManifestEntry struct {
 	Host   string            `json:"host"`
-	SHA256 map[string]string `json:"sha256"` // by platform, e.g. "linux_amd64"
+	Base   string            `json:"base,omitempty"` // PBCE: the upstream PocketBase version it is based on
+	SHA256 map[string]string `json:"sha256"`         // by platform, e.g. "linux_amd64"
+}
+
+// Release lines, the prefix of an instance's version: "pb:0.36.*" (upstream PocketBase) or "ce:0.0.*" (PBCE).
+// A version without a prefix is upstream.
+const (
+	LinePB = "pb"
+	LineCE = "ce"
+)
+
+// MinUpstream is the oldest upstream PocketBase version served: 0.22 and older are sunset.
+const MinUpstream = "0.23.0"
+
+// ParseVersion splits "ce:0.0.*" into its line and version (range); no prefix = upstream.
+func ParseVersion(v string) (line, want string, err error) {
+	v = strings.TrimSpace(v)
+	line, want = LinePB, v
+	if i := strings.Index(v, ":"); i >= 0 {
+		line, want = v[:i], v[i+1:]
+	}
+	if line != LinePB && line != LineCE {
+		return "", "", fmt.Errorf("pocketbase version %q: unknown release line %q (use pb: or ce:)", v, line)
+	}
+	return line, strings.TrimPrefix(strings.TrimSpace(want), "v"), nil
 }
 
 // LoadManifest reads a manifest file.
@@ -70,37 +98,55 @@ func (b *Binaries) platform() string {
 	return "linux_" + runtime.GOARCH
 }
 
-// Path is where a version's binary lives in the cache (whether or not it is there).
-func (b *Binaries) Path(version string) string {
+// Path is where a release's binary lives in the cache (whether or not it is there): upstream at
+// <Root>/<version>/<platform>/pocketbase (PocketHost's existing layout), PBCE at <Root>/ce/<version>/<platform>/….
+func (b *Binaries) Path(line, version string) string {
+	if line == LineCE {
+		return filepath.Join(b.Root, "ce", version, b.platform(), "pocketbase")
+	}
 	return filepath.Join(b.Root, version, b.platform(), "pocketbase")
 }
 
-// Versions lists the versions available (cached, or downloadable for this platform), newest first.
-func (b *Binaries) Versions() []string {
+func (b *Binaries) entries(line string) map[string]ManifestEntry {
+	if b.Manifest == nil {
+		return nil
+	}
+	if line == LineCE {
+		return b.Manifest.CE
+	}
+	return b.Manifest.Versions
+}
+
+// Versions lists a line's available versions (cached, or downloadable for this platform), newest first. Upstream
+// versions older than [MinUpstream] are left out.
+func (b *Binaries) Versions(line string) []string {
+	min := semver.MustParse(MinUpstream)
 	seen := map[string]bool{}
 	var list []*semver.Version
 	add := func(v string) {
 		sv, err := semver.StrictNewVersion(v)
-		if err != nil || sv.Prerelease() != "" || seen[v] {
+		if err != nil || sv.Prerelease() != "" || seen[v] || (line == LinePB && sv.LessThan(min)) {
 			return
 		}
 		seen[v] = true
 		list = append(list, sv)
 	}
-	if entries, err := os.ReadDir(b.Root); err == nil {
+	dir := b.Root
+	if line == LineCE {
+		dir = filepath.Join(b.Root, "ce")
+	}
+	if entries, err := os.ReadDir(dir); err == nil {
 		for _, e := range entries {
 			if e.IsDir() {
-				if _, err := os.Stat(b.Path(e.Name())); err == nil {
+				if _, err := os.Stat(b.Path(line, e.Name())); err == nil {
 					add(e.Name())
 				}
 			}
 		}
 	}
-	if b.Manifest != nil {
-		for v, e := range b.Manifest.Versions {
-			if e.SHA256[b.platform()] != "" {
-				add(v)
-			}
+	for v, e := range b.entries(line) {
+		if e.SHA256[b.platform()] != "" {
+			add(v)
 		}
 	}
 	sort.Sort(sort.Reverse(semver.Collection(list)))
@@ -111,33 +157,41 @@ func (b *Binaries) Versions() []string {
 	return out
 }
 
-// Match returns the newest available version satisfying want: an exact version ("0.22.21") or a range ("0.22.*",
-// "~0.22", "^0.36", ">=0.30 <0.40").
-func (b *Binaries) Match(want string) (string, error) {
-	want = strings.TrimPrefix(strings.TrimSpace(want), "v")
-	c, err := semver.NewConstraint(want)
-	if err != nil {
-		return "", fmt.Errorf("pocketbase version %q: %w", want, err)
-	}
-	for _, v := range b.Versions() {
-		if c.Check(semver.MustParse(v)) {
-			return v, nil
-		}
-	}
-	return "", fmt.Errorf("no PocketBase version satisfying %q", want)
-}
-
-// Resolve matches want and returns the version and the path of its binary, downloading it when needed.
-func (b *Binaries) Resolve(ctx context.Context, want string) (version, path string, err error) {
-	version, err = b.Match(want)
+// Match returns the line and newest available version satisfying want: "pb:0.36.*", "ce:0.0.1", or an upstream
+// version without a prefix; exact versions and ranges ("0.36.*", "~0.36", "^0.30", ">=0.30 <0.40") both work.
+func (b *Binaries) Match(want string) (line, version string, err error) {
+	line, rng, err := ParseVersion(want)
 	if err != nil {
 		return "", "", err
 	}
-	path = b.Path(version)
-	if _, err := os.Stat(path); err == nil {
-		return version, path, nil
+	c, err := semver.NewConstraint(rng)
+	if err != nil {
+		return "", "", fmt.Errorf("pocketbase version %q: %w", want, err)
 	}
-	return version, path, b.download(ctx, version)
+	for _, v := range b.Versions(line) {
+		if c.Check(semver.MustParse(v)) {
+			return line, v, nil
+		}
+	}
+	if line == LinePB {
+		if sv, err := semver.NewVersion(strings.TrimSuffix(strings.TrimSuffix(rng, ".*"), ".x")); err == nil && sv.LessThan(semver.MustParse(MinUpstream)) {
+			return "", "", fmt.Errorf("PocketBase %s is no longer supported (0.22 and older are sunset; use 0.23 or newer)", rng)
+		}
+	}
+	return "", "", fmt.Errorf("no PocketBase version satisfying %q", want)
+}
+
+// Resolve matches want and returns its line, version and the path of its binary, downloading it when needed.
+func (b *Binaries) Resolve(ctx context.Context, want string) (line, version, path string, err error) {
+	line, version, err = b.Match(want)
+	if err != nil {
+		return "", "", "", err
+	}
+	path = b.Path(line, version)
+	if _, err := os.Stat(path); err == nil {
+		return line, version, path, nil
+	}
+	return line, version, path, b.download(ctx, line, version)
 }
 
 func (b *Binaries) lock(version string) *sync.Mutex {
@@ -154,20 +208,20 @@ func (b *Binaries) lock(version string) *sync.Mutex {
 	return m
 }
 
-func (b *Binaries) download(ctx context.Context, version string) error {
-	l := b.lock(version)
+func (b *Binaries) download(ctx context.Context, line, version string) error {
+	l := b.lock(line + ":" + version)
 	l.Lock()
 	defer l.Unlock()
-	path := b.Path(version)
+	path := b.Path(line, version)
 	if _, err := os.Stat(path); err == nil {
 		return nil // another request downloaded it meanwhile
 	}
 	if b.Manifest == nil {
 		return fmt.Errorf("pocketbase %s is not cached and there is no manifest to download it from", version)
 	}
-	e, ok := b.Manifest.Versions[version]
+	e, ok := b.entries(line)[version]
 	if !ok {
-		return fmt.Errorf("pocketbase %s is not in the manifest", version)
+		return fmt.Errorf("pocketbase %s:%s is not in the manifest", line, version)
 	}
 	sum := e.SHA256[b.platform()]
 	tmpl := b.Manifest.Hosts[e.Host]

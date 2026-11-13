@@ -83,13 +83,13 @@ func TestRuntime(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// instance a (0.22): a hook that reads env, as customers' hooks do
-	a := edge.Instance{ID: "cedockera", Version: "0.22.*", Secrets: map[string]string{"FOO": "bar"}}
-	b := edge.Instance{ID: "cedockerb", Version: "0.36.*"}
+	// instance a (upstream 0.23): a hook that reads env, as customers' hooks do; b runs a PBCE release
+	a := edge.Instance{ID: "cedockera", Version: "pb:0.23.*", Secrets: map[string]string{"FOO": "bar"}}
+	b := edge.Instance{ID: "cedockerb", Version: "ce:0.0.*"}
 	if err := os.MkdirAll(filepath.Join(data, a.ID, "pb_hooks"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	hook := `routerAdd("GET", "/env", (c) => c.string(200, $os.getenv("FOO") + "|" + $os.getenv("PH_APP_NAME") + "|" + $os.getenv("PB_VERSION_SEEN")))`
+	hook := `routerAdd("GET", "/env", (e) => e.string(200, $os.getenv("FOO") + "|" + $os.getenv("PH_APP_NAME") + "|" + $os.getenv("PB_VERSION_SEEN")))`
 	if err := os.WriteFile(filepath.Join(data, a.ID, "pb_hooks", "env.pb.js"), []byte(hook), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -115,7 +115,7 @@ func TestRuntime(t *testing.T) {
 	if t.Failed() {
 		return
 	}
-	if code, body := get(t, rt, a, "/env"); code != 200 || body != "bar|cedockera|0.22.58" {
+	if code, body := get(t, rt, a, "/env"); code != 200 || body != "bar|cedockera|pb:0.23.12" {
 		t.Fatalf("a /env: %d %q", code, body)
 	}
 	if rt.RunningCount() != 2 {
@@ -126,7 +126,7 @@ func TestRuntime(t *testing.T) {
 	for _, s := range list {
 		versions[s.Labels[LabelInstance]] = s.Labels[LabelVersion]
 	}
-	if versions["cedockera"] != "0.22.58" || versions["cedockerb"] != "0.36.9" {
+	if versions["cedockera"] != "pb:0.23.12" || versions["cedockerb"] != "ce:0.0.1" {
 		t.Fatalf("labels: %v", versions)
 	}
 	if _, err := os.Stat(filepath.Join(data, a.ID, "pb_data", "data.db")); err != nil {
@@ -201,5 +201,8 @@ func TestRuntimeBadVersion(t *testing.T) {
 	defer rt.Shutdown()
 	if code, body := get(t, rt, edge.Instance{ID: "cedockerx", Version: "0.99.*"}, "/"); code != 503 || !strings.Contains(body, "no PocketBase version") {
 		t.Fatalf("%d %q", code, body)
+	}
+	if code, body := get(t, rt, edge.Instance{ID: "cedockery", Version: "0.22.*"}, "/"); code != 503 || !strings.Contains(body, "no longer supported") {
+		t.Fatalf("sunset version: %d %q", code, body)
 	}
 }

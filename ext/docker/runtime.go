@@ -35,7 +35,7 @@ import (
 const (
 	LabelRuntime  = "ce.runtime"  // "docker"
 	LabelInstance = "ce.instance" // instance id
-	LabelVersion  = "ce.version"  // resolved PocketBase version
+	LabelVersion  = "ce.version"  // resolved release: "pb:0.36.9" or "ce:0.0.1"
 	LabelSpec     = "ce.spec"     // hash of the container's configuration
 )
 
@@ -54,7 +54,7 @@ type Config struct {
 	Home     string    // the instance folder inside the container (default /home/pockethost)
 	Binaries *Binaries // PocketBase binaries by version (required)
 
-	DefaultVersion string // for instances without a Version (e.g. "0.22.*"); empty = such instances fail
+	DefaultVersion string // for instances without a Version (e.g. "pb:0.36.*" or "ce:0.0.*"); empty = such instances fail
 
 	IdleTTL             time.Duration // stop after this long without requests (default 10m)
 	MaxConcurrentStarts int           // containers starting at once (default 4)
@@ -77,7 +77,7 @@ type Config struct {
 	// else claims them; see [edge.Runtime.Serves]).
 	Serves func(inst edge.Instance) bool
 	// Prepare adds host-specific mounts, environment and labels (e.g. platform hooks, an app URL). version is the
-	// resolved PocketBase version.
+	// resolved release with its line, e.g. "pb:0.36.9" or "ce:0.0.1".
 	Prepare func(ctx context.Context, inst edge.Instance, version string, spec *Spec) error
 	// AdoptImage: at start, also adopt running containers of this image that carry no labels and are named after an
 	// instance id (containers started by another manager, e.g. PocketHost's Node edge).
@@ -329,10 +329,11 @@ func (rt *Runtime) containerConfig(ctx context.Context, inst edge.Instance) (con
 	if want == "" {
 		return containerConfig{}, "", errors.New("no PocketBase version")
 	}
-	version, bin, err := rt.cfg.Binaries.Resolve(ctx, want)
+	line, ver, bin, err := rt.cfg.Binaries.Resolve(ctx, want)
 	if err != nil {
 		return containerConfig{}, "", err
 	}
+	version := line + ":" + ver // e.g. "pb:0.36.9", "ce:0.0.1"
 	dir := inst.Dir
 	if dir == "" {
 		dir = filepath.Join(rt.cfg.DataRoot, inst.ID)

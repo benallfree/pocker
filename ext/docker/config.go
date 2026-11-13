@@ -13,10 +13,10 @@ import (
 //
 //	docker:
 //	  image: alpine:3.20                    # base image the binaries run in
-//	  binaries: /var/lib/pocketbase         # binary cache (<binaries>/<version>/linux_amd64/pocketbase)
+//	  binaries: /var/lib/pocketbase         # binary cache (<binaries>/<version>/linux_amd64/pocketbase; PBCE under ce/)
 //	  manifest: /etc/pocketbase/versions.json  # releases it may download (optional)
 //	  data_root: /var/lib/instances         # default: pb_root
-//	  default_version: "0.22.*"             # for instances without one
+//	  default_version: "pb:0.36.*"          # for instances without one (pb: upstream, ce: PBCE)
 //	  idle_ttl: 10m
 //	  max_concurrent_starts: 4
 //	  memory: 512MiB
