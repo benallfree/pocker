@@ -39,7 +39,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/filesystem/blob"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/filesystem/internal/s3blob/s3"
@@ -70,15 +69,6 @@ type driver struct {
 }
 
 // Close implements [blob/Driver.Close].
-// SignedURL implements [blob.URLSigner] with a SigV4 presigned GET.
-func (drv *driver) SignedURL(ctx context.Context, key string, opts *blob.SignedURLOptions) (string, error) {
-	now := opts.Now
-	if now.IsZero() {
-		now = time.Now()
-	}
-	return drv.s3.PresignGet(key, opts.Expiry, now, opts.Overrides)
-}
-
 func (drv *driver) Close() error {
 	return nil // nothing to close
 }

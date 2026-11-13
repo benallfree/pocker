@@ -20,19 +20,20 @@
 package s3redirect
 
 import (
-	"errors"
 	"log/slog"
 	"mime"
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
 
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
-	"ganigeorgiev.com/pocketbase/pocketbase/tools/filesystem/blob"
+	"ganigeorgiev.com/pocketbase/pocketbase/tools/filesystem"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/hook"
+	"github.com/pockethost/pocketbase/ext/s3redirect/sigv4"
 )
 
 // Name is the plugin's name: its config key (plugins.s3redirect).
@@ -148,10 +149,11 @@ func (p *Plugin) handle(e *core.FileDownloadRequestEvent, ttl time.Duration) err
 		}
 		defer fsys.Close()
 	}
-	signed, err := fsys.SignedURL(e.ServedPath, &blob.SignedURLOptions{Expiry: ttl, Overrides: overrides, Now: p.cfg.now()})
-	if errors.Is(err, errors.ErrUnsupported) {
-		return e.Next() // local disk: stream as usual
+	signer := signerFor(e.App, fsys)
+	if signer == nil {
+		return e.Next() // local disk (or a filesystem that can't sign): stream as usual
 	}
+	signed, err := signer.SignedURL(e.ServedPath, ttl, p.cfg.now(), overrides)
 	if err != nil {
 		p.log.Warn("s3redirect: signing failed, streaming instead", "error", err)
 		return e.Next()
@@ -224,4 +226,36 @@ func responseHeaders(r *http.Request, servedPath, name string) (disposition, con
 		contentType = forced
 	}
 	return disposition, contentType
+}
+
+// Signer is implemented by filesystem drivers that can hand out a time-limited direct URL for a key, such as
+// ext/storage's bucket driver. A plugin supplying its own S3 filesystem (OnFilesystemCreate) implements it on its
+// driver so downloads from it can be redirected.
+type Signer interface {
+	SignedURL(key string, ttl time.Duration, now time.Time, overrides url.Values) (string, error)
+}
+
+// signerFor returns how to sign fsys's keys: its driver when that's a [Signer], else the app's own S3 settings when
+// fsys is PocketBase's S3 filesystem for them; nil when it can't sign (local disk, or an unknown driver).
+func signerFor(app core.App, fsys *filesystem.System) Signer {
+	drv := fsys.Driver()
+	if s, ok := drv.(Signer); ok {
+		return s
+	}
+	st := app.Settings().S3
+	if !st.Enabled || !isPocketBaseS3(drv) {
+		return nil
+	}
+	return sigv4.Config{Endpoint: st.Endpoint, Bucket: st.Bucket, Region: st.Region, AccessKey: st.AccessKey,
+		SecretKey: st.Secret, PathStyle: st.ForcePathStyle}
+}
+
+// isPocketBaseS3 reports whether drv is PocketBase's own S3 driver (tools/filesystem/internal/s3blob), the one
+// NewFilesystem builds from the app's S3 settings.
+func isPocketBaseS3(drv any) bool {
+	t := reflect.TypeOf(drv)
+	for t != nil && t.Kind() == reflect.Pointer {
+		t = t.Elem()
+	}
+	return t != nil && strings.HasSuffix(t.PkgPath(), "/tools/filesystem/internal/s3blob")
 }

@@ -10,6 +10,8 @@ import (
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"ganigeorgiev.com/pocketbase/pocketbase/tests"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/filesystem"
+	"ganigeorgiev.com/pocketbase/pocketbase/tools/filesystem/blob"
+	"github.com/pockethost/pocketbase/ext/s3redirect/sigv4"
 )
 
 func TestResponseHeaders(t *testing.T) {
@@ -142,7 +144,7 @@ func TestDownloadRedirects(t *testing.T) {
 			ExpectedContent: []string{`"data":{}`},
 		},
 		{
-			Name:   "a filesystem supplied through OnFilesystemCreate is signed for like the app's own S3 (ext/storage)",
+			Name:   "a filesystem supplied through OnFilesystemCreate is signed by its driver when it's a Signer (ext/storage)",
 			Method: http.MethodGet,
 			URL:    "/api/files/docs/rec000000000001/photo_abc.png",
 			TestAppFactory: func(t testing.TB) *tests.TestApp {
@@ -153,7 +155,8 @@ func TestDownloadRedirects(t *testing.T) {
 						if err != nil {
 							return err
 						}
-						e.Filesystem = fsys
+						e.Filesystem = filesystem.New(signingDriver{Driver: fsys.Driver(), Config: sigv4.Config{
+							Endpoint: "https://files.example.com", Bucket: "other", Region: "auto", AccessKey: "a", SecretKey: "s"}})
 					}
 					return e.Next()
 				})
@@ -232,4 +235,11 @@ func TestLocalDownloadOpensOneFilesystem(t *testing.T) {
 	if n != 1 {
 		t.Fatalf("%d storage filesystems opened for one download, want 1", n)
 	}
+}
+
+// signingDriver is how a plugin supplying its own S3 filesystem makes downloads from it redirect: its driver
+// implements Signer (here through sigv4.Config's SignedURL).
+type signingDriver struct {
+	blob.Driver
+	sigv4.Config
 }

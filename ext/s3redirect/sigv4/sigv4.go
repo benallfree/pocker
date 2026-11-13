@@ -1,6 +1,11 @@
-package s3
+// Package sigv4 presigns S3 GET URLs (AWS Signature Version 4, query-string auth): a pure function of the bucket
+// config, so it needs nothing from PocketBase's S3 client.
+package sigv4
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/url"
@@ -9,12 +14,22 @@ import (
 	"time"
 )
 
+// Config is an S3-compatible bucket.
+type Config struct {
+	Endpoint  string // host or URL; http:// is kept, https is the default
+	Bucket    string
+	Region    string // default us-east-1
+	AccessKey string
+	SecretKey string
+	PathStyle bool // bucket in the path (e.g. MinIO) instead of the host name
+}
+
 // PresignGet returns a SigV4 query-signed GET URL for key, valid for ttl from now (clamped to 1s..7 days, the
 // SigV4 maximum). Extra response overrides (S3's response-content-disposition, response-content-type, ...) are
 // signed into the URL.
-func (s3 *S3) PresignGet(key string, ttl time.Duration, now time.Time, overrides url.Values) (string, error) {
+func (s3 Config) PresignGet(key string, ttl time.Duration, now time.Time, overrides url.Values) (string, error) {
 	if s3.Endpoint == "" || s3.Bucket == "" || s3.AccessKey == "" || s3.SecretKey == "" {
-		return "", errors.New("s3: incomplete config for signing")
+		return "", errors.New("sigv4: incomplete config for signing")
 	}
 	if ttl < time.Second {
 		ttl = time.Second
@@ -38,7 +53,7 @@ func (s3 *S3) PresignGet(key string, ttl time.Duration, now time.Time, overrides
 	}
 
 	objectPath := "/" + uriEncode(strings.TrimLeft(key, "/"), false)
-	if s3.UsePathStyle {
+	if s3.PathStyle {
 		objectPath = "/" + uriEncode(s3.Bucket, false) + objectPath
 	} else {
 		host = s3.Bucket + "." + host
@@ -116,4 +131,20 @@ func uriEncode(s string, encodeSlash bool) string {
 		}
 	}
 	return b.String()
+}
+
+func sha256Hex(content []byte) string {
+	h := sha256.Sum256(content)
+	return hex.EncodeToString(h[:])
+}
+
+func hmacSHA256(key []byte, content string) []byte {
+	mac := hmac.New(sha256.New, key)
+	mac.Write([]byte(content))
+	return mac.Sum(nil)
+}
+
+// SignedURL is [Config.PresignGet] for key with the given arguments, so a Config is an ext/s3redirect Signer.
+func (s3 Config) SignedURL(key string, ttl time.Duration, now time.Time, overrides url.Values) (string, error) {
+	return s3.PresignGet(key, ttl, now, overrides)
 }

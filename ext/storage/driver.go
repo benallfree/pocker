@@ -2,18 +2,20 @@ package storage
 
 import (
 	"context"
-	"errors"
-	"fmt"
+	"net/url"
 	"strings"
+	"time"
 
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/filesystem/blob"
+	"github.com/pockethost/pocketbase/ext/s3redirect/sigv4"
 )
 
 // prefixDriver fences a driver to the keys under prefix: the app sees "a/b.png", the bucket stores
 // "<prefix>a/b.png". Nothing outside the prefix can be read, listed, written or deleted.
 type prefixDriver struct {
 	blob.Driver
-	prefix string // ends with "/"
+	prefix string       // ends with "/"
+	sign   sigv4.Config // the bucket, for presigned downloads
 }
 
 func (d prefixDriver) k(key string) string { return d.prefix + key }
@@ -38,14 +40,10 @@ func (d prefixDriver) Delete(ctx context.Context, key string) error {
 	return d.Driver.Delete(ctx, d.k(key))
 }
 
-// SignedURL signs the prefixed key when the wrapped driver can sign (S3), so code that signs through the filesystem
-// (ext/s3redirect) sees the fenced bucket like any other S3 mount.
-func (d prefixDriver) SignedURL(ctx context.Context, key string, opts *blob.SignedURLOptions) (string, error) {
-	s, ok := d.Driver.(blob.URLSigner)
-	if !ok {
-		return "", fmt.Errorf("signed URLs: %w", errors.ErrUnsupported)
-	}
-	return s.SignedURL(ctx, d.k(key), opts)
+// SignedURL signs the prefixed key with the bucket's own credentials (ext/s3redirect's Signer), so downloads from the
+// fenced bucket redirect like any other S3 mount.
+func (d prefixDriver) SignedURL(key string, ttl time.Duration, now time.Time, overrides url.Values) (string, error) {
+	return d.sign.PresignGet(d.k(key), ttl, now, overrides)
 }
 
 func (d prefixDriver) ListPaged(ctx context.Context, opts *blob.ListOptions) (*blob.ListPage, error) {

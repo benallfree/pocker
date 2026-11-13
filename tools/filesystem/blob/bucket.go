@@ -52,21 +52,6 @@ func NewBucket(drv Driver) *Bucket {
 	return &Bucket{drv: drv}
 }
 
-// SignedURL returns a time-limited URL to read key directly from the storage
-// service, or an error wrapping [errors.ErrUnsupported] when the driver can't
-// sign (e.g. local files).
-func (b *Bucket) SignedURL(ctx context.Context, key string, opts *SignedURLOptions) (string, error) {
-	s, ok := b.drv.(URLSigner)
-	if !ok {
-		return "", fmt.Errorf("signed URLs: %w", errors.ErrUnsupported)
-	}
-	if opts == nil {
-		opts = &SignedURLOptions{}
-	}
-	u, err := s.SignedURL(ctx, key, opts)
-	return u, wrapError(b.drv, err, key)
-}
-
 // Driver returns the bucket's driver (e.g. to wrap it: a key prefix, a fallback).
 func (b *Bucket) Driver() Driver {
 	return b.drv

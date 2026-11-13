@@ -71,10 +71,14 @@ instances:
       s3redirect: { enabled: false }   # per instance: enabled, ttl
 ```
 
-Each instance signs through its own files filesystem (`app.NewFilesystem().SignedURL`): its own S3 settings, or a
-bucket another plugin supplies through PocketBase's `OnFilesystemCreate` hook (for example
+Each instance signs for the filesystem its files are served from: with its own S3 settings when that's
+PocketBase's S3 filesystem, or through the filesystem's driver when another plugin supplies the bucket through
+PocketBase's `OnFilesystemCreate` hook and the driver implements `s3redirect.Signer` (for example
 [`ext/storage`](../storage/README.md)'s default bucket, fenced to `instances/<id>/storage/`). Nothing needs wiring:
 whatever the files live on, if it can sign, downloads redirect; local disk streams as usual.
+
+Signing is SigV4 query-string auth in [`sigv4`](sigv4/sigv4.go), checked against AWS's documented example. It needs
+no change to PocketBase's S3 client.
 
 ## Try it
 

@@ -1,4 +1,4 @@
-package s3_test
+package sigv4_test
 
 import (
 	"net/url"
@@ -6,12 +6,12 @@ import (
 	"testing"
 	"time"
 
-	"ganigeorgiev.com/pocketbase/pocketbase/tools/filesystem/internal/s3blob/s3"
+	"github.com/pockethost/pocketbase/ext/s3redirect/sigv4"
 )
 
 // AWS's documented presigned URL example (IAM user guide, "Authenticating Requests: Using Query Parameters").
 func TestPresignGetAWSExample(t *testing.T) {
-	c := &s3.S3{Endpoint: "s3.amazonaws.com", Bucket: "examplebucket", Region: "us-east-1",
+	c := sigv4.Config{Endpoint: "s3.amazonaws.com", Bucket: "examplebucket", Region: "us-east-1",
 		AccessKey: "AKIAIOSFODNN7EXAMPLE", SecretKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"}
 	got, err := c.PresignGet("test.txt", 86400*time.Second, time.Date(2013, 5, 24, 0, 0, 0, 0, time.UTC), nil)
 	if err != nil {
@@ -27,7 +27,7 @@ func TestPresignGetAWSExample(t *testing.T) {
 }
 
 func TestPresignGetPathStyle(t *testing.T) {
-	c := &s3.S3{Endpoint: "http://127.0.0.1:9000/", Bucket: "b", AccessKey: "k", SecretKey: "s", UsePathStyle: true}
+	c := sigv4.Config{Endpoint: "http://127.0.0.1:9000/", Bucket: "b", AccessKey: "k", SecretKey: "s", PathStyle: true}
 	got, err := c.PresignGet("instances/abc/storage/col/rec/a b+c.png", time.Minute, time.Unix(0, 0),
 		url.Values{"response-content-disposition": {`inline; filename="a b+c.png"`}})
 	if err != nil {

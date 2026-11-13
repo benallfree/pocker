@@ -36,6 +36,7 @@ import (
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/filesystem"
 	"github.com/pockethost/pocketbase/ext/pocker"
+	"github.com/pockethost/pocketbase/ext/s3redirect/sigv4"
 )
 
 // Name is the plugin's name and config key.
@@ -269,5 +270,7 @@ func open(b *Bucket, prefix string) (*filesystem.System, error) {
 	if err != nil {
 		return nil, err
 	}
-	return filesystem.New(prefixDriver{Driver: s3.Driver(), prefix: prefix}), nil
+	sign := sigv4.Config{Endpoint: b.Endpoint, Bucket: b.Bucket, Region: b.Region, AccessKey: b.AccessKey,
+		SecretKey: b.Secret, PathStyle: b.ForcePathStyle}
+	return filesystem.New(prefixDriver{Driver: s3.Driver(), prefix: prefix, sign: sign}), nil
 }
