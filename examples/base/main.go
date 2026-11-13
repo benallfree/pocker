@@ -9,9 +9,9 @@ import (
 	"ganigeorgiev.com/pocketbase/pocketbase"
 	"ganigeorgiev.com/pocketbase/pocketbase/apis"
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
-	"ganigeorgiev.com/pocketbase/pocketbase/plugins/ghupdate"
 	"ganigeorgiev.com/pocketbase/pocketbase/plugins/jsvm"
 	"ganigeorgiev.com/pocketbase/pocketbase/plugins/migratecmd"
+	"ganigeorgiev.com/pocketbase/pocketbase/plugins/update"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/hook"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/osutils"
 )
@@ -100,9 +100,12 @@ func main() {
 		Dir:          migrationsDir,
 	})
 
-	// update command: PocketBase CE releases on GitHub (pockethost/pocketbase), not upstream.
-	// Custom builds: set ghupdate.Config{Owner, Repo, BaseURL} or -ldflags "-X .../plugins/ghupdate.DefaultOwner=...".
-	ghupdate.MustRegister(app, app.RootCmd, ghupdate.Config{})
+	// update command
+	update.MustRegister(app, app.RootCmd, update.Config{
+		BaseURL:    "https://ganigeorgiev.com",
+		Project:    "pocketbase",
+		Repository: "pocketbase",
+	})
 
 	// static route to serves files from the provided public dir
 	// (if publicDir exists and the route path is not already defined)

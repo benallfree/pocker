@@ -1,4 +1,4 @@
-module github.com/pockethost/pocketbase/cmd/pocketbase
+module github.com/pockethost/pocketbase/examples/ce
 
 go 1.27
 

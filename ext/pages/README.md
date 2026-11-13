@@ -68,7 +68,7 @@ cd myapp
 pocketbase serve --dir ./pb_data
 ```
 
-The standard CE binary ([`cmd/pocketbase`](../../cmd/pocketbase/main.go)) includes pages: put a `pb_pages` folder next
+The standard CE binary ([`examples/ce`](../../examples/ce/main.go)) includes pages: put a `pb_pages` folder next
 to `pb_data` and run `pocketbase serve`. `--pagesDir` points it somewhere else. In your own Go build:
 
 ```go

@@ -279,8 +279,8 @@ func main() {
 	})
 
 	// update command: PocketBase CE releases on GitHub (pockethost/pocketbase), not upstream.
-	// Custom builds: set ghupdate.Config{Owner, Repo, BaseURL} or -ldflags "-X .../plugins/ghupdate.DefaultOwner=...".
-	ghupdate.MustRegister(app, app.RootCmd, ghupdate.Config{})
+	// Custom builds that publish their own releases change Owner/Repo here.
+	ghupdate.MustRegister(app, app.RootCmd, ghupdate.Config{Owner: "pockethost", Repo: "pocketbase"})
 
 	// static route to serves files from the provided public dir
 	// (if publicDir exists and the route path is not already defined)

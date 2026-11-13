@@ -34,7 +34,7 @@ func (p *Plugin) BindJS(app core.App, vm *goja.Runtime) { /* vm.Set("$hello", ..
 ```
 
 - **Single app:** `ceplugin.MustRegister(app, plugins...)`, and `ceplugin.BindJS(app, vm, plugins...)` in jsvm's
-  `OnInit`. The standard binary does this for the plugins it ships ([`cmd/pocketbase`](../cmd/pocketbase/main.go)).
+  `OnInit`. The standard binary does this for the plugins it ships ([`examples/ce`](../examples/ce/main.go)).
 - **Pocker:** put the plugin in `Server.Plugins`. Pocker calls `Register` for every instance with that instance's
   settings: the config file's top-level `<name>:` key, then the instance's `plugins.<name>`, over the defaults given
   to your constructor. `enabled: false` (the instance wins) means `Register` and `BindJS` are never called for it.

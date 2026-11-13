@@ -10,9 +10,7 @@ before:
 
 builds:
   - id: build_noncgo
-    # the standard CE binary: examples/base + the default CE plugins (ext/pages), in its own module
-    dir: cmd/pocketbase
-    main: .
+    main: ./examples/base
     binary: pocketbase
     ldflags:
       - -s -w -X ganigeorgiev.com/pocketbase/pocketbase.Version={{ .Version }}
@@ -46,41 +44,11 @@ builds:
 
 release:
   draft: true
-  name_template: 'PocketBase CE {{ .Tag }}'
-  # every release's notes start with the install lines
-  header: |
-    ## Install
-
-    ```bash
-    brew install pockethost/tap/pocketbase
-    ```
-
-    Homebrew on macOS or Linux; the formula comes from [pockethost/homebrew-tap](https://github.com/pockethost/homebrew-tap). Or download the zip for your platform below and run `./pocketbase serve`.
-
-# the Homebrew formula in pockethost/homebrew-tap, updated on every release. brews is deprecated in favor of
-# homebrew_casks, but casks are macOS-only and quarantine unsigned binaries; the formula works on macOS and Linux.
-brews:
-  - name: pocketbase
-    ids: [archive_noncgo]
-    repository:
-      owner: pockethost
-      name: homebrew-tap
-    directory: Formula
-    homepage: https://github.com/pockethost/pocketbase
-    description: PocketBase Community Edition, a community fork of PocketBase with plugins (pages, pocker and more)
-    license: MIT
-    commit_author:
-      name: PocketHost
-      email: noreply@pockethost.io
-    install: |
-      bin.install "pocketbase"
-    test: |
-      system "#{bin}/pocketbase", "--version"
 
 archives:
   - id: archive_noncgo
-    ids: [build_noncgo]
-    formats: [zip]
+    builds: [build_noncgo]
+    format: zip
     files:
       - LICENSE.md
       - CHANGELOG.md
@@ -91,7 +59,9 @@ checksum:
 snapshot:
   version_template: '{{ incpatch .Version }}-next'
 
-# GitHub renders every newline in release notes as a line break: never hard-wrap the header above or the notes file.
-# Release notes are written by hand: always run `goreleaser release --release-notes <file>` (that skips the
-# generated changelog, which would list PocketBase's whole upstream history). Don't set changelog.disable: it drops
-# the --release-notes file too. The header above is prepended to the notes.
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^examples:'
+      - '^ui:'

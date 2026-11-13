@@ -137,7 +137,7 @@ You could also check the recommendations in https://pocketbase.io/docs/how-to-us
 You could download the prebuilt executable for your platform from the [Releases page](https://ganigeorgiev.com/pocketbase/pocketbase/releases).
 Once downloaded, extract the archive and run `./pocketbase serve` in the extracted directory.
 
-The prebuilt executables are built from [`cmd/pocketbase`](cmd/pocketbase/main.go): PocketBase's `examples/base` plus the CE plugins that ship by default. They come with the JS VM plugin enabled, which lets you extend PocketBase with JavaScript (_see [Extend with JavaScript](https://pocketbase.io/docs/js-overview/)_), and with the [Core Extensions](#core-extensions) above.
+The prebuilt executables are built from [`examples/ce`](examples/ce/main.go): PocketBase's `examples/base` plus the CE plugins that ship by default. They come with the JS VM plugin enabled, which lets you extend PocketBase with JavaScript (_see [Extend with JavaScript](https://pocketbase.io/docs/js-overview/)_), and with the [Core Extensions](#core-extensions) above.
 
 ### Use as a Go framework/toolkit
 
@@ -187,13 +187,13 @@ _For more details please refer to [Extend with Go](https://pocketbase.io/docs/go
 
 ### Building and running the repo main.go example
 
-To build the standalone executable, like the prebuilt ones in the releases page, run `go build` inside the `cmd/pocketbase` directory (`examples/base` builds plain PocketBase without the CE plugins):
+To build the standalone executable, like the prebuilt ones in the releases page, run `go build` inside the `examples/ce` directory (`examples/base` builds plain PocketBase without the CE plugins):
 
 0. [Install Go 1.27+](https://go.dev/doc/install) (_if you haven't already_)
 1. Clone/download the repo
-2. Navigate to `cmd/pocketbase`
-3. Run `CGO_ENABLED=0 go build` to build a binary for your current environment
-   _(or to target other platforms use `GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build`; see https://go.dev/doc/install/source#environment)_
+2. Navigate to `examples/ce`
+3. Run `CGO_ENABLED=0 go build -o pocketbase` to build a binary for your current environment
+   _(or to target other platforms use `GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o pocketbase`; see https://go.dev/doc/install/source#environment)_
 4. Start the created executable by running `./pocketbase serve`.
 
 Note that the supported build targets by the pure Go SQLite driver at the moment are:
