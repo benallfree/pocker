@@ -59,8 +59,7 @@ func hooksBinds(app core.App, loader *goja.Runtime, executors *vmsPool) {
 		// register the hook to the loader
 		loader.Set(jsName, func(callback string, tags ...string) {
 			// overwrite the global $app with the hook scoped instance
-			callback = `function(e) { $app = e.app; return (` + callback + `).call(undefined, e) }`
-			pr := goja.MustCompile(defaultScriptPath, "{("+callback+").apply(undefined, __args)}", true)
+			pr, src := compileHandler(loader, "{(function(e) { $app = e.app; return (", callback, ").call(undefined, e) }).apply(undefined, __args)}")
 
 			tagsAsValues := make([]reflect.Value, len(tags))
 			for i, tag := range tags {
@@ -90,7 +89,7 @@ func hooksBinds(app core.App, loader *goja.Runtime, executors *vmsPool) {
 						return resErr
 					}
 
-					return normalizeException(err)
+					return src.remap(normalizeException(err))
 				})
 
 				return []reflect.Value{reflect.ValueOf(&err).Elem()}
@@ -104,12 +103,12 @@ func hooksBinds(app core.App, loader *goja.Runtime, executors *vmsPool) {
 
 func cronBinds(app core.App, loader *goja.Runtime, executors *vmsPool) {
 	cronAdd := func(jobId, cronExpr, handler string) {
-		pr := goja.MustCompile(defaultScriptPath, "{("+handler+").apply(undefined)}", true)
+		pr, src := compileHandler(loader, "{(", handler, ").apply(undefined)}")
 
 		err := app.Cron().Add(jobId, cronExpr, func() {
 			err := executors.run(func(executor *goja.Runtime) error {
 				_, err := executor.RunProgram(pr)
-				return err
+				return src.remap(err)
 			})
 
 			if err != nil {
@@ -149,12 +148,12 @@ func cronBinds(app core.App, loader *goja.Runtime, executors *vmsPool) {
 
 func routerBinds(app core.App, loader *goja.Runtime, executors *vmsPool) {
 	loader.Set("routerAdd", func(method string, path string, handler goja.Value, middlewares ...goja.Value) {
-		wrappedMiddlewares, err := wrapMiddlewares(executors, middlewares...)
+		wrappedMiddlewares, err := wrapMiddlewares(loader, executors, middlewares...)
 		if err != nil {
 			panic("[routerAdd] failed to wrap middlewares: " + err.Error())
 		}
 
-		wrappedHandler, err := wrapHandlerFunc(executors, handler)
+		wrappedHandler, err := wrapHandlerFunc(loader, executors, handler)
 		if err != nil {
 			panic("[routerAdd] failed to wrap handler: " + err.Error())
 		}
@@ -167,7 +166,7 @@ func routerBinds(app core.App, loader *goja.Runtime, executors *vmsPool) {
 	})
 
 	loader.Set("routerUse", func(middlewares ...goja.Value) {
-		wrappedMiddlewares, err := wrapMiddlewares(executors, middlewares...)
+		wrappedMiddlewares, err := wrapMiddlewares(loader, executors, middlewares...)
 		if err != nil {
 			panic("[routerUse] failed to wrap middlewares: " + err.Error())
 		}
@@ -179,7 +178,7 @@ func routerBinds(app core.App, loader *goja.Runtime, executors *vmsPool) {
 	})
 }
 
-func wrapHandlerFunc(executors *vmsPool, handler goja.Value) (func(*core.RequestEvent) error, error) {
+func wrapHandlerFunc(loader *goja.Runtime, executors *vmsPool, handler goja.Value) (func(*core.RequestEvent) error, error) {
 	if handler == nil {
 		return nil, errors.New("handler must be non-nil")
 	}
@@ -189,7 +188,7 @@ func wrapHandlerFunc(executors *vmsPool, handler goja.Value) (func(*core.Request
 		// "native" handler func - no need to wrap
 		return h, nil
 	case func(goja.FunctionCall) goja.Value, string:
-		pr := goja.MustCompile(defaultScriptPath, "{("+handler.String()+").apply(undefined, __args)}", true)
+		pr, src := compileHandler(loader, "{(", handler.String(), ").apply(undefined, __args)}")
 
 		wrappedHandler := func(e *core.RequestEvent) error {
 			return executors.run(func(executor *goja.Runtime) error {
@@ -205,7 +204,7 @@ func wrapHandlerFunc(executors *vmsPool, handler goja.Value) (func(*core.Request
 					return resErr
 				}
 
-				return normalizeException(err)
+				return src.remap(normalizeException(err))
 			})
 		}
 
@@ -221,7 +220,7 @@ type gojaHookHandler struct {
 	priority       int
 }
 
-func wrapMiddlewares(executors *vmsPool, rawMiddlewares ...goja.Value) ([]*hook.Handler[*core.RequestEvent], error) {
+func wrapMiddlewares(loader *goja.Runtime, executors *vmsPool, rawMiddlewares ...goja.Value) ([]*hook.Handler[*core.RequestEvent], error) {
 	wrappedMiddlewares := make([]*hook.Handler[*core.RequestEvent], len(rawMiddlewares))
 
 	for i, m := range rawMiddlewares {
@@ -243,7 +242,7 @@ func wrapMiddlewares(executors *vmsPool, rawMiddlewares ...goja.Value) ([]*hook.
 				return nil, errors.New("missing or invalid Middleware function")
 			}
 
-			pr := goja.MustCompile(defaultScriptPath, "{("+v.serializedFunc+").apply(undefined, __args)}", true)
+			pr, src := compileHandler(loader, "{(", v.serializedFunc, ").apply(undefined, __args)}")
 
 			wrappedMiddlewares[i] = &hook.Handler[*core.RequestEvent]{
 				Id:       v.id,
@@ -262,12 +261,12 @@ func wrapMiddlewares(executors *vmsPool, rawMiddlewares ...goja.Value) ([]*hook.
 							return resErr
 						}
 
-						return normalizeException(err)
+						return src.remap(normalizeException(err))
 					})
 				},
 			}
 		case func(goja.FunctionCall) goja.Value, string:
-			pr := goja.MustCompile(defaultScriptPath, "{("+m.String()+").apply(undefined, __args)}", true)
+			pr, src := compileHandler(loader, "{(", m.String(), ").apply(undefined, __args)}")
 
 			wrappedMiddlewares[i] = &hook.Handler[*core.RequestEvent]{
 				Func: func(e *core.RequestEvent) error {
@@ -284,7 +283,7 @@ func wrapMiddlewares(executors *vmsPool, rawMiddlewares ...goja.Value) ([]*hook.
 							return resErr
 						}
 
-						return normalizeException(err)
+						return src.remap(normalizeException(err))
 					})
 				},
 			}
@@ -1317,4 +1316,11 @@ type shapeFieldInfo struct {
 	value     any
 	valueType reflect.Type
 	key       string
+}
+
+// CE: compileHandler compiles a serialized handler wrapped as prefix+src+suffix and locates it in the hooks file
+// being loaded, so errors it throws can point there ([hookSource.remap]).
+func compileHandler(loader *goja.Runtime, prefix, src, suffix string) (*goja.Program, *hookSource) {
+	pr := goja.MustCompile(defaultScriptPath, prefix+src+suffix, true)
+	return pr, locateHandler(loader, src, len(prefix))
 }

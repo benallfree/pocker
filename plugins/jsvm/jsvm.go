@@ -415,9 +415,12 @@ func (p *plugin) registerHooks() error {
 				panic(callErr)
 			}
 			defer done()
+			name := p.hooksDisplayName(file) // CE: errors name the hooks file, not <cwd>/pb.js
+			setLoadingFile(loader, name, string(content))
+			defer clearLoadingFile(loader)
 			_, err := loader.RunScript(defaultScriptPath, string(content))
 			if err != nil {
-				panic(err)
+				panic(wholeFile(name).remap(err))
 			}
 		}()
 	}
@@ -660,6 +663,15 @@ func (p *plugin) onCall(vm *goja.Runtime) (func(), error) {
 		return func() {}, nil
 	}
 	return p.config.OnCall(vm)
+}
+
+// CE: hooksDisplayName is how errors name a hooks file: pb_hooks/<file> (the hooks folder's own name on disk).
+func (p *plugin) hooksDisplayName(file string) string {
+	dir := "pb_hooks"
+	if p.config.HooksFS == nil && p.config.HooksDir != "" {
+		dir = filepath.Base(p.config.HooksDir)
+	}
+	return filepath.ToSlash(filepath.Join(dir, file))
 }
 
 // CE: hookFiles returns the .pb.js files from HooksFS in embedded mode, otherwise from HooksDir.

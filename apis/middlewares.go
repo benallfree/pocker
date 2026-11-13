@@ -415,6 +415,10 @@ func logRequest(event *core.RequestEvent, err error) {
 				slog.Any("details", apiErr.RawData()),
 			)
 		} else {
+			// CE: the client gets the error handler's generic ApiError, so log its status (not 0)
+			if status == 0 {
+				status = router.ToApiError(err).Status
+			}
 			attrs = append(attrs, slog.String("error", err.Error()))
 		}
 	}

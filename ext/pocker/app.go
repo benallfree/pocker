@@ -80,6 +80,7 @@ func startApp(opts appOptions, inst Instance) (r *runningApp, err error) {
 		IsDev:         inst.Dev || opts.ForceDev,
 		EncryptionKey: inst.EncryptionKey,
 		AppMigrations: &core.MigrationsList{}, // this app's JS migrations only
+		OnLog:         appLogToInstanceLog(openInstanceLog(dir)),
 	})
 	// every message names its instance (the dev mail trap and relays show it); first, so later hooks see it
 	app.OnMailerSend().Bind(&hook.Handler[*core.MailerEvent]{
