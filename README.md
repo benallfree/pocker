@@ -16,43 +16,43 @@ That's [Homebrew](https://brew.sh) on macOS or Linux (the formula lives in
 [Releases](https://github.com/pockethost/pocketone/releases). Then:
 
 ```bash
-pocketone serve
+pocketbase serve
 ```
 
-Start a site from a starter kit with `pocketone pages create myapp` ([pages](ext/pages/README.md)).
+Start a site from a starter kit with `pocketbase pages create myapp` ([pages](ext/pages/README.md)).
 
 In dev mode (`serve --dev`), an app without SMTP doesn't use the host's `sendmail`: its mail is caught in-process and
 you read it at http://127.0.0.1:8025 ([mailtrap](ext/mailtrap/README.md)).
 
 ## Core Extensions
 
-These are extensions to PocketOne's core that ship with every binary. They do not add runtime overhead if you
+These are extensions to the PocketBase core that ship with every binary. They do not add runtime overhead if you
 choose not to use them.
 
 | Plugin | Description | Status |
 |---|---|---|
-| **[PITR](ext/pitr/README.md)** (Litestream) | Point-in-time restore of your database, from Settings → Backups or `pocketone pitr restore`. On by default; `--pitr=false` turns it off. | Stable |
+| **[PITR](ext/pitr/README.md)** (Litestream) | Point-in-time restore of your database, from Settings → Backups or `pocketbase pitr restore`. On by default; `--pitr=false` turns it off. | Stable |
 | **[Auto TLS](ext/autotls/README.md)** | On-demand certificates and wildcards through ACME. | Stable under Pocker; Beta on a single app (`--autotls`) |
 | **[Bulk Mail](ext/bulkmail/README.md)** | Campaigns to your app's own users, with audiences from a collection, a view or SQL. | Beta |
 | **[Pages](ext/pages/README.md)** (formerly PocketPages) | Server-rendered pages from a `pb_pages` folder. | Beta |
 | **[Vacuum](ext/vacuum/README.md)** | Scheduled SQLite VACUUM. | Planned |
 | **[MCP](ext/mcp/README.md)** | An MCP endpoint at `/mcp` so agents can manage your app and call its tools. | Beta |
-| **[OAuth Server](ext/oauth-server/README.md)** | Your app as an OAuth provider; `pocketone login` and MCP sign-in use it. | Beta |
+| **[OAuth Server](ext/oauth-server/README.md)** | Your app as an OAuth provider; `pocketbase login` and MCP sign-in use it. | Beta |
 | **[S3 Redirect](ext/s3redirect/README.md)** | File downloads as short-lived signed S3 redirects. | Beta |
 | **[Tokens](ext/tokens/README.md)** | Long-lived API tokens (`pbt_…`) with scopes. | Beta |
-| **[Deploy](ext/deploy/README.md)** | `pocketone deploy \| dev \| pull \| logs` and the deploy API. | Beta |
+| **[Deploy](ext/deploy/README.md)** | `pocketbase deploy \| dev \| pull \| logs` and the deploy API. | Beta |
 | **[Remotes](ext/remotes/README.md)** | Named remotes and saved logins for the `pocketone` command. | Beta |
 
 ## Community Plugins
 
 These plugins are maintained by PocketHost and the community and are MIT. You can mix and match them to create your
-own custom PocketOne experience.
+own custom PocketBase experience.
 
 **Run many instances**
 
 | Plugin | Description | Status |
 |---|---|---|
-| **[Pocker](ext/pocker/README.md)** | Hundreds of PocketOne apps in one Go process, routed by hostname. | Stable |
+| **[Pocker](ext/pocker/README.md)** | Hundreds of PocketBase instances in one Go process, routed by hostname. | Stable |
 | **[Schedules](ext/schedules/README.md)** | Scheduled webhooks that wake sleeping instances (headed into Pocker). | Planned |
 | **[Mothership](ext/mothership/README.md)** | A control plane and its edges, across regions. Needs Pocker. | Planned |
 | **[Sandbox](ext/sandbox/README.md)** | Confines untrusted JS hooks, SQL and outbound network ([how is this safe?](ext/sandbox/README.md#how-is-this-safe)). Required for Multitenant. | Stable |
@@ -93,59 +93,162 @@ Plugins are welcome. Read [Create your own plugin](docs/plugins.md), then open a
 every level: on a single app and on every instance under pocker. Keep changes to PocketBase's own code to the minimum hook your plugin needs, and include a small
 `example/main.go` that builds and shows the feature.
 
-## Built on PocketBase
+MIT, like PocketBase.
 
-PocketOne is built on [PocketBase](https://pocketbase.io), an open source Go backend with an embedded SQLite database
-and realtime subscriptions, files and users management, a superuser dashboard and a REST-ish API. PocketOne keeps
-PocketBase's APIs, so [PocketBase's documentation](https://pocketbase.io/docs) applies to the core, and the official
-PocketBase SDKs ([JavaScript](https://github.com/pocketbase/js-sdk), [Dart](https://github.com/pocketbase/dart-sdk))
-work with PocketOne apps.
+---
 
-PocketOne isn't affiliated with or endorsed by PocketBase. Please don't take PocketOne questions or issues to the
-PocketBase project.
+<p align="center">
+    <a href="https://pocketbase.io" target="_blank" rel="noopener">
+        <img src="https://i.imgur.com/aCBbjKx.png" alt="PocketBase - open source backend in 1 file" />
+    </a>
+</p>
 
-## Use as a standalone app
+<p align="center">
+    <a href="https://pkg.go.dev/ganigeorgiev.com/pocketbase/pocketbase" target="_blank" rel="noopener"><img src="https://godoc.org/ganigeorgiev.com/pocketbase/pocketbase?status.svg" alt="Go package documentation" /></a>
+</p>
 
-Install with Homebrew (above), or download the zip for your platform from
-[Releases](https://github.com/pockethost/pocketone/releases), extract it and run `./pocketone serve`.
+[PocketBase](https://pocketbase.io) is an open source Go backend that includes:
 
-The prebuilt executables are built from [`examples/ce`](examples/ce/main.go): PocketBase's `examples/base` plus the
-plugins that ship by default. They include the JS VM, so you can extend your app with JavaScript (see
-[Extend with JavaScript](https://pocketbase.io/docs/js-overview/)), and the [Core Extensions](#core-extensions) above.
+- embedded database (_SQLite_) with **realtime subscriptions**
+- built-in **files and users management**
+- convenient **Superuser dashboard UI**
+- and simple **REST-ish API**
 
-## Use as a Go framework
+**For documentation and examples, please visit https://pocketbase.io/docs .**
 
-PocketOne keeps PocketBase's Go module path, so an app written against PocketBase builds against PocketOne with one
-`replace` line in its `go.mod`:
+> **NB!** Please keep in mind that PocketBase is still under active development
+> and full backward compatibility is not guaranteed before reaching v1.0.0.
 
+
+## API SDK clients
+
+The easiest way to interact with the PocketBase Web APIs is to use one of the official SDK clients:
+
+- **JavaScript - [pocketbase/js-sdk](https://ganigeorgiev.com/pocketbase/js-sdk)** (_Browser, Node.js, React Native_)
+- **Dart - [pocketbase/dart-sdk](https://ganigeorgiev.com/pocketbase/dart-sdk)** (_Web, Mobile, Desktop, CLI_)
+
+You could also check the recommendations in https://pocketbase.io/docs/how-to-use/.
+
+
+## Overview
+
+### Use as standalone app
+
+You could download the prebuilt executable for your platform from the [Releases page](https://ganigeorgiev.com/pocketbase/pocketbase/releases).
+Once downloaded, extract the archive and run `./pocketbase serve` in the extracted directory.
+
+The prebuilt executables are built from [`examples/ce`](examples/ce/main.go): PocketBase's `examples/base` plus the CE plugins that ship by default. They come with the JS VM plugin enabled, which lets you extend PocketBase with JavaScript (_see [Extend with JavaScript](https://pocketbase.io/docs/js-overview/)_), and with the [Core Extensions](#core-extensions) above.
+
+### Use as a Go framework/toolkit
+
+PocketBase is distributed as a regular Go library package which allows you to build
+your own custom app specific business logic and still have a single portable executable at the end.
+
+Here is a minimal example:
+
+0. [Install Go 1.27+](https://go.dev/doc/install) (_if you haven't already_)
+
+1. Create a new project directory with the following `main.go` file inside it:
+    ```go
+    package main
+
+    import (
+        "log"
+
+        "ganigeorgiev.com/pocketbase/pocketbase"
+        "ganigeorgiev.com/pocketbase/pocketbase/core"
+    )
+
+    func main() {
+        app := pocketbase.New()
+
+        app.OnServe().BindFunc(func(se *core.ServeEvent) error {
+            // registers new "GET /hello" route
+            se.Router.GET("/hello", func(re *core.RequestEvent) error {
+                return re.String(200, "Hello world!")
+            })
+
+            return se.Next()
+        })
+
+        if err := app.Start(); err != nil {
+            log.Fatal(err)
+        }
+    }
+    ```
+
+2. To init the dependencies, run `go mod init myapp && go mod tidy`.
+
+3. To start the application, run `go run main.go serve`.
+
+4. To build a statically linked executable, you can run `CGO_ENABLED=0 go build` and then start the created executable with `./myapp serve`.
+
+_For more details please refer to [Extend with Go](https://pocketbase.io/docs/go-overview/)._
+
+### Building and running the repo main.go example
+
+To build the standalone executable, like the prebuilt ones in the releases page, run `go build` inside the `examples/ce` directory (`examples/base` builds plain PocketBase without the CE plugins):
+
+0. [Install Go 1.27+](https://go.dev/doc/install) (_if you haven't already_)
+1. Clone/download the repo
+2. Navigate to `examples/ce`
+3. Run `CGO_ENABLED=0 go build -o pocketbase` to build a binary for your current environment
+   _(or to target other platforms use `GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o pocketbase`; see https://go.dev/doc/install/source#environment)_
+4. Start the created executable by running `./pocketbase serve`.
+
+Note that the supported build targets by the pure Go SQLite driver at the moment are:
+
+| GOOS    | GOARCH  |
+|---------|---------|
+| darwin  | amd64   |
+| darwin  | arm64   |
+| freebsd | 386     |
+| freebsd | amd64   |
+| freebsd | arm     |
+| freebsd | arm64   |
+| linux   | 386     |
+| linux   | amd64   |
+| linux   | arm     |
+| linux   | arm64   |
+| linux   | loong64 |
+| linux   | ppc64le |
+| linux   | riscv64 |
+| linux   | s390x   |
+| netbsd  | amd64   |
+| openbsd | amd64   |
+| openbsd | arm64   |
+| windows | 386     |
+| windows | amd64   |
+| windows | arm64   |
+
+### Testing
+
+PocketBase comes with mixed bag of unit and integration tests.
+To run them, use the standard `go test` command:
+
+```sh
+go test ./...
 ```
-replace ganigeorgiev.com/pocketbase/pocketbase => github.com/pockethost/pocketone v0.0.1
-```
 
-Plugins are separate modules under `github.com/pockethost/pocketone/ext/...`. See
-[Create your own plugin](docs/plugins.md) for how to wire them in, and
-[Extend with Go](https://pocketbase.io/docs/go-overview/) for the core APIs.
+Check also the [Testing guide](http://pocketbase.io/docs/testing) to learn how to write your own custom application tests.
 
-## Build from source
-
-0. [Install Go 1.27+](https://go.dev/doc/install).
-1. Clone this repo and go to `examples/ce`.
-2. Run `CGO_ENABLED=0 go build -o pocketone` (for another platform, add `GOOS=linux GOARCH=amd64`).
-3. Start it with `./pocketone serve`.
-
-`examples/base` builds plain PocketBase without the plugins. The pure Go SQLite driver supports darwin, linux and
-windows on amd64 and arm64, plus the other targets listed in
-[modernc.org/sqlite](https://pkg.go.dev/modernc.org/sqlite#hdr-Supported_platforms_and_architectures).
-
-## Testing
-
-Run `go test ./...` at the repo root for the core, and inside each `ext/<name>` module for its plugin.
 
 ## Security
 
-If you find a security issue in PocketOne, don't open a public issue. Contact the maintainers privately on
-[Discord](https://discord.gg/nVTxCMEcGT).
+If you discover a security vulnerability within PocketBase, please submit a [private bug](https://ganigeorgiev.com/pocketbase/discussions/new/Bugs?private=1) OR send an e-mail to **support at pocketbase.io**.
 
-## License
+You could find more details in the project [Security policy](https://ganigeorgiev.com/pocketbase/pocketbase/files/SECURITY.md).
 
-MIT. PocketOne includes PocketBase, copyright Gani Georgiev, under the MIT License; see [LICENSE.md](LICENSE.md).
+
+## Contributing
+
+PocketBase is free and open source project licensed under the [MIT License](https://ganigeorgiev.com/pocketbase/pocketbase/files/LICENSE.md).
+
+You are free to do whatever you want with it, even offering it as a paid service
+_(if you decide to do the latter, please make it clear that your service is not affiliated with the PocketBase project to avoid people wrongly submitting issues related to your service in the project's tracker)_.
+
+You could help me by:
+
+- [Report bugs and security issues](https://ganigeorgiev.com/pocketbase/discussions?category=Bugs)
+- [Suggesting new features](https://ganigeorgiev.com/pocketbase/discussions?category=Feature+requests)
+- [Help other people in the discussions](https://ganigeorgiev.com/pocketbase/discussions)
