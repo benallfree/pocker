@@ -6,7 +6,7 @@ description: The Datastar add-on adds ctx.datastar helpers for Datastar script t
 # Datastar Plugin
 
 The Datastar add-on adds helpers for [Datastar](https://data-star.dev). It's a JS plugin that ships with PocketPages
-rather than a built-in: copy [`addons/datastar.js`](https://github.com/pockethost/pocketbase/blob/main/ext/pages/addons/datastar.js)
+rather than a built-in: copy [`addons/datastar.js`](https://github.com/pockethost/pocketone/blob/main/ext/pages/addons/datastar.js)
 into `pb_pages/_private/` (the `datastar` starter kit already has it) and list it in `+config.js`:
 
 ```js

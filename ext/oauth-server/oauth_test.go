@@ -20,8 +20,8 @@ import (
 	"ganigeorgiev.com/pocketbase/pocketbase/apis"
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"ganigeorgiev.com/pocketbase/pocketbase/tests"
-	"github.com/pockethost/pocketbase/ext/remotes"
-	"github.com/pockethost/pocketbase/ext/tokens"
+	"github.com/pockethost/pocketone/ext/remotes"
+	"github.com/pockethost/pocketone/ext/tokens"
 )
 
 func serveApp(t *testing.T, app *tests.TestApp) string {

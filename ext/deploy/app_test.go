@@ -14,8 +14,8 @@ import (
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"ganigeorgiev.com/pocketbase/pocketbase/tests"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/types"
-	"github.com/pockethost/pocketbase/ext/remotes"
-	"github.com/pockethost/pocketbase/ext/tokens"
+	"github.com/pockethost/pocketone/ext/remotes"
+	"github.com/pockethost/pocketone/ext/tokens"
 )
 
 // serveApp runs app's router (OnServe included) on a local test server.

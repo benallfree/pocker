@@ -1,4 +1,4 @@
-// Package firewall is PBCE's request firewall for a multi-instance host (ext/host): an allowed-peers list, trusted
+// Package firewall is PocketOne's request firewall for a multi-instance host (ext/host): an allowed-peers list, trusted
 // proxies and client IPs, and per-IP and per-instance rate limits (hourly budgets and concurrency caps, with higher
 // limits for trusted clients). It is a host [host.Gate]; settings come from the config's `firewall:` and
 // `rate_limits:` sections and, per instance, `plugins.firewall`. It works with or without ext/edge.
@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pockethost/pocketbase/ext/host"
+	"github.com/pockethost/pocketone/ext/host"
 
 	"gopkg.in/yaml.v3"
 )

@@ -15,10 +15,10 @@ import (
 
 	"ganigeorgiev.com/pocketbase/pocketbase"
 	"ganigeorgiev.com/pocketbase/pocketbase/plugins/jsvm"
-	"github.com/pockethost/pocketbase/ext/deploy"
-	"github.com/pockethost/pocketbase/ext/devusers"
-	"github.com/pockethost/pocketbase/ext/remotes"
-	"github.com/pockethost/pocketbase/ext/tokens"
+	"github.com/pockethost/pocketone/ext/deploy"
+	"github.com/pockethost/pocketone/ext/devusers"
+	"github.com/pockethost/pocketone/ext/remotes"
+	"github.com/pockethost/pocketone/ext/tokens"
 )
 
 func main() {

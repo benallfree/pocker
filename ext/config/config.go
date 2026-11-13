@@ -1,4 +1,4 @@
-// Package config is PBCE's config file: pocketbase.yaml, with secrets in a .env beside it.
+// Package config is PocketOne's config file: pocketbase.yaml, with secrets in a .env beside it.
 //
 // Each plugin owns one top-level section, declared with ceplugin.NewSection (a typed key the owner exports); a
 // plugin reads a section only through its owner's key. This package finds and parses the files, expands $VARS,
@@ -18,7 +18,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/pockethost/pocketbase/ext/ceplugin"
+	"github.com/pockethost/pocketone/ext/ceplugin"
 	"gopkg.in/yaml.v3"
 )
 

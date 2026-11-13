@@ -3,7 +3,7 @@ package pocker
 import (
 	"context"
 
-	"github.com/pockethost/pocketbase/ext/host"
+	"github.com/pockethost/pocketone/ext/host"
 
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"github.com/dop251/goja"

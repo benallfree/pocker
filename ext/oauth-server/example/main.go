@@ -12,10 +12,10 @@ import (
 	"log"
 
 	"ganigeorgiev.com/pocketbase/pocketbase"
-	"github.com/pockethost/pocketbase/ext/devusers"
-	oauthserver "github.com/pockethost/pocketbase/ext/oauth-server"
-	"github.com/pockethost/pocketbase/ext/remotes"
-	"github.com/pockethost/pocketbase/ext/tokens"
+	"github.com/pockethost/pocketone/ext/devusers"
+	oauthserver "github.com/pockethost/pocketone/ext/oauth-server"
+	"github.com/pockethost/pocketone/ext/remotes"
+	"github.com/pockethost/pocketone/ext/tokens"
 )
 
 func main() {

@@ -31,5 +31,5 @@ A handler it can't place (built from a string, registered at runtime) keeps jsvm
 ## No change to PocketBase's behavior
 
 It's a jsvm extension (`jsvm.Config.Extensions`) with `OnLoad` and `OnCompile` methods, plus `jsvm.ScriptPath()`
-(PocketBase CE's small seam; with no extensions, jsvm behaves like upstream). It used to live inside jsvm (`hooksource.go`); it moved here on
+(PocketOne's small seam; with no extensions, jsvm behaves like upstream). It used to live inside jsvm (`hooksource.go`); it moved here on
 2026-11-13.

@@ -5,7 +5,7 @@ import (
 
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"github.com/dop251/goja"
-	"github.com/pockethost/pocketbase/ext/ceplugin"
+	"github.com/pockethost/pocketone/ext/ceplugin"
 	"gopkg.in/yaml.v3"
 )
 

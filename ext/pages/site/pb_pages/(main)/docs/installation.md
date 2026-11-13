@@ -1,11 +1,11 @@
 ---
 title: Installation
-description: Run PocketPages v1 on PocketBase CE with the pages plugin, using a pb_pages folder.
+description: Run PocketPages v1 on PocketOne with the pages plugin, using a pb_pages folder.
 ---
 
 # Installation
 
-PocketPages v1 is built into PocketBase CE as the `pages` plugin (`ext/pages`). There is nothing to install from npm. You need a PocketBase CE binary with the plugin.
+PocketPages v1 is built into PocketOne as the `pages` plugin (`ext/pages`). There is nothing to install from npm. You need a PocketOne binary with the plugin.
 
 <%- include('quickstart') %>
 

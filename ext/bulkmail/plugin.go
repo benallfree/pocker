@@ -3,10 +3,10 @@ package bulkmail
 import (
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"github.com/dop251/goja"
-	"github.com/pockethost/pocketbase/ext/ceplugin"
+	"github.com/pockethost/pocketone/ext/ceplugin"
 )
 
-// Plugin is bulk mail as a PocketBase CE plugin ([ceplugin.Plugin]): the same value works on a single app and on
+// Plugin is bulk mail as a PocketOne plugin ([ceplugin.Plugin]): the same value works on a single app and on
 // every instance under pocker.
 //
 //	ceplugin.MustRegister(app, bulkmail.New(bulkmail.Config{}))         // a single app

@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/filesystem/blob"
-	"github.com/pockethost/pocketbase/ext/s3redirect/sigv4"
+	"github.com/pockethost/pocketone/ext/s3redirect/sigv4"
 )
 
 // prefixDriver fences a driver to the keys under prefix: the app sees "a/b.png", the bucket stores

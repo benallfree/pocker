@@ -1,4 +1,4 @@
-module github.com/pockethost/pocketbase/ext/sandbox
+module github.com/pockethost/pocketone/ext/sandbox
 
 go 1.27
 
@@ -9,7 +9,7 @@ require (
 	github.com/dop251/goja v0.0.0-20261023121931-6ace4dde0b29
 	github.com/dop251/goja_nodejs v0.0.0-20260212111938-1f56ff5bcf14
 	github.com/gabriel-vasile/mimetype v1.4.15
-	github.com/pockethost/pocketbase/ext/devusers v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/devusers v0.0.0-00010101000000-000000000000
 	modernc.org/libc v1.77.1
 	modernc.org/sqlite v1.60.1
 )
@@ -49,4 +49,4 @@ require (
 
 replace ganigeorgiev.com/pocketbase/pocketbase => ../..
 
-replace github.com/pockethost/pocketbase/ext/devusers => ../devusers
+replace github.com/pockethost/pocketone/ext/devusers => ../devusers

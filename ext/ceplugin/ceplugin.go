@@ -1,4 +1,4 @@
-// Package ceplugin is PocketBase CE's plugin contract: one plugin value that works on a single app and,
+// Package ceplugin is PocketOne's plugin contract: one plugin value that works on a single app and,
 // unchanged, on every instance under pocker (ext/pocker hosts any [Plugin] in Server.Plugins).
 //
 // A plugin implements Name and Register, and optionally [JSBinder]:
@@ -28,7 +28,7 @@ import (
 	"github.com/dop251/goja"
 )
 
-// Plugin is a PocketBase CE plugin.
+// Plugin is a PocketOne plugin.
 type Plugin interface {
 	// Name is the plugin's key: a top-level key in a pocker config file, an instance's `plugins.<name>` block, the
 	// prefix of its collections (`_<name>_`) and its name in logs.

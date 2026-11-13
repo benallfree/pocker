@@ -6,8 +6,8 @@ import (
 	"fmt"
 
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
-	"github.com/pockethost/pocketbase/ext/pages"
-	"github.com/pockethost/pocketbase/ext/pocker"
+	"github.com/pockethost/pocketone/ext/pages"
+	"github.com/pockethost/pocketone/ext/pocker"
 )
 
 // Name is the plugin's name under pocker: an instance's `plugins.pages` block.

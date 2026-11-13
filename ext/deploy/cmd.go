@@ -14,8 +14,8 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
-	"github.com/pockethost/pocketbase/ext/deploy/internal/glob"
-	"github.com/pockethost/pocketbase/ext/remotes"
+	"github.com/pockethost/pocketone/ext/deploy/internal/glob"
+	"github.com/pockethost/pocketone/ext/remotes"
 	"github.com/spf13/cobra"
 )
 

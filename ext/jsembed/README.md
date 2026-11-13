@@ -35,5 +35,5 @@ embedded hooks: `go run ./example serve`, then `curl http://127.0.0.1:8090/hello
 ## No change to PocketBase's behavior
 
 `Hooks` and `Migrations` are jsvm extensions (`jsvm.Config.Extensions`) with `HookFiles`, `Require` and
-`MigrationFiles` methods (PocketBase CE's small seam; with no extensions, jsvm behaves like upstream). It used to live inside jsvm (`HooksFS`/`MigrationsFS`); it moved
+`MigrationFiles` methods (PocketOne's small seam; with no extensions, jsvm behaves like upstream). It used to live inside jsvm (`HooksFS`/`MigrationsFS`); it moved
 here on 2026-11-13.

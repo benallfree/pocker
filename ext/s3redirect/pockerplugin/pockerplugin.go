@@ -15,8 +15,8 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
-	"github.com/pockethost/pocketbase/ext/pocker"
-	"github.com/pockethost/pocketbase/ext/s3redirect"
+	"github.com/pockethost/pocketone/ext/pocker"
+	"github.com/pockethost/pocketone/ext/s3redirect"
 )
 
 // Name is the plugin's name under pocker: the top-level config key and an instance's `plugins.s3redirect` block.

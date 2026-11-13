@@ -1,4 +1,4 @@
-module github.com/pockethost/pocketbase/ext/autotls
+module github.com/pockethost/pocketone/ext/autotls
 
 go 1.27
 
@@ -6,8 +6,8 @@ require (
 	ganigeorgiev.com/pocketbase/pocketbase v0.0.0-00010101000000-000000000000
 	github.com/caddyserver/certmagic v0.25.6
 	github.com/libdns/cloudflare v0.2.2
-	github.com/pockethost/pocketbase/ext/ceplugin v0.0.0-00010101000000-000000000000
-	github.com/pockethost/pocketbase/ext/pocker v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/ceplugin v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/pocker v0.0.0-00010101000000-000000000000
 	golang.org/x/crypto v0.58.0
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -40,9 +40,9 @@ require (
 	github.com/mholt/acmez/v3 v3.1.7 // indirect
 	github.com/miekg/dns v1.1.73 // indirect
 	github.com/ncruces/go-strftime v1.1.0 // indirect
-	github.com/pockethost/pocketbase/ext/host v0.0.0-00010101000000-000000000000 // indirect
-	github.com/pockethost/pocketbase/ext/jserrors v0.0.0-00010101000000-000000000000 // indirect
-	github.com/pockethost/pocketbase/ext/sandbox v0.0.0-00010101000000-000000000000 // indirect
+	github.com/pockethost/pocketone/ext/host v0.0.0-00010101000000-000000000000 // indirect
+	github.com/pockethost/pocketone/ext/jserrors v0.0.0-00010101000000-000000000000 // indirect
+	github.com/pockethost/pocketone/ext/sandbox v0.0.0-00010101000000-000000000000 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/spf13/cast v1.10.0 // indirect
 	github.com/spf13/cobra v1.10.2 // indirect
@@ -65,14 +65,14 @@ require (
 
 replace (
 	ganigeorgiev.com/pocketbase/pocketbase => ../..
-	github.com/pockethost/pocketbase/ext/pocker => ../pocker
-	github.com/pockethost/pocketbase/ext/sandbox => ../sandbox
+	github.com/pockethost/pocketone/ext/pocker => ../pocker
+	github.com/pockethost/pocketone/ext/sandbox => ../sandbox
 )
 
-replace github.com/pockethost/pocketbase/ext/edge => ../edge
+replace github.com/pockethost/pocketone/ext/edge => ../edge
 
-replace github.com/pockethost/pocketbase/ext/host => ../host
+replace github.com/pockethost/pocketone/ext/host => ../host
 
-replace github.com/pockethost/pocketbase/ext/ceplugin => ../ceplugin
+replace github.com/pockethost/pocketone/ext/ceplugin => ../ceplugin
 
-replace github.com/pockethost/pocketbase/ext/jserrors => ../jserrors
+replace github.com/pockethost/pocketone/ext/jserrors => ../jserrors

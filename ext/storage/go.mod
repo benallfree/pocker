@@ -1,11 +1,11 @@
-module github.com/pockethost/pocketbase/ext/storage
+module github.com/pockethost/pocketone/ext/storage
 
 go 1.27
 
 require (
 	ganigeorgiev.com/pocketbase/pocketbase v0.0.0-00010101000000-000000000000
-	github.com/pockethost/pocketbase/ext/pocker v0.0.0-00010101000000-000000000000
-	github.com/pockethost/pocketbase/ext/s3redirect v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/pocker v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/s3redirect v0.0.0-00010101000000-000000000000
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -33,10 +33,10 @@ require (
 	github.com/mattn/go-colorable v0.1.16 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/ncruces/go-strftime v1.1.0 // indirect
-	github.com/pockethost/pocketbase/ext/ceplugin v0.0.0-00010101000000-000000000000 // indirect
-	github.com/pockethost/pocketbase/ext/host v0.0.0-00010101000000-000000000000 // indirect
-	github.com/pockethost/pocketbase/ext/jserrors v0.0.0-00010101000000-000000000000 // indirect
-	github.com/pockethost/pocketbase/ext/sandbox v0.0.0-00010101000000-000000000000 // indirect
+	github.com/pockethost/pocketone/ext/ceplugin v0.0.0-00010101000000-000000000000 // indirect
+	github.com/pockethost/pocketone/ext/host v0.0.0-00010101000000-000000000000 // indirect
+	github.com/pockethost/pocketone/ext/jserrors v0.0.0-00010101000000-000000000000 // indirect
+	github.com/pockethost/pocketone/ext/sandbox v0.0.0-00010101000000-000000000000 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/rogpeppe/go-internal v1.10.0 // indirect
 	github.com/spf13/cast v1.10.0 // indirect
@@ -61,17 +61,17 @@ require (
 replace ganigeorgiev.com/pocketbase/pocketbase => ../..
 
 replace (
-	github.com/pockethost/pocketbase/ext/pocker => ../pocker
-	github.com/pockethost/pocketbase/ext/s3redirect => ../s3redirect
-	github.com/pockethost/pocketbase/ext/sandbox => ../sandbox
+	github.com/pockethost/pocketone/ext/pocker => ../pocker
+	github.com/pockethost/pocketone/ext/s3redirect => ../s3redirect
+	github.com/pockethost/pocketone/ext/sandbox => ../sandbox
 )
 
-replace github.com/pockethost/pocketbase/ext/devusers => ../devusers
+replace github.com/pockethost/pocketone/ext/devusers => ../devusers
 
-replace github.com/pockethost/pocketbase/ext/edge => ../edge
+replace github.com/pockethost/pocketone/ext/edge => ../edge
 
-replace github.com/pockethost/pocketbase/ext/host => ../host
+replace github.com/pockethost/pocketone/ext/host => ../host
 
-replace github.com/pockethost/pocketbase/ext/ceplugin => ../ceplugin
+replace github.com/pockethost/pocketone/ext/ceplugin => ../ceplugin
 
-replace github.com/pockethost/pocketbase/ext/jserrors => ../jserrors
+replace github.com/pockethost/pocketone/ext/jserrors => ../jserrors

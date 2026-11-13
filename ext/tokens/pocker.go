@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
-	"github.com/pockethost/pocketbase/ext/pocker"
+	"github.com/pockethost/pocketone/ext/pocker"
 )
 
 // Name is the plugin's key under an instance's `plugins:`.

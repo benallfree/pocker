@@ -18,9 +18,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/pockethost/pocketbase/ext/deploy/internal/glob"
-	"github.com/pockethost/pocketbase/ext/deploy/nodemodules"
-	"github.com/pockethost/pocketbase/ext/remotes"
+	"github.com/pockethost/pocketone/ext/deploy/internal/glob"
+	"github.com/pockethost/pocketone/ext/deploy/nodemodules"
+	"github.com/pockethost/pocketone/ext/remotes"
 )
 
 // API paths. A CE remote serves PockerPrefix; PocketHost edges serve LegacyPrefix (the npm CLI's), which the client

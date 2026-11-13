@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pockethost/pocketbase/ext/ceplugin"
+	"github.com/pockethost/pocketone/ext/ceplugin"
 )
 
 type testCfg struct {

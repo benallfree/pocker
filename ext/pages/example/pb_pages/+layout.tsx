@@ -40,7 +40,7 @@ export default function Layout({ ctx, children, slot, asset }: any) {
         {flash && <p class="flash">{String(flash)}</p>}
         <main>{children}</main>
         <footer>
-          Rendered by <code>ext/pages</code> in PocketBase CE · page file <code>{ctx.route.file}</code>
+          Rendered by <code>ext/pages</code> in PocketOne · page file <code>{ctx.route.file}</code>
         </footer>
       </body>
     </html>

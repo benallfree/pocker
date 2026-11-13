@@ -1,6 +1,6 @@
-# PocketBase Community Edition
+# PocketOne - A community fork of PocketBase
 
-PocketBase Community Edition (PocketBase CE) is a community fork of [PocketBase](https://pocketbase.io). It tracks
+PocketOne is a community fork of [PocketBase](https://pocketbase.io). It tracks
 upstream and aims to keep its own changes to the core small: just the hooks that let plugins extend and override
 PocketBase. Everything else is a plugin. Maintained by [PocketHost](https://pockethost.io); not affiliated with or
 endorsed by the PocketBase project.
@@ -13,7 +13,7 @@ brew install pockethost/tap/pocketbase
 
 That's [Homebrew](https://brew.sh) on macOS or Linux (the formula lives in
 [pockethost/homebrew-tap](https://github.com/pockethost/homebrew-tap)). Or download the zip for your platform from
-[Releases](https://github.com/pockethost/pocketbase/releases). Then:
+[Releases](https://github.com/pockethost/pocketone/releases). Then:
 
 ```bash
 pocketbase serve

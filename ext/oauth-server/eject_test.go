@@ -12,9 +12,9 @@ import (
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"ganigeorgiev.com/pocketbase/pocketbase/plugins/jsvm"
 	"ganigeorgiev.com/pocketbase/pocketbase/tests"
-	"github.com/pockethost/pocketbase/ext/pages"
-	"github.com/pockethost/pocketbase/ext/remotes"
-	"github.com/pockethost/pocketbase/ext/tokens"
+	"github.com/pockethost/pocketone/ext/pages"
+	"github.com/pockethost/pocketone/ext/remotes"
+	"github.com/pockethost/pocketone/ext/tokens"
 )
 
 func TestEjectRendersThroughPages(t *testing.T) {

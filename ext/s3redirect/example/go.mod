@@ -1,4 +1,4 @@
-module github.com/pockethost/pocketbase/ext/s3redirect/example
+module github.com/pockethost/pocketone/ext/s3redirect/example
 
 go 1.27
 
@@ -6,8 +6,8 @@ require (
 	ganigeorgiev.com/pocketbase/pocketbase v0.0.0-00010101000000-000000000000
 	github.com/aws/aws-sdk-go-v2 v1.48.0
 	github.com/johannesboyne/gofakes3 v1.2.0
-	github.com/pockethost/pocketbase/ext/devusers v0.0.0-00010101000000-000000000000
-	github.com/pockethost/pocketbase/ext/s3redirect v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/devusers v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/s3redirect v0.0.0-00010101000000-000000000000
 )
 
 require (
@@ -54,14 +54,14 @@ require (
 replace ganigeorgiev.com/pocketbase/pocketbase => ../../..
 
 replace (
-	github.com/pockethost/pocketbase/ext/devusers => ../../devusers
-	github.com/pockethost/pocketbase/ext/pocker => ../../pocker
-	github.com/pockethost/pocketbase/ext/s3redirect => ..
-	github.com/pockethost/pocketbase/ext/sandbox => ../../sandbox
+	github.com/pockethost/pocketone/ext/devusers => ../../devusers
+	github.com/pockethost/pocketone/ext/pocker => ../../pocker
+	github.com/pockethost/pocketone/ext/s3redirect => ..
+	github.com/pockethost/pocketone/ext/sandbox => ../../sandbox
 )
 
-replace github.com/pockethost/pocketbase/ext/host => ../../host
+replace github.com/pockethost/pocketone/ext/host => ../../host
 
-replace github.com/pockethost/pocketbase/ext/ceplugin => ../../ceplugin
+replace github.com/pockethost/pocketone/ext/ceplugin => ../../ceplugin
 
-replace github.com/pockethost/pocketbase/ext/jserrors => ../../jserrors
+replace github.com/pockethost/pocketone/ext/jserrors => ../../jserrors

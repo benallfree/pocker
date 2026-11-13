@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/pockethost/pocketbase/ext/tokens"
+	"github.com/pockethost/pocketone/ext/tokens"
 )
 
 // What Claude's connector flow needs (pockethost-support plans/ce-mcp-plan.md, Auth).

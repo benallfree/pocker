@@ -8,11 +8,11 @@ import (
 	"net/netip"
 	"runtime/debug"
 
-	"github.com/pockethost/pocketbase/ext/host"
-	"github.com/pockethost/pocketbase/ext/sandbox"
+	"github.com/pockethost/pocketone/ext/host"
+	"github.com/pockethost/pocketone/ext/sandbox"
 
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
-	"github.com/pockethost/pocketbase/ext/ceplugin"
+	"github.com/pockethost/pocketone/ext/ceplugin"
 )
 
 // Server wires a [Config], an [InstanceSource] and a [Manager] into one HTTP server.
@@ -111,7 +111,7 @@ func (s *Server) Run(ctx context.Context) error {
 			}
 		}
 		if cp, ok := p.(ceplugin.Plugin); ok {
-			// a PocketBase CE plugin: register it on every instance, with that instance's settings
+			// a PocketOne plugin: register it on every instance, with that instance's settings
 			if _, own := p.(AppIniter); !own {
 				h, err := hostCEPlugin(cp, s.Config.Doc())
 				if err != nil {

@@ -1,4 +1,4 @@
-// Settings → Mail note for PocketBase CE ext/mailrelay: tells the superuser where mail goes while SMTP is off.
+// Settings → Mail note for PocketOne ext/mailrelay: tells the superuser where mail goes while SMTP is off.
 // Plain DOM plus the dashboard's app.pb client, so it depends on as little of the experimental UI kit as possible.
 (() => {
     let status = null;

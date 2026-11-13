@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	"github.com/pockethost/pocketbase/ext/sandbox"
+	"github.com/pockethost/pocketone/ext/sandbox"
 	"net"
 	"net/http"
 	"net/http/httptest"

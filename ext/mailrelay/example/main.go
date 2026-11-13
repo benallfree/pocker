@@ -1,4 +1,4 @@
-// Command example is a Pocker build with mailrelay, relaying into PocketBase CE's dev mail trap: every instance
+// Command example is a Pocker build with mailrelay, relaying into PocketOne's dev mail trap: every instance
 // without its own SMTP sends as <instance>@mail.localhost, and all of it lands in one inbox.
 //
 //	go run ./example --dev
@@ -8,7 +8,7 @@
 //	curl -X POST http://alpha.localhost:8090/api/collections/users/request-password-reset -d email=user@example.com
 //	curl -X POST http://beta.localhost:8090/api/collections/users/request-password-reset -d email=user@example.com
 //
-// and read it in PocketBase CE's dev mail trap at http://127.0.0.1:8025 (filter by instance; PB_MAILTRAP_HTTP and
+// and read it in PocketOne's dev mail trap at http://127.0.0.1:8025 (filter by instance; PB_MAILTRAP_HTTP and
 // PB_MAILTRAP_SMTP change its ports). Settings → Mail in each dashboard shows the relay.
 //
 // Logins (ext/devusers, local testing only): dashboard admin@example.com / password, app user user@example.com / password.
@@ -22,10 +22,10 @@ import (
 	"os/signal"
 
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
-	"github.com/pockethost/pocketbase/ext/devusers"
-	"github.com/pockethost/pocketbase/ext/mailrelay"
-	"github.com/pockethost/pocketbase/ext/mailtrap"
-	"github.com/pockethost/pocketbase/ext/pocker"
+	"github.com/pockethost/pocketone/ext/devusers"
+	"github.com/pockethost/pocketone/ext/mailrelay"
+	"github.com/pockethost/pocketone/ext/mailtrap"
+	"github.com/pockethost/pocketone/ext/pocker"
 )
 
 func main() {

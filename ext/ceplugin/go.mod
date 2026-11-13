@@ -1,4 +1,4 @@
-module github.com/pockethost/pocketbase/ext/ceplugin
+module github.com/pockethost/pocketone/ext/ceplugin
 
 go 1.27
 

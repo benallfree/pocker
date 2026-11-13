@@ -5,7 +5,7 @@ Many PocketBase instances in one process (like Docker, but for PocketBase), rout
 **Runs on:** it is the multi-instance host; [mothership](../mothership/README.md) and other host-level plugins
 register on it.
 
-> **Status.** Working: this folder is the Go module `github.com/pockethost/pocketbase/ext/pocker` (CLI in
+> **Status.** Working: this folder is the Go module `github.com/pockethost/pocketone/ext/pocker` (CLI in
 > [`cmd/pocker`](cmd/pocker), runnable [`example/`](example), configuration and API in [POCKER.md](POCKER.md)).  Routing,
 > pocker is a runtime provider on [ext/host](../host/README.md) (routing, listeners); the firewall is
 > [ext/firewall](../firewall/README.md) and forwarding to other edges [ext/edge](../edge/README.md); auto TLS and Server-Timing are

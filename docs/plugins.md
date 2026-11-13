@@ -1,6 +1,6 @@
 # Create your own plugin
 
-A PocketBase CE plugin is Go code compiled into your build. It can add, to every instance:
+A PocketOne plugin is Go code compiled into your build. It can add, to every instance:
 - Go routes;
 - PocketBase hooks;
 - collections;
@@ -10,7 +10,7 @@ It can also run process-wide jobs and middleware.
 
 ## The plugin contract: `ceplugin`
 
-Write a plugin once, against [`ceplugin`](../ext/ceplugin/ceplugin.go) (its own module, `github.com/pockethost/pocketbase/ext/ceplugin`; core has no part in it), and the same value runs on a single app
+Write a plugin once, against [`ceplugin`](../ext/ceplugin/ceplugin.go) (its own module, `github.com/pockethost/pocketone/ext/ceplugin`; core has no part in it), and the same value runs on a single app
 and on every instance under pocker:
 
 ```go
@@ -59,12 +59,12 @@ A build is a small `main.go` that starts a `pocker.Server` with your code.
 
 ## Your module
 
-PocketBase CE keeps PocketBase's module path, so upstream merges stay clean. Point it at PocketBase CE in your `go.mod`:
+PocketOne keeps PocketBase's module path, so upstream merges stay clean. Point it at PocketOne in your `go.mod`:
 
 ```
 require ganigeorgiev.com/pocketbase/pocketbase v0.41.1
 
-replace ganigeorgiev.com/pocketbase/pocketbase => github.com/pockethost/pocketbase <commit or version>
+replace ganigeorgiev.com/pocketbase/pocketbase => github.com/pockethost/pocketone <commit or version>
 ```
 
 Go only honors `replace` in the main module, so the final binary's `go.mod` needs this line, not only your
@@ -179,7 +179,7 @@ Plugins are welcome, from us and from you. Open a pull request that adds `ext/<y
 
 ### Change PocketBase's core as little as possible
 
-PocketBase CE stays close to upstream so every PocketBase release merges cleanly. If your plugin needs something the
+PocketOne stays close to upstream so every PocketBase release merges cleanly. If your plugin needs something the
 core doesn't offer yet:
 - **Add the smallest hook that makes it possible:** an extension point or an override, not your plugin's logic. A
   nil-checked function field, a list callers can append to, or an event, with upstream behavior unchanged when nothing
@@ -196,7 +196,7 @@ core doesn't offer yet:
 
 ```
 ext/<name>/
-  go.mod            module github.com/pockethost/pocketbase/ext/<name>
+  go.mod            module github.com/pockethost/pocketone/ext/<name>
   README.md         what it does, runs on (single app, pocker or both), config
   <name>.go         the plugin
   <name>_test.go
@@ -219,4 +219,4 @@ ext/<name>/
 
 ## Planned plugins
 
-Our own plugins will live in this repo under [`ext/`](../ext), each as its own Go module (`github.com/pockethost/pocketbase/ext/<name>`) with its own version tags. The list and what each will do is in [ext/README.md](../ext/README.md).
+Our own plugins will live in this repo under [`ext/`](../ext), each as its own Go module (`github.com/pockethost/pocketone/ext/<name>`) with its own version tags. The list and what each will do is in [ext/README.md](../ext/README.md).

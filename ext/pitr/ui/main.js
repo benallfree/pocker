@@ -1,4 +1,4 @@
-// Point-in-time restore section on Settings → Backups (PocketBase CE ext/pitr).
+// Point-in-time restore section on Settings → Backups (PocketOne ext/pitr).
 // Served at /_/extensions/pitr/main.js and bundled into /_/extensions.js by the dashboard.
 // Uses plain DOM plus the dashboard's app.pb client, so it depends on as little of the experimental UI kit as possible.
 

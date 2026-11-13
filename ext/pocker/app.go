@@ -19,8 +19,8 @@ import (
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/security"
 	"ganigeorgiev.com/pocketbase/pocketbase/ui"
 	"github.com/dop251/goja"
-	"github.com/pockethost/pocketbase/ext/jserrors"
-	"github.com/pockethost/pocketbase/ext/sandbox"
+	"github.com/pockethost/pocketone/ext/jserrors"
+	"github.com/pockethost/pocketone/ext/sandbox"
 )
 
 // InstanceHeader names the instance on every message it sends (the dev mail trap and relays show and filter by it).

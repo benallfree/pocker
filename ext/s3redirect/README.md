@@ -4,8 +4,8 @@ File downloads as short-lived signed redirects, after PocketBase's own access ch
 
 **Runs on:** Single app, or many under [pocker](../pocker/README.md).
 
-> **Status.** Working: Go module `github.com/pockethost/pocketbase/ext/s3redirect`, no dependencies beyond
-> PocketBase CE. [`example/`](example/main.go) runs one app with its own in-process bucket, nothing to set up.
+> **Status.** Working: Go module `github.com/pockethost/pocketone/ext/s3redirect`, no dependencies beyond
+> PocketOne. [`example/`](example/main.go) runs one app with its own in-process bucket, nothing to set up.
 
 ## What it does
 
@@ -36,7 +36,7 @@ bucket allowing `GET` from your origin. Plain `<img>`, `<video>` and links need 
 
 ## In the standard CE binary
 
-`examples/ce` (the PocketBase CE release binary) registers it **on by default**: turn on S3 in Settings → Files
+`examples/ce` (the PocketOne release binary) registers it **on by default**: turn on S3 in Settings → Files
 storage and downloads redirect. Flags: `--s3Redirect=false` streams as before, `--s3RedirectTTL 2m` changes how long
 each URL is valid.
 
@@ -53,7 +53,7 @@ Then turn on S3 in Settings → Files storage.
 ## Many apps (pocker)
 
 ```go
-import "github.com/pockethost/pocketbase/ext/s3redirect/pockerplugin"
+import "github.com/pockethost/pocketone/ext/s3redirect/pockerplugin"
 
 srv.Plugins = append(srv.Plugins, pockerplugin.New(s3redirect.Config{}))
 ```

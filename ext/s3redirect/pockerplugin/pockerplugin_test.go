@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pockethost/pocketbase/ext/pocker"
+	"github.com/pockethost/pocketone/ext/pocker"
 )
 
 func TestInstanceConfig(t *testing.T) {

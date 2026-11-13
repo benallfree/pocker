@@ -10,8 +10,8 @@ import (
 
 	"ganigeorgiev.com/pocketbase/pocketbase"
 	"ganigeorgiev.com/pocketbase/pocketbase/plugins/jsvm"
-	"github.com/pockethost/pocketbase/ext/devusers"
-	"github.com/pockethost/pocketbase/ext/jserrors"
+	"github.com/pockethost/pocketone/ext/devusers"
+	"github.com/pockethost/pocketone/ext/jserrors"
 )
 
 func main() {

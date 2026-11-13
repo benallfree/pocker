@@ -20,7 +20,7 @@ import (
 
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/filesystem"
-	"github.com/pockethost/pocketbase/ext/pocker"
+	"github.com/pockethost/pocketone/ext/pocker"
 )
 
 var quiet = slog.New(slog.NewTextHandler(io.Discard, nil))

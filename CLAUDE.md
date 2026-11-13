@@ -1,6 +1,6 @@
-# PocketBase CE
+# PocketOne
 
-PocketBase CE is PocketBase plus plugins. **PocketBase's own code ("core") changes only for hooks that let `ext/`
+PocketOne is PocketBase plus plugins. **PocketBase's own code ("core") changes only for hooks that let `ext/`
 extend or override behavior; the features themselves live in `ext/`.** Core is every path outside what CE owns:
 `ext/`, `examples/ce/`, `docs/`, `README.md`, `CLAUDE.md`, `.github/`, `.claude/`. Each core change is marked
 `// CE:` so upstream merges stay easy.

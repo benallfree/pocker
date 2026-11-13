@@ -14,8 +14,8 @@ import (
 	"time"
 
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
-	"github.com/pockethost/pocketbase/ext/pages"
-	"github.com/pockethost/pocketbase/ext/pocker"
+	"github.com/pockethost/pocketone/ext/pages"
+	"github.com/pockethost/pocketone/ext/pocker"
 )
 
 type fixedSource []pocker.Instance

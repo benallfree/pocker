@@ -1,4 +1,4 @@
-module github.com/pockethost/pocketbase/ext/pocker
+module github.com/pockethost/pocketone/ext/pocker
 
 go 1.27
 
@@ -7,11 +7,11 @@ require (
 	ganigeorgiev.com/pocketbase/pocketbase v0.0.0-00010101000000-000000000000
 	github.com/dop251/goja v0.0.0-20261023121931-6ace4dde0b29
 	github.com/fsnotify/fsnotify v1.10.1
-	github.com/pockethost/pocketbase/ext/ceplugin v0.0.0-00010101000000-000000000000
-	github.com/pockethost/pocketbase/ext/devusers v0.0.0-00010101000000-000000000000
-	github.com/pockethost/pocketbase/ext/host v0.0.0-00010101000000-000000000000
-	github.com/pockethost/pocketbase/ext/jserrors v0.0.0-00010101000000-000000000000
-	github.com/pockethost/pocketbase/ext/sandbox v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/ceplugin v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/devusers v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/host v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/jserrors v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/sandbox v0.0.0-00010101000000-000000000000
 	golang.org/x/crypto v0.58.0
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -55,13 +55,13 @@ require (
 
 replace (
 	ganigeorgiev.com/pocketbase/pocketbase => ../..
-	github.com/pockethost/pocketbase/ext/sandbox => ../sandbox
+	github.com/pockethost/pocketone/ext/sandbox => ../sandbox
 )
 
-replace github.com/pockethost/pocketbase/ext/devusers => ../devusers
+replace github.com/pockethost/pocketone/ext/devusers => ../devusers
 
-replace github.com/pockethost/pocketbase/ext/host => ../host
+replace github.com/pockethost/pocketone/ext/host => ../host
 
-replace github.com/pockethost/pocketbase/ext/ceplugin => ../ceplugin
+replace github.com/pockethost/pocketone/ext/ceplugin => ../ceplugin
 
-replace github.com/pockethost/pocketbase/ext/jserrors => ../jserrors
+replace github.com/pockethost/pocketone/ext/jserrors => ../jserrors

@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pockethost/pocketbase/ext/host"
+	"github.com/pockethost/pocketone/ext/host"
 
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/hook"

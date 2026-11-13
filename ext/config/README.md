@@ -1,9 +1,9 @@
 # config
 
-PBCE's config file: `pocketbase.yaml`, with secrets in a `.env` beside it. Linked by default in the `pocketbase`
+PocketOne's config file: `pocketbase.yaml`, with secrets in a `.env` beside it. Linked by default in the `pocketbase`
 binary.
 
-> **Status.** Working: Go module `github.com/pockethost/pocketbase/ext/config`. Sections today: `server`, `app`,
+> **Status.** Working: Go module `github.com/pockethost/pocketone/ext/config`. Sections today: `server`, `app`,
 > `provider` (reserved for runtime providers). Plugins move their settings into their own sections next.
 
 ## Sections

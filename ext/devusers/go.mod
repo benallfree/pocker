@@ -1,4 +1,4 @@
-module github.com/pockethost/pocketbase/ext/devusers
+module github.com/pockethost/pocketone/ext/devusers
 
 go 1.27
 

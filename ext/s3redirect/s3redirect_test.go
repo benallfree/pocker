@@ -11,7 +11,7 @@ import (
 	"ganigeorgiev.com/pocketbase/pocketbase/tests"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/filesystem"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/filesystem/blob"
-	"github.com/pockethost/pocketbase/ext/s3redirect/sigv4"
+	"github.com/pockethost/pocketone/ext/s3redirect/sigv4"
 )
 
 func TestResponseHeaders(t *testing.T) {

@@ -15,7 +15,7 @@ import (
 	"ganigeorgiev.com/pocketbase/pocketbase/apis"
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"ganigeorgiev.com/pocketbase/pocketbase/tests"
-	"github.com/pockethost/pocketbase/ext/tokens"
+	"github.com/pockethost/pocketone/ext/tokens"
 )
 
 // serve runs app's router (OnServe included) on a local test server.

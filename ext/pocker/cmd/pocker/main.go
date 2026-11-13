@@ -15,13 +15,13 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/pockethost/pocketbase/ext/autotls"
-	"github.com/pockethost/pocketbase/ext/edge"
-	"github.com/pockethost/pocketbase/ext/firewall"
-	"github.com/pockethost/pocketbase/ext/mailtrap"
-	"github.com/pockethost/pocketbase/ext/mothership/mirror"
-	"github.com/pockethost/pocketbase/ext/pocker"
-	"github.com/pockethost/pocketbase/ext/servertiming"
+	"github.com/pockethost/pocketone/ext/autotls"
+	"github.com/pockethost/pocketone/ext/edge"
+	"github.com/pockethost/pocketone/ext/firewall"
+	"github.com/pockethost/pocketone/ext/mailtrap"
+	"github.com/pockethost/pocketone/ext/mothership/mirror"
+	"github.com/pockethost/pocketone/ext/pocker"
+	"github.com/pockethost/pocketone/ext/servertiming"
 )
 
 func main() {

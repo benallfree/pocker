@@ -1,13 +1,13 @@
 ---
-title: PocketPages is now built into PocketBase CE
-description: PocketPages v1 ships inside PocketBase Community Edition. No npm install, no boot file, JSX and TypeScript pages, and 11 to 17 times the requests per second.
+title: PocketPages is now built into PocketOne
+description: PocketPages v1 ships inside PocketOne. No npm install, no boot file, JSX and TypeScript pages, and 11 to 17 times the requests per second.
 date: 2026-11-11
 author: Ben Allfree
-tags: release, v1, PocketBase CE
+tags: release, v1, PocketOne
 ---
 
 PocketPages used to be an npm package you installed next to PocketBase and booted from a hook file. As of today it's
-part of [PocketBase Community Edition](https://github.com/pockethost/pocketbase), a community fork of PocketBase that
+part of [PocketOne](https://github.com/pockethost/pocketone), a community fork of PocketBase that
 PocketHost maintains. Put a `pb_pages` folder next to `pb_data` and it's served.
 
 ```bash

@@ -31,7 +31,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/pockethost/pocketbase/ext/edge"
+	"github.com/pockethost/pocketone/ext/edge"
 	"gopkg.in/yaml.v3"
 )
 

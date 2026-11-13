@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pockethost/pocketbase/ext/host"
+	"github.com/pockethost/pocketone/ext/host"
 	"gopkg.in/yaml.v3"
 )
 

@@ -4,7 +4,7 @@ Point-in-time restore: Litestream replication of each app's database (local or a
 
 **Runs on:** Single app, or many under [pocker](../pocker/README.md).
 
-> **Status.** Working: Go module `github.com/pockethost/pocketbase/ext/pitr` (Litestream v0.5.18, pinned).
+> **Status.** Working: Go module `github.com/pockethost/pocketone/ext/pitr` (Litestream v0.5.18, pinned).
 > [`example/main.go`](example/main.go) runs one app with local history.
 
 ## What it does

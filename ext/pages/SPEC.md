@@ -1,6 +1,6 @@
 # PocketPages v1 specification
 
-The contract for `ext/pages`, PocketBase CE's server-rendered multi-page app plugin. The test fixtures
+The contract for `ext/pages`, PocketOne's server-rendered multi-page app plugin. The test fixtures
 ([`fixtures/`](fixtures)), the starter kits and the PocketPages site are written against this document. Where the
 implementation and this document disagree, one of them is a bug.
 

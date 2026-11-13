@@ -3,7 +3,7 @@
 The fleet layer for a multi-instance host ([ext/host](../host/README.md)): requests for instances another edge owns
 are forwarded there over the private network. Works with either runtime provider.
 
-> **Status.** Working: Go module `github.com/pockethost/pocketbase/ext/edge`. The host core moved to ext/host and the
+> **Status.** Working: Go module `github.com/pockethost/pocketone/ext/edge`. The host core moved to ext/host and the
 > firewall to [ext/firewall](../firewall/README.md) (2026-11-13); ext/edge still re-exports the host names for one
 > release.
 

@@ -33,7 +33,7 @@ import (
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/filesystem"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/hook"
-	"github.com/pockethost/pocketbase/ext/s3redirect/sigv4"
+	"github.com/pockethost/pocketone/ext/s3redirect/sigv4"
 )
 
 // Name is the plugin's name: its config key (plugins.s3redirect).

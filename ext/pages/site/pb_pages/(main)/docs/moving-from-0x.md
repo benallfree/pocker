@@ -1,11 +1,11 @@
 ---
 title: Moving from PocketPages 0.x
-description: What changed between the PocketPages npm package (0.x) and PocketPages v1 in PocketBase CE.
+description: What changed between the PocketPages npm package (0.x) and PocketPages v1 in PocketOne.
 ---
 
 # Moving from PocketPages 0.x
 
-PocketPages v1 is part of PocketBase CE (the `pages` plugin). It keeps the ideas of the npm package (a folder of files that become routes, EJS, layouts, middleware, private partials) and changes the shapes. Apps written for 0.x don't run unchanged.
+PocketPages v1 is part of PocketOne (the `pages` plugin). It keeps the ideas of the npm package (a folder of files that become routes, EJS, layouts, middleware, private partials) and changes the shapes. Apps written for 0.x don't run unchanged.
 
 There is no migration tool. Start a new app with `pocketbase pages create <name>`, then move your pages over using the list below. The npm package is being retired.
 

@@ -1,4 +1,4 @@
-// Package autotls is a PocketBase CE plugin: automatic HTTPS certificates through ACME, with CertMagic (Caddy's
+// Package autotls is a PocketOne plugin: automatic HTTPS certificates through ACME, with CertMagic (Caddy's
 // certificate engine). Two entry points:
 //
 //   - Under pocker, [New] is a server plugin that reads pocker.yaml's `tls:` block; certificate files
@@ -25,7 +25,7 @@ import (
 
 	"github.com/caddyserver/certmagic"
 	"github.com/libdns/cloudflare"
-	"github.com/pockethost/pocketbase/ext/pocker"
+	"github.com/pockethost/pocketone/ext/pocker"
 	"gopkg.in/yaml.v3"
 )
 

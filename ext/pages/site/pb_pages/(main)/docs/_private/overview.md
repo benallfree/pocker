@@ -1,11 +1,11 @@
 ---
 title: Overview
-description: PocketPages is server-rendered multi-page apps for PocketBase CE, from a pb_pages folder of EJS and Markdown files.
+description: PocketPages is server-rendered multi-page apps for PocketOne, from a pb_pages folder of EJS and Markdown files.
 ---
 
 # Overview
 
-PocketPages turns a folder of files into a server-rendered website, inside PocketBase. It is built into PocketBase CE as the `pages` plugin (`ext/pages`): no npm package, no boot file, no build step.
+PocketPages turns a folder of files into a server-rendered website, inside PocketBase. It is built into PocketOne as the `pages` plugin (`ext/pages`): no npm package, no boot file, no build step.
 
 Use PocketPages to create slim and modern web apps:
 

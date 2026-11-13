@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pockethost/pocketbase/ext/s3redirect/sigv4"
+	"github.com/pockethost/pocketone/ext/s3redirect/sigv4"
 )
 
 // AWS's documented presigned URL example (IAM user guide, "Authenticating Requests: Using Query Parameters").

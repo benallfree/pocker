@@ -1,7 +1,7 @@
 // Command example runs one PocketBase app with bulk mail: a "Mail" page in the dashboard, campaigns to the app's
 // own users, and $bulkmail in JS hooks.
 //
-// Run it in dev mode: while SMTP is off, PocketBase CE's dev mail trap catches every mail (bulk mail included) and
+// Run it in dev mode: while SMTP is off, PocketOne's dev mail trap catches every mail (bulk mail included) and
 // shows it at http://127.0.0.1:8025, with nothing else to install:
 //
 //	go run ./example serve --dev
@@ -15,9 +15,9 @@ import (
 	"ganigeorgiev.com/pocketbase/pocketbase"
 	"ganigeorgiev.com/pocketbase/pocketbase/plugins/jsvm"
 	"github.com/dop251/goja"
-	"github.com/pockethost/pocketbase/ext/bulkmail"
-	"github.com/pockethost/pocketbase/ext/ceplugin"
-	"github.com/pockethost/pocketbase/ext/devusers"
+	"github.com/pockethost/pocketone/ext/bulkmail"
+	"github.com/pockethost/pocketone/ext/ceplugin"
+	"github.com/pockethost/pocketone/ext/devusers"
 )
 
 func main() {

@@ -5,7 +5,7 @@ hostname, wildcards through DNS-01, more CAs.
 
 **Runs on:** Single app (in the standard `pocketbase` binary), or many under [pocker](../pocker/README.md).
 
-> **Status.** Stable under pocker; Beta on a single app. Go module `github.com/pockethost/pocketbase/ext/autotls`.
+> **Status.** Stable under pocker; Beta on a single app. Go module `github.com/pockethost/pocketone/ext/autotls`.
 
 ## Single app
 

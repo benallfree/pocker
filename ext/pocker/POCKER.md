@@ -244,20 +244,20 @@ Kept small and marked `// CE:` so upstream merges stay easy:
 
 ## Versions
 
-PocketBase CE has its own version line, starting at `v0.0.1`, independent of PocketBase's numbers. When PocketBase
+PocketOne has its own version line, starting at `v0.0.1`, independent of PocketBase's numbers. When PocketBase
 releases, we merge it and decide then how to bump ours. Each release says which PocketBase version it's based on.
 
-The module path stays `ganigeorgiev.com/pocketbase/pocketbase`, so a build pins a PocketBase CE version through the
+The module path stays `ganigeorgiev.com/pocketbase/pocketbase`, so a build pins a PocketOne version through the
 `replace` line:
 
 ```
-replace ganigeorgiev.com/pocketbase/pocketbase => github.com/pockethost/pocketbase v0.0.1
+replace ganigeorgiev.com/pocketbase/pocketbase => github.com/pockethost/pocketone v0.0.1
 ```
 
 ## Upstream tracking
 
 Fetch upstream without its tags: PocketBase's `v0.x` tags must never land in this repo, or Go would take `v0.41.1` for
-the newest PocketBase CE.
+the newest PocketOne.
 
 ```sh
 git remote add upstream https://ganigeorgiev.com/git/pocketbase/pocketbase

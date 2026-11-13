@@ -29,7 +29,7 @@ import (
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/security"
 	"github.com/domodwyer/mailyak/v3"
 	"github.com/gabriel-vasile/mimetype"
-	"github.com/pockethost/pocketbase/ext/pocker"
+	"github.com/pockethost/pocketone/ext/pocker"
 	"gopkg.in/yaml.v3"
 )
 

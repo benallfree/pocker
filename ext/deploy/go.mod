@@ -1,4 +1,4 @@
-module github.com/pockethost/pocketbase/ext/deploy
+module github.com/pockethost/pocketone/ext/deploy
 
 go 1.27
 
@@ -6,10 +6,10 @@ require (
 	ganigeorgiev.com/pocketbase/dbx v1.13.0
 	ganigeorgiev.com/pocketbase/pocketbase v0.0.0-00010101000000-000000000000
 	github.com/fsnotify/fsnotify v1.10.1
-	github.com/pockethost/pocketbase/ext/devusers v0.0.0-00010101000000-000000000000
-	github.com/pockethost/pocketbase/ext/pocker v0.0.0-00010101000000-000000000000
-	github.com/pockethost/pocketbase/ext/remotes v0.0.0-00010101000000-000000000000
-	github.com/pockethost/pocketbase/ext/tokens v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/devusers v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/pocker v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/remotes v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/tokens v0.0.0-00010101000000-000000000000
 	github.com/spf13/cobra v1.10.2
 )
 
@@ -35,10 +35,10 @@ require (
 	github.com/mattn/go-colorable v0.1.16 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/ncruces/go-strftime v1.1.0 // indirect
-	github.com/pockethost/pocketbase/ext/ceplugin v0.0.0-00010101000000-000000000000 // indirect
-	github.com/pockethost/pocketbase/ext/host v0.0.0-00010101000000-000000000000 // indirect
-	github.com/pockethost/pocketbase/ext/jserrors v0.0.0-00010101000000-000000000000 // indirect
-	github.com/pockethost/pocketbase/ext/sandbox v0.0.0-00010101000000-000000000000 // indirect
+	github.com/pockethost/pocketone/ext/ceplugin v0.0.0-00010101000000-000000000000 // indirect
+	github.com/pockethost/pocketone/ext/host v0.0.0-00010101000000-000000000000 // indirect
+	github.com/pockethost/pocketone/ext/jserrors v0.0.0-00010101000000-000000000000 // indirect
+	github.com/pockethost/pocketone/ext/sandbox v0.0.0-00010101000000-000000000000 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/spf13/cast v1.10.0 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
@@ -59,20 +59,20 @@ require (
 
 replace ganigeorgiev.com/pocketbase/pocketbase => ../..
 
-replace github.com/pockethost/pocketbase/ext/devusers => ../devusers
+replace github.com/pockethost/pocketone/ext/devusers => ../devusers
 
-replace github.com/pockethost/pocketbase/ext/pocker => ../pocker
+replace github.com/pockethost/pocketone/ext/pocker => ../pocker
 
-replace github.com/pockethost/pocketbase/ext/sandbox => ../sandbox
+replace github.com/pockethost/pocketone/ext/sandbox => ../sandbox
 
-replace github.com/pockethost/pocketbase/ext/tokens => ../tokens
+replace github.com/pockethost/pocketone/ext/tokens => ../tokens
 
-replace github.com/pockethost/pocketbase/ext/remotes => ../remotes
+replace github.com/pockethost/pocketone/ext/remotes => ../remotes
 
-replace github.com/pockethost/pocketbase/ext/edge => ../edge
+replace github.com/pockethost/pocketone/ext/edge => ../edge
 
-replace github.com/pockethost/pocketbase/ext/host => ../host
+replace github.com/pockethost/pocketone/ext/host => ../host
 
-replace github.com/pockethost/pocketbase/ext/ceplugin => ../ceplugin
+replace github.com/pockethost/pocketone/ext/ceplugin => ../ceplugin
 
-replace github.com/pockethost/pocketbase/ext/jserrors => ../jserrors
+replace github.com/pockethost/pocketone/ext/jserrors => ../jserrors

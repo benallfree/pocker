@@ -11,8 +11,8 @@ import (
 	"ganigeorgiev.com/pocketbase/pocketbase/apis"
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"ganigeorgiev.com/pocketbase/pocketbase/tests"
-	"github.com/pockethost/pocketbase/ext/edge"
-	"github.com/pockethost/pocketbase/ext/mothership"
+	"github.com/pockethost/pocketone/ext/edge"
+	"github.com/pockethost/pocketone/ext/mothership"
 )
 
 var quiet = slog.New(slog.NewTextHandler(io.Discard, nil))

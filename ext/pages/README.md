@@ -78,7 +78,7 @@ pages.MustRegister(app, pages.Config{}) // serves pb_pages next to pb_data
 app.Start()
 ```
 
-Module `github.com/pockethost/pocketbase/ext/pages`. See [example/main.go](example/main.go) and
+Module `github.com/pockethost/pocketone/ext/pages`. See [example/main.go](example/main.go) and
 [Create your own plugin](../../docs/plugins.md).
 
 ## Under pocker

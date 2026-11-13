@@ -1,24 +1,24 @@
-module github.com/pockethost/pocketbase/examples/ce
+module github.com/pockethost/pocketone/examples/ce
 
 go 1.27
 
 require (
 	ganigeorgiev.com/pocketbase/pocketbase v0.0.0-00010101000000-000000000000
 	github.com/dop251/goja v0.0.0-20261023121931-6ace4dde0b29
-	github.com/pockethost/pocketbase/ext/autotls v0.0.0-20261112000927-b078fd50496e
-	github.com/pockethost/pocketbase/ext/bulkmail v0.0.0-00010101000000-000000000000
-	github.com/pockethost/pocketbase/ext/ceplugin v0.0.0-00010101000000-000000000000
-	github.com/pockethost/pocketbase/ext/config v0.0.0-00010101000000-000000000000
-	github.com/pockethost/pocketbase/ext/deploy v0.0.0-00010101000000-000000000000
-	github.com/pockethost/pocketbase/ext/jserrors v0.0.0-00010101000000-000000000000
-	github.com/pockethost/pocketbase/ext/mailtrap v0.0.0-00010101000000-000000000000
-	github.com/pockethost/pocketbase/ext/mcp v0.0.0-00010101000000-000000000000
-	github.com/pockethost/pocketbase/ext/oauth-server v0.0.0-00010101000000-000000000000
-	github.com/pockethost/pocketbase/ext/pages v0.0.0-00010101000000-000000000000
-	github.com/pockethost/pocketbase/ext/pitr v0.0.0-00010101000000-000000000000
-	github.com/pockethost/pocketbase/ext/remotes v0.0.0-00010101000000-000000000000
-	github.com/pockethost/pocketbase/ext/s3redirect v0.0.0-00010101000000-000000000000
-	github.com/pockethost/pocketbase/ext/tokens v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/autotls v0.0.0-20261112000927-b078fd50496e
+	github.com/pockethost/pocketone/ext/bulkmail v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/ceplugin v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/config v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/deploy v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/jserrors v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/mailtrap v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/mcp v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/oauth-server v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/pages v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/pitr v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/remotes v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/s3redirect v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/tokens v0.0.0-00010101000000-000000000000
 )
 
 require (
@@ -63,9 +63,9 @@ require (
 	github.com/miekg/dns v1.1.73 // indirect
 	github.com/ncruces/go-strftime v1.1.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.23 // indirect
-	github.com/pockethost/pocketbase/ext/host v0.0.0-00010101000000-000000000000 // indirect
-	github.com/pockethost/pocketbase/ext/pocker v0.0.0-00010101000000-000000000000 // indirect
-	github.com/pockethost/pocketbase/ext/sandbox v0.0.0-00010101000000-000000000000 // indirect
+	github.com/pockethost/pocketone/ext/host v0.0.0-00010101000000-000000000000 // indirect
+	github.com/pockethost/pocketone/ext/pocker v0.0.0-00010101000000-000000000000 // indirect
+	github.com/pockethost/pocketone/ext/sandbox v0.0.0-00010101000000-000000000000 // indirect
 	github.com/prometheus/client_golang v1.17.0 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.45.0 // indirect
@@ -101,40 +101,40 @@ require (
 
 replace (
 	ganigeorgiev.com/pocketbase/pocketbase => ../..
-	github.com/pockethost/pocketbase/ext/pages => ../../ext/pages
-	github.com/pockethost/pocketbase/ext/s3redirect => ../../ext/s3redirect
+	github.com/pockethost/pocketone/ext/pages => ../../ext/pages
+	github.com/pockethost/pocketone/ext/s3redirect => ../../ext/s3redirect
 )
 
-replace github.com/pockethost/pocketbase/ext/pocker => ../../ext/pocker
+replace github.com/pockethost/pocketone/ext/pocker => ../../ext/pocker
 
-replace github.com/pockethost/pocketbase/ext/sandbox => ../../ext/sandbox
+replace github.com/pockethost/pocketone/ext/sandbox => ../../ext/sandbox
 
-replace github.com/pockethost/pocketbase/ext/devusers => ../../ext/devusers
+replace github.com/pockethost/pocketone/ext/devusers => ../../ext/devusers
 
 replace (
-	github.com/pockethost/pocketbase/ext/deploy => ../../ext/deploy
-	github.com/pockethost/pocketbase/ext/oauth-server => ../../ext/oauth-server
-	github.com/pockethost/pocketbase/ext/remotes => ../../ext/remotes
-	github.com/pockethost/pocketbase/ext/tokens => ../../ext/tokens
+	github.com/pockethost/pocketone/ext/deploy => ../../ext/deploy
+	github.com/pockethost/pocketone/ext/oauth-server => ../../ext/oauth-server
+	github.com/pockethost/pocketone/ext/remotes => ../../ext/remotes
+	github.com/pockethost/pocketone/ext/tokens => ../../ext/tokens
 )
 
-replace github.com/pockethost/pocketbase/ext/bulkmail => ../../ext/bulkmail
+replace github.com/pockethost/pocketone/ext/bulkmail => ../../ext/bulkmail
 
-replace github.com/pockethost/pocketbase/ext/autotls => ../../ext/autotls
+replace github.com/pockethost/pocketone/ext/autotls => ../../ext/autotls
 
 replace (
-	github.com/pockethost/pocketbase/ext/mcp => ../../ext/mcp
-	github.com/pockethost/pocketbase/ext/pitr => ../../ext/pitr
+	github.com/pockethost/pocketone/ext/mcp => ../../ext/mcp
+	github.com/pockethost/pocketone/ext/pitr => ../../ext/pitr
 )
 
-replace github.com/pockethost/pocketbase/ext/config => ../../ext/config
+replace github.com/pockethost/pocketone/ext/config => ../../ext/config
 
-replace github.com/pockethost/pocketbase/ext/edge => ../../ext/edge
+replace github.com/pockethost/pocketone/ext/edge => ../../ext/edge
 
-replace github.com/pockethost/pocketbase/ext/host => ../../ext/host
+replace github.com/pockethost/pocketone/ext/host => ../../ext/host
 
-replace github.com/pockethost/pocketbase/ext/mailtrap => ../../ext/mailtrap
+replace github.com/pockethost/pocketone/ext/mailtrap => ../../ext/mailtrap
 
-replace github.com/pockethost/pocketbase/ext/ceplugin => ../../ext/ceplugin
+replace github.com/pockethost/pocketone/ext/ceplugin => ../../ext/ceplugin
 
-replace github.com/pockethost/pocketbase/ext/jserrors => ../../ext/jserrors
+replace github.com/pockethost/pocketone/ext/jserrors => ../../ext/jserrors

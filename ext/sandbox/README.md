@@ -4,14 +4,14 @@ The JS sandbox for untrusted instances: file access confined to the instance fol
 
 **Runs on:** Any app; required by pocker for untrusted tenants.
 
-> **Status.** Working: Go module `github.com/pockethost/pocketbase/ext/sandbox`. It plugs into PocketBase's JS plugin
+> **Status.** Working: Go module `github.com/pockethost/pocketone/ext/sandbox`. It plugs into PocketBase's JS plugin
 > as a jsvm extension, `jsvm.Config{Extensions: []jsvm.Extension{sb}}` (its `OnInit`, `OnCall` and `HTTPClient`); [`example/main.go`](example/main.go) runs
 > one sandboxed app. [pocker](../pocker/README.md) uses it for every instance; its attack tests live there. The SQL
 > guard, outbound network rules and memory watch are still in pocker and move here next.
 
 ## How is this safe?
 
-With [pocker](../pocker/README.md), PocketBase CE can serve hundreds of PocketBase instances from one Go process, each with its own owner, hooks and data.
+With [pocker](../pocker/README.md), PocketOne can serve hundreds of PocketBase instances from one Go process, each with its own owner, hooks and data.
 This section explains why that's safe enough to run code from people you don't know, and where it isn't.
 
 Configuration and the engine API are in [POCKER.md](../pocker/POCKER.md). The attack tests are in [`sandbox_test.go`](../pocker/sandbox_test.go).
@@ -83,7 +83,7 @@ the environment:
 #### 5. SQL: SQLite's own authorizer
 
 Raw SQL is allowed (`$app.db().newQuery(...)`), because PocketBase apps depend on it. Instead of parsing statements,
-PocketBase CE installs SQLite's authorizer callback on every connection, so SQLite itself refuses:
+PocketOne installs SQLite's authorizer callback on every connection, so SQLite itself refuses:
 - `ATTACH` and `VACUUM INTO` outside the instance's `pb_data`;
 - `load_extension`;
 - the pragmas that move SQLite's files elsewhere.
@@ -92,7 +92,7 @@ Statements without a deadline get one (`max_query_duration`).
 
 #### 6. Outbound network: public addresses only
 
-PocketBase CE installs one dialer process-wide, on Go's default HTTP transport and PocketBase's SMTP client. It covers:
+PocketOne installs one dialer process-wide, on Go's default HTTP transport and PocketBase's SMTP client. It covers:
 - `$http.send`
 - `$filesystem.fileFromURL`
 - S3 storage and backups
@@ -131,14 +131,14 @@ Be clear about these before you host strangers:
 - **Memory attribution is best-effort.** The watcher blames whoever is running JS when the heap grows. That's usually
   right, but not guaranteed. A hook that allocates faster than the 50 ms sample, through a path the one-shot caps
   don't cover, can still push the process over its limit.
-- **It's one address space.** A bug in Go, goja, SQLite or PocketBase CE's own checks would cross tenants in a way a
+- **It's one address space.** A bug in Go, goja, SQLite or PocketOne's own checks would cross tenants in a way a
   container boundary wouldn't. The sandbox tests cover the known paths, but they don't prove nothing else exists.
 - **No OS-level layer yet.** Seccomp, Landlock and a second, OS-level egress filter aren't built in.
 
 ### How to run it
 
 For untrusted tenants, add the OS layers yourself:
-- run PocketBase CE as a non-root user that owns only the instances folder;
+- run PocketOne as a non-root user that owns only the instances folder;
 - set `memory_limit` and run it under a cgroup memory limit, so the worst case is a restart, not a host OOM;
 - add an OS firewall rule that lets that user reach public addresses only, an egress layer independent of the
   process;

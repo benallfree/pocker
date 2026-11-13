@@ -18,8 +18,8 @@ import (
 	"time"
 
 	"ganigeorgiev.com/pocketbase/pocketbase"
-	"github.com/pockethost/pocketbase/ext/devusers"
-	"github.com/pockethost/pocketbase/ext/s3redirect"
+	"github.com/pockethost/pocketone/ext/devusers"
+	"github.com/pockethost/pocketone/ext/s3redirect"
 )
 
 func main() {

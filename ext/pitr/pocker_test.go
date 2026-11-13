@@ -12,7 +12,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
-	"github.com/pockethost/pocketbase/ext/pocker"
+	"github.com/pockethost/pocketone/ext/pocker"
 )
 
 type fixedSource []pocker.Instance

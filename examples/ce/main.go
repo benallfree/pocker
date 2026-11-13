@@ -1,4 +1,4 @@
-// Command pocketbase is the standard PocketBase CE binary: PocketBase's examples/base plus the CE plugins that ship
+// Command pocketbase is the standard PocketOne binary: PocketBase's examples/base plus the CE plugins that ship
 // by default (ext/pages, ext/s3redirect, ext/bulkmail, ext/tokens, ext/remotes, ext/oauth-server, ext/deploy, ext/mcp,
 // ext/pitr, ext/autotls). It's its
 // own module so core's go.mod stays upstream's.
@@ -22,20 +22,20 @@ import (
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/hook"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/osutils"
 	"github.com/dop251/goja"
-	"github.com/pockethost/pocketbase/ext/autotls"
-	"github.com/pockethost/pocketbase/ext/bulkmail"
-	"github.com/pockethost/pocketbase/ext/ceplugin"
-	"github.com/pockethost/pocketbase/ext/config"
-	"github.com/pockethost/pocketbase/ext/deploy"
-	"github.com/pockethost/pocketbase/ext/jserrors"
-	"github.com/pockethost/pocketbase/ext/mailtrap"
-	"github.com/pockethost/pocketbase/ext/mcp"
-	oauthserver "github.com/pockethost/pocketbase/ext/oauth-server"
-	"github.com/pockethost/pocketbase/ext/pages"
-	"github.com/pockethost/pocketbase/ext/pitr"
-	"github.com/pockethost/pocketbase/ext/remotes"
-	"github.com/pockethost/pocketbase/ext/s3redirect"
-	"github.com/pockethost/pocketbase/ext/tokens"
+	"github.com/pockethost/pocketone/ext/autotls"
+	"github.com/pockethost/pocketone/ext/bulkmail"
+	"github.com/pockethost/pocketone/ext/ceplugin"
+	"github.com/pockethost/pocketone/ext/config"
+	"github.com/pockethost/pocketone/ext/deploy"
+	"github.com/pockethost/pocketone/ext/jserrors"
+	"github.com/pockethost/pocketone/ext/mailtrap"
+	"github.com/pockethost/pocketone/ext/mcp"
+	oauthserver "github.com/pockethost/pocketone/ext/oauth-server"
+	"github.com/pockethost/pocketone/ext/pages"
+	"github.com/pockethost/pocketone/ext/pitr"
+	"github.com/pockethost/pocketone/ext/remotes"
+	"github.com/pockethost/pocketone/ext/s3redirect"
+	"github.com/pockethost/pocketone/ext/tokens"
 )
 
 func main() {
@@ -64,7 +64,7 @@ func main() {
 	app.RootCmd.PersistentFlags().StringVar(&envPath, "env-file", "", "secrets for $VAR references in the config file (default .env beside it); never passed to the app")
 	app.RootCmd.AddCommand(config.NewCommand(func() config.Options { return cfgOpts }))
 
-	// PocketBase CE plugins that ship in the standard binary and follow the plugin contract (ceplugin): Register
+	// PocketOne plugins that ship in the standard binary and follow the plugin contract (ceplugin): Register
 	// here, and BindJS in the jsvm below. Bulk mail: campaigns to the app's own users (Mail in the dashboard, Bulk
 	// mail on Settings > Mail); nothing happens until someone starts a campaign. Defaults: 5/s, 5,000/day.
 	cePlugins := []ceplugin.Plugin{
@@ -280,7 +280,7 @@ func main() {
 		Dir:          migrationsDir,
 	})
 
-	// update command: PocketBase CE releases on GitHub (pockethost/pocketbase), not upstream.
+	// update command: PocketOne releases on GitHub (pockethost/pocketone), not upstream.
 	// Custom builds that publish their own releases change Owner/Repo here.
 	ghupdate.MustRegister(app, app.RootCmd, ghupdate.Config{Owner: "pockethost", Repo: "pocketbase"})
 

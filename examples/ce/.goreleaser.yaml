@@ -1,4 +1,4 @@
-# PocketBase CE's release config (the repo root's .goreleaser.yaml is upstream's, for plain examples/base).
+# PocketOne's release config (the repo root's .goreleaser.yaml is upstream's, for plain examples/base).
 # Run from the repo root:
 #
 #   goreleaser release --config examples/ce/.goreleaser.yaml --release-notes <file>
@@ -52,7 +52,7 @@ builds:
 
 release:
   draft: true
-  name_template: 'PocketBase CE {{ .Tag }}'
+  name_template: 'PocketOne {{ .Tag }}'
   # every release's notes start with the install lines
   header: |
     ## Install
@@ -72,8 +72,8 @@ brews:
       owner: pockethost
       name: homebrew-tap
     directory: Formula
-    homepage: https://github.com/pockethost/pocketbase
-    description: PocketBase Community Edition, a community fork of PocketBase with plugins (pages, pocker and more)
+    homepage: https://github.com/pockethost/pocketone
+    description: PocketOne, a community fork of PocketBase with plugins (pages, pocker and more)
     license: MIT
     commit_author:
       name: PocketHost

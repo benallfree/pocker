@@ -1,4 +1,4 @@
-module github.com/pockethost/pocketbase/ext/jsembed
+module github.com/pockethost/pocketone/ext/jsembed
 
 go 1.27
 
@@ -6,7 +6,7 @@ require (
 	ganigeorgiev.com/pocketbase/pocketbase v0.0.0-00010101000000-000000000000
 	github.com/dop251/goja v0.0.0-20261023121931-6ace4dde0b29
 	github.com/dop251/goja_nodejs v0.0.0-20260212111938-1f56ff5bcf14
-	github.com/pockethost/pocketbase/ext/devusers v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/devusers v0.0.0-00010101000000-000000000000
 )
 
 require (
@@ -49,4 +49,4 @@ require (
 
 replace ganigeorgiev.com/pocketbase/pocketbase => ../..
 
-replace github.com/pockethost/pocketbase/ext/devusers => ../devusers
+replace github.com/pockethost/pocketone/ext/devusers => ../devusers

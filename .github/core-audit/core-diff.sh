@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Prints the PocketBase core changes in a commit range: every path outside what PocketBase CE owns.
+# Prints the PocketBase core changes in a commit range: every path outside what PocketOne owns.
 #
 #   .github/core-audit/core-diff.sh <base> <head>     # e.g. origin/main HEAD, or <sha>^ <sha>
 #   .github/core-audit/core-diff.sh --files <base> <head>

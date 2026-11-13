@@ -13,8 +13,8 @@ import (
 	"time"
 
 	"ganigeorgiev.com/pocketbase/pocketbase"
-	"github.com/pockethost/pocketbase/ext/devusers"
-	"github.com/pockethost/pocketbase/ext/pitr"
+	"github.com/pockethost/pocketone/ext/devusers"
+	"github.com/pockethost/pocketone/ext/pitr"
 )
 
 func main() {

@@ -1,6 +1,6 @@
 # pocketpages.dev
 
-The PocketPages website and docs, written as a PocketPages v1 app. It runs on PocketBase CE with the pages plugin
+The PocketPages website and docs, written as a PocketPages v1 app. It runs on PocketOne with the pages plugin
 (`ext/pages`) and follows [`../SPEC.md`](../SPEC.md).
 
 ## Layout
@@ -13,7 +13,7 @@ The PocketPages website and docs, written as a PocketPages v1 app. It runs on Po
 
 ## Run it
 
-With a PocketBase CE binary that includes `ext/pages`, from this folder:
+With a PocketOne binary that includes `ext/pages`, from this folder:
 
 ```bash
 pocketbase serve --dev --dir ./pb_data

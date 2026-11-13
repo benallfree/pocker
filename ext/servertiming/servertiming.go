@@ -1,4 +1,4 @@
-// Package servertiming is a PocketBase CE plugin for the pocker host: a Server-Timing response header with the
+// Package servertiming is a PocketOne plugin for the pocker host: a Server-Timing response header with the
 // timings the host and other plugins register for each request (see pocker.Timing).
 //
 //	srv := &pocker.Server{Config: cfg, Plugins: []pocker.Plugin{servertiming.New()}}
@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pockethost/pocketbase/ext/pocker"
+	"github.com/pockethost/pocketone/ext/pocker"
 )
 
 // Header carries per-hop timing in the standard Server-Timing response header. Each hop measures from

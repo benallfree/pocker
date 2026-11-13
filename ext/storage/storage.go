@@ -35,8 +35,8 @@ import (
 
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/filesystem"
-	"github.com/pockethost/pocketbase/ext/pocker"
-	"github.com/pockethost/pocketbase/ext/s3redirect/sigv4"
+	"github.com/pockethost/pocketone/ext/pocker"
+	"github.com/pockethost/pocketone/ext/s3redirect/sigv4"
 )
 
 // Name is the plugin's name and config key.

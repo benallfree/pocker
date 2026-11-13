@@ -19,10 +19,10 @@ import (
 	"os/signal"
 
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
-	"github.com/pockethost/pocketbase/ext/devusers"
-	"github.com/pockethost/pocketbase/ext/pages"
-	"github.com/pockethost/pocketbase/ext/pages/pockerplugin"
-	"github.com/pockethost/pocketbase/ext/pocker"
+	"github.com/pockethost/pocketone/ext/devusers"
+	"github.com/pockethost/pocketone/ext/pages"
+	"github.com/pockethost/pocketone/ext/pages/pockerplugin"
+	"github.com/pockethost/pocketone/ext/pocker"
 )
 
 func main() {

@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
-	oauthserver "github.com/pockethost/pocketbase/ext/oauth-server"
-	"github.com/pockethost/pocketbase/ext/tokens"
+	oauthserver "github.com/pockethost/pocketone/ext/oauth-server"
+	"github.com/pockethost/pocketone/ext/tokens"
 )
 
 // OAuth signs MCP requests in with access tokens from ext/oauth-server (API tokens from ext/tokens), the way Claude

@@ -1,11 +1,11 @@
 ---
 title: Going Live
-description: Deploy a PocketPages app by putting pb_pages next to pb_data on a PocketBase CE server with the pages plugin.
+description: Deploy a PocketPages app by putting pb_pages next to pb_data on a PocketOne server with the pages plugin.
 ---
 
 # Going Live
 
-A PocketPages app is a `pb_pages` folder. To go live, run PocketBase CE with the pages plugin on your server and put `pb_pages` next to `pb_data`, along with your other `pb_*` folders:
+A PocketPages app is a `pb_pages` folder. To go live, run PocketOne with the pages plugin on your server and put `pb_pages` next to `pb_data`, along with your other `pb_*` folders:
 
 ```
 pb_data/
@@ -29,4 +29,4 @@ Copy the changed files into `pb_pages`. The route table is rebuilt on any change
 
 ## Multitenant hosts
 
-Under a multitenant PocketBase CE host, every instance has its own `pb_pages`, and page code runs with the same limits as the rest of the instance's JS.
+Under a multitenant PocketOne host, every instance has its own `pb_pages`, and page code runs with the same limits as the rest of the instance's JS.

@@ -1,4 +1,4 @@
-module github.com/pockethost/pocketbase/ext/host
+module github.com/pockethost/pocketone/ext/host
 
 go 1.27
 

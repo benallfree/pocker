@@ -9,7 +9,7 @@ the mothership through its schema and mirror extensions. Billing extends tenants
 
 **Runs on:** a [host](../host/README.md) with the [edge](../edge/README.md) fleet layer.
 
-> **Status.** Early: Go module `github.com/pockethost/pocketbase/ext/mothership`. Built: the canonical `edges` and
+> **Status.** Early: Go module `github.com/pockethost/pocketone/ext/mothership`. Built: the canonical `edges` and
 > `instances` collections (`mothership.EnsureCollections`) and the edge side (`mirror`). Not yet: the mothership's own
 > endpoints (placement, moves), instance status reports.
 

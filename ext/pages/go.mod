@@ -1,4 +1,4 @@
-module github.com/pockethost/pocketbase/ext/pages
+module github.com/pockethost/pocketone/ext/pages
 
 go 1.27
 
@@ -7,8 +7,8 @@ require (
 	ganigeorgiev.com/pocketbase/pocketbase v0.0.0-00010101000000-000000000000
 	github.com/dop251/goja v0.0.0-20261023121931-6ace4dde0b29
 	github.com/evanw/esbuild v0.28.2
-	github.com/pockethost/pocketbase/ext/devusers v0.0.0-00010101000000-000000000000
-	github.com/pockethost/pocketbase/ext/pocker v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/devusers v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/pocker v0.0.0-00010101000000-000000000000
 	github.com/spf13/cobra v1.10.2
 	github.com/yuin/goldmark v1.8.7
 	golang.org/x/oauth2 v0.37.0
@@ -37,10 +37,10 @@ require (
 	github.com/mattn/go-colorable v0.1.16 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/ncruces/go-strftime v1.1.0 // indirect
-	github.com/pockethost/pocketbase/ext/ceplugin v0.0.0-00010101000000-000000000000 // indirect
-	github.com/pockethost/pocketbase/ext/host v0.0.0-00010101000000-000000000000 // indirect
-	github.com/pockethost/pocketbase/ext/jserrors v0.0.0-00010101000000-000000000000 // indirect
-	github.com/pockethost/pocketbase/ext/sandbox v0.0.0-00010101000000-000000000000 // indirect
+	github.com/pockethost/pocketone/ext/ceplugin v0.0.0-00010101000000-000000000000 // indirect
+	github.com/pockethost/pocketone/ext/host v0.0.0-00010101000000-000000000000 // indirect
+	github.com/pockethost/pocketone/ext/jserrors v0.0.0-00010101000000-000000000000 // indirect
+	github.com/pockethost/pocketone/ext/sandbox v0.0.0-00010101000000-000000000000 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/spf13/cast v1.10.0 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
@@ -58,16 +58,16 @@ require (
 
 replace ganigeorgiev.com/pocketbase/pocketbase => ../..
 
-replace github.com/pockethost/pocketbase/ext/devusers => ../devusers
+replace github.com/pockethost/pocketone/ext/devusers => ../devusers
 
-replace github.com/pockethost/pocketbase/ext/pocker => ../pocker
+replace github.com/pockethost/pocketone/ext/pocker => ../pocker
 
-replace github.com/pockethost/pocketbase/ext/sandbox => ../sandbox
+replace github.com/pockethost/pocketone/ext/sandbox => ../sandbox
 
-replace github.com/pockethost/pocketbase/ext/edge => ../edge
+replace github.com/pockethost/pocketone/ext/edge => ../edge
 
-replace github.com/pockethost/pocketbase/ext/host => ../host
+replace github.com/pockethost/pocketone/ext/host => ../host
 
-replace github.com/pockethost/pocketbase/ext/ceplugin => ../ceplugin
+replace github.com/pockethost/pocketone/ext/ceplugin => ../ceplugin
 
-replace github.com/pockethost/pocketbase/ext/jserrors => ../jserrors
+replace github.com/pockethost/pocketone/ext/jserrors => ../jserrors

@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pockethost/pocketbase/ext/remotes"
+	"github.com/pockethost/pocketone/ext/remotes"
 )
 
 // FileEntry is one entry of a remote listing.

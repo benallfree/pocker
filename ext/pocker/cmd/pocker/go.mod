@@ -1,15 +1,15 @@
-module github.com/pockethost/pocketbase/ext/pocker/cmd/pocker
+module github.com/pockethost/pocketone/ext/pocker/cmd/pocker
 
 go 1.27
 
 require (
-	github.com/pockethost/pocketbase/ext/autotls v0.0.0-00010101000000-000000000000
-	github.com/pockethost/pocketbase/ext/edge v0.0.0-20261113092039-67b21912ae84
-	github.com/pockethost/pocketbase/ext/firewall v0.0.0-00010101000000-000000000000
-	github.com/pockethost/pocketbase/ext/mailtrap v0.0.0-00010101000000-000000000000
-	github.com/pockethost/pocketbase/ext/mothership v0.0.0-00010101000000-000000000000
-	github.com/pockethost/pocketbase/ext/pocker v0.0.0-00010101000000-000000000000
-	github.com/pockethost/pocketbase/ext/servertiming v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/autotls v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/edge v0.0.0-20261113092039-67b21912ae84
+	github.com/pockethost/pocketone/ext/firewall v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/mailtrap v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/mothership v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/pocker v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/servertiming v0.0.0-00010101000000-000000000000
 )
 
 require (
@@ -43,10 +43,10 @@ require (
 	github.com/mholt/acmez/v3 v3.1.7 // indirect
 	github.com/miekg/dns v1.1.73 // indirect
 	github.com/ncruces/go-strftime v1.1.0 // indirect
-	github.com/pockethost/pocketbase/ext/ceplugin v0.0.0-00010101000000-000000000000 // indirect
-	github.com/pockethost/pocketbase/ext/host v0.0.0-00010101000000-000000000000 // indirect
-	github.com/pockethost/pocketbase/ext/jserrors v0.0.0-00010101000000-000000000000 // indirect
-	github.com/pockethost/pocketbase/ext/sandbox v0.0.0-00010101000000-000000000000 // indirect
+	github.com/pockethost/pocketone/ext/ceplugin v0.0.0-00010101000000-000000000000 // indirect
+	github.com/pockethost/pocketone/ext/host v0.0.0-00010101000000-000000000000 // indirect
+	github.com/pockethost/pocketone/ext/jserrors v0.0.0-00010101000000-000000000000 // indirect
+	github.com/pockethost/pocketone/ext/sandbox v0.0.0-00010101000000-000000000000 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/spf13/cast v1.10.0 // indirect
 	github.com/spf13/cobra v1.10.2 // indirect
@@ -71,22 +71,22 @@ require (
 
 replace (
 	ganigeorgiev.com/pocketbase/pocketbase => ../../../..
-	github.com/pockethost/pocketbase/ext/autotls => ../../../autotls
-	github.com/pockethost/pocketbase/ext/pocker => ../..
-	github.com/pockethost/pocketbase/ext/sandbox => ../../../sandbox
-	github.com/pockethost/pocketbase/ext/servertiming => ../../../servertiming
+	github.com/pockethost/pocketone/ext/autotls => ../../../autotls
+	github.com/pockethost/pocketone/ext/pocker => ../..
+	github.com/pockethost/pocketone/ext/sandbox => ../../../sandbox
+	github.com/pockethost/pocketone/ext/servertiming => ../../../servertiming
 )
 
-replace github.com/pockethost/pocketbase/ext/edge => ../../../edge
+replace github.com/pockethost/pocketone/ext/edge => ../../../edge
 
-replace github.com/pockethost/pocketbase/ext/mothership => ../../../mothership
+replace github.com/pockethost/pocketone/ext/mothership => ../../../mothership
 
-replace github.com/pockethost/pocketbase/ext/host => ../../../host
+replace github.com/pockethost/pocketone/ext/host => ../../../host
 
-replace github.com/pockethost/pocketbase/ext/firewall => ../../../firewall
+replace github.com/pockethost/pocketone/ext/firewall => ../../../firewall
 
-replace github.com/pockethost/pocketbase/ext/mailtrap => ../../../mailtrap
+replace github.com/pockethost/pocketone/ext/mailtrap => ../../../mailtrap
 
-replace github.com/pockethost/pocketbase/ext/ceplugin => ../../../ceplugin
+replace github.com/pockethost/pocketone/ext/ceplugin => ../../../ceplugin
 
-replace github.com/pockethost/pocketbase/ext/jserrors => ../../../jserrors
+replace github.com/pockethost/pocketone/ext/jserrors => ../../../jserrors

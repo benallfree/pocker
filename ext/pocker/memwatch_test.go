@@ -3,7 +3,7 @@ package pocker
 import (
 	"context"
 	"encoding/json"
-	"github.com/pockethost/pocketbase/ext/sandbox"
+	"github.com/pockethost/pocketone/ext/sandbox"
 	"net/http"
 	"net/http/httptest"
 	"os"

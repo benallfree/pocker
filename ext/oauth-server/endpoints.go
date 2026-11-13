@@ -15,7 +15,7 @@ import (
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"ganigeorgiev.com/pocketbase/pocketbase/mails"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/security"
-	"github.com/pockethost/pocketbase/ext/tokens"
+	"github.com/pockethost/pocketone/ext/tokens"
 )
 
 const (

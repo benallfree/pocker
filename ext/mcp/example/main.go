@@ -18,10 +18,10 @@ import (
 	"ganigeorgiev.com/pocketbase/pocketbase"
 	"ganigeorgiev.com/pocketbase/pocketbase/plugins/jsvm"
 	"github.com/dop251/goja"
-	"github.com/pockethost/pocketbase/ext/devusers"
-	"github.com/pockethost/pocketbase/ext/mcp"
-	oauthserver "github.com/pockethost/pocketbase/ext/oauth-server"
-	"github.com/pockethost/pocketbase/ext/tokens"
+	"github.com/pockethost/pocketone/ext/devusers"
+	"github.com/pockethost/pocketone/ext/mcp"
+	oauthserver "github.com/pockethost/pocketone/ext/oauth-server"
+	"github.com/pockethost/pocketone/ext/tokens"
 )
 
 func main() {
