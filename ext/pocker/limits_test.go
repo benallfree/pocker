@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -121,12 +122,22 @@ func TestSecretChangeRestartsApp(t *testing.T) {
 	}
 	inst := Instance{ID: "app", Hosts: []string{"app.example.com"}, Secrets: map[string]string{"API_KEY": "old"}}
 	src := &chanSource{list: []Instance{inst}, ch: make(chan Change)}
+	var restartedMu sync.Mutex
 	var restarted []string
 	m := NewManager(src, ManagerOptions{
-		PBRoot:  root,
-		Logger:  slog.New(slog.NewTextHandler(io.Discard, nil)),
-		OnEvent: func(e Event) { restarted = append(restarted, string(e.Kind)) },
+		PBRoot: root,
+		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
+		OnEvent: func(e Event) {
+			restartedMu.Lock()
+			restarted = append(restarted, string(e.Kind))
+			restartedMu.Unlock()
+		},
 	})
+	events := func() []string {
+		restartedMu.Lock()
+		defer restartedMu.Unlock()
+		return append([]string(nil), restarted...)
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go m.Run(ctx)
@@ -151,12 +162,12 @@ func TestSecretChangeRestartsApp(t *testing.T) {
 	if got := get(); got != "rotated" {
 		t.Fatalf("after rotation: got %q, want rotated", got)
 	}
-	if !containsString(restarted, string(EventStarted)) || !containsString(restarted, string(EventRestarted)) {
-		t.Fatalf("expected started and restarted events, got %v", restarted)
+	if ev := events(); !containsString(ev, string(EventStarted)) || !containsString(ev, string(EventRestarted)) {
+		t.Fatalf("expected started and restarted events, got %v", ev)
 	}
 	countRestarts := func() int {
 		n := 0
-		for _, k := range restarted {
+		for _, k := range events() {
 			if k == string(EventRestarted) {
 				n++
 			}
@@ -169,7 +180,7 @@ func TestSecretChangeRestartsApp(t *testing.T) {
 	src.ch <- Change{Kind: Upsert, Instance: inst}
 	time.Sleep(50 * time.Millisecond)
 	if countRestarts() != 1 {
-		t.Fatalf("hosts change must not restart, events: %v", restarted)
+		t.Fatalf("hosts change must not restart, events: %v", events())
 	}
 }
 

@@ -120,7 +120,7 @@ func startApp(opts appOptions, inst Instance) (r *runningApp, err error) {
 	err = jsvm.Register(app, jsvm.Config{
 		HooksDir:      filepath.Join(dir, "pb_hooks"),
 		MigrationsDir: filepath.Join(dir, "pb_migrations"),
-		HooksWatch:    false, // one process serves every app: a hooks change must not restart it
+		HooksWatch:    false, // PocketBase's watcher would open an inotify instance per app; the Manager's shared watcher restarts just this app
 		HooksPoolSize: opts.HooksPoolSize,
 		OnInit: func(vm *goja.Runtime) {
 			sb.OnInit(vm)
