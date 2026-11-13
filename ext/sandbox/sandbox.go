@@ -679,8 +679,6 @@ var hiddenMethods = map[string]map[string]bool{
 		// process lifecycle: one app must not restart, re-bootstrap or migrate the shared process
 		"Restart": true, "RestoreBackup": true, "Bootstrap": true, "ResetBootstrapState": true,
 		"RunAllMigrations": true, "RunSystemMigrations": true, "RunAppMigrations": true,
-		// per-app internals (DataDir stays: it is inside the confined app folder)
-		"AppMigrationsList": true,
 		// server-level hooks and the cron scheduler (JS functions run on other goroutines; use cronAdd)
 		"OnServe": true, "OnTerminate": true, "OnBootstrap": true, "Cron": true,
 		// hookless copy of the app bypasses every hook, including the platform's

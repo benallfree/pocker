@@ -216,7 +216,7 @@ const (
 )
 
 // FilesystemCreateEvent is triggered by app.NewFilesystem() and app.NewBackupsFilesystem(); plugins may trigger it
-// for their own kinds (e.g. ext/pitr's "litestream").
+// for their own kinds.
 // A handler may set Filesystem (e.g. a default bucket when the app's own S3 is off);
 // otherwise the default one from the app settings (S3 or local) is created.
 type FilesystemCreateEvent struct {

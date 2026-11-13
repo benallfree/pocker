@@ -29,6 +29,15 @@ Core-Audit: upstream-merge v0.x.y
 `upstream-merge` is only for merging a PocketBase release; resolve conflicts in the `// CE:` spots and audit any
 CE change the merge forced.
 
+## Core changes that aren't hooks
+
+Bug fixes to upstream behavior, each tested and meant for upstream; drop each one once upstream has it:
+
+- `apis/middlewares.go` `logRequest`: logs the status the client actually got for a plain error, not 0.
+- `apis/realtime.go` `realtimeCanAccessRecord`: a superuser's subscription filter may use hidden fields, as in the
+  list API (`TestRealtimeSuperuserFilterOnHiddenField`).
+- `core/notify_watcher.go`: keeps the notify file until the next write, so macOS (kqueue) sees the change.
+
 ## Other rules
 
 - Plugins are their own Go modules under `ext/<name>/` with a README and a minimal `example/main.go`

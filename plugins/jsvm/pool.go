@@ -73,18 +73,20 @@ func (p *vmsPool) run(call func(vm *goja.Runtime) error) error {
 	//
 	// note: if turned out not efficient we may change this in the future
 	// by adding the created item in the pool with some timer for removal
-	// CE: a lazy pool keeps the new vm
-	if freeItem == nil && p.max > 0 {
-		p.mux.Lock()
-		if len(p.items) < p.max {
-			freeItem = &poolItem{vm: p.factory(), busy: true}
-			p.items = append(p.items, freeItem)
-		}
-		p.mux.Unlock()
-	}
-
 	if freeItem == nil {
-		return p.call(call, p.factory())
+		vm := p.factory()
+		// CE: a lazy pool keeps the new vm while it has room (built above, outside the lock)
+		if p.max > 0 {
+			p.mux.Lock()
+			if len(p.items) < p.max {
+				freeItem = &poolItem{vm: vm, busy: true}
+				p.items = append(p.items, freeItem)
+			}
+			p.mux.Unlock()
+		}
+		if freeItem == nil {
+			return p.call(call, vm)
+		}
 	}
 
 	execErr := p.call(call, freeItem.vm)

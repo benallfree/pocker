@@ -887,10 +887,6 @@ func BindApis(vm *goja.Runtime) {
 	registerFactoryAsConstructor(vm, "InternalServerError", router.NewInternalServerError)
 }
 
-// BindHTTP registers $http.* namespaced object with common utils
-// for sending HTTP requests.
-//
-// See https://pocketbase.io/jsvm/modules/_http.html.
 // CE: httpClientKey is the global property $http.send takes its *http.Client from: an extension's HTTPClient (e.g.
 // a sandbox capping timeouts and response sizes for that app). Without it, http.DefaultClient is used.
 const httpClientKey = "__jsvm_http_client"
@@ -907,6 +903,10 @@ func httpClient(vm *goja.Runtime) *http.Client {
 	return http.DefaultClient
 }
 
+// BindHTTP registers $http.* namespaced object with common utils
+// for sending HTTP requests.
+//
+// See https://pocketbase.io/jsvm/modules/_http.html.
 func BindHTTP(vm *goja.Runtime) {
 	obj := vm.NewObject()
 	vm.Set("$http", obj)
@@ -1288,11 +1288,8 @@ type shapeFieldInfo struct {
 }
 
 // CE: compileHandler compiles a serialized handler wrapped as prefix+src+suffix and returns how to map the errors it
-// throws (the extensions' OnCompile; identity without any).
+// throws (the extensions' OnCompile; identity without any). executors must not be nil.
 func compileHandler(executors *vmsPool, prefix, src, suffix string) (*goja.Program, func(error) error) {
 	pr := goja.MustCompile(defaultScriptPath, prefix+src+suffix, true)
-	if executors == nil {
-		return pr, func(err error) error { return err }
-	}
 	return pr, executors.ext.compile(executors.loader, src, len(prefix))
 }

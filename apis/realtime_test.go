@@ -1239,3 +1239,60 @@ func TestRealtimeRecordResolve(t *testing.T) {
 		})
 	}
 }
+
+// CE: a superuser's subscription filter may use hidden fields, as in the list API; a regular user's may not.
+func TestRealtimeSuperuserFilterOnHiddenField(t *testing.T) {
+	t.Parallel()
+
+	testApp, _ := tests.NewTestApp()
+	defer testApp.Cleanup()
+
+	if _, err := apis.NewRouter(testApp); err != nil {
+		t.Fatal(err)
+	}
+
+	testCollection := core.NewBaseCollection("test_realtime_hidden_filter")
+	testCollection.ListRule = types.Pointer("@request.auth.id != ''")
+	testCollection.Fields.Add(&core.TextField{Name: "hidden", Hidden: true})
+	if err := testApp.Save(testCollection); err != nil {
+		t.Fatal(err)
+	}
+
+	sub := testCollection.Name + `/*?options={"query":{"filter":"hidden='match'"}}`
+
+	regular, err := testApp.FindAuthRecordByEmail("users", "test@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	regularClient := subscriptions.NewDefaultClient()
+	regularClient.Set(apis.RealtimeClientAuthKey, regular)
+	regularClient.Subscribe(sub)
+	testApp.SubscriptionsBroker().Register(regularClient)
+
+	superuser, err := testApp.FindAuthRecordByEmail(core.CollectionNameSuperusers, "test@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	superuserClient := subscriptions.NewDefaultClient()
+	superuserClient.Set(apis.RealtimeClientAuthKey, superuser)
+	superuserClient.Subscribe(sub)
+	testApp.SubscriptionsBroker().Register(superuserClient)
+
+	record := core.NewRecord(testCollection)
+	record.Set("hidden", "match")
+	if err := testApp.Save(record); err != nil {
+		t.Fatal(err)
+	}
+
+	select {
+	case <-superuserClient.Channel():
+	case <-time.After(3 * time.Second):
+		t.Fatal("the superuser's hidden-field filter should match the event")
+	}
+
+	select {
+	case msg := <-regularClient.Channel():
+		t.Fatalf("a regular user's hidden-field filter must not match, got %s", msg.Data)
+	case <-time.After(200 * time.Millisecond):
+	}
+}
