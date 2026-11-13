@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"syscall"
 	"time"
 
 	"github.com/benbjohnson/litestream"
@@ -282,11 +281,10 @@ func checkDisk(dataDir string) error {
 	if err != nil {
 		return nil
 	}
-	var st syscall.Statfs_t
-	if err := syscall.Statfs(dataDir, &st); err != nil {
+	free, ok := freeBytes(dataDir)
+	if !ok {
 		return nil
 	}
-	free := int64(st.Bavail) * int64(st.Bsize)
 	if need := 2 * fi.Size(); free < need {
 		return fmt.Errorf("not enough free disk space for a restore: need %d MiB, have %d MiB", need>>20, free>>20)
 	}
