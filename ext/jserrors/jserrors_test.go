@@ -1,9 +1,10 @@
-package jsvm
+package jserrors
 
 import (
 	"strings"
 	"testing"
 
+	"ganigeorgiev.com/pocketbase/pocketbase/plugins/jsvm"
 	"github.com/dop251/goja"
 )
 
@@ -32,20 +33,21 @@ func TestHookSourcePositions(t *testing.T) {
 	}
 
 	// run the second handler the way the binds do and check the thrown position maps to line 6
-	pr, src := compileHandler(loader, "{(", second, ").apply(undefined, [])}")
+	pr := goja.MustCompile(jsvm.ScriptPath(), "{("+second+").apply(undefined, [])}", true)
+	src := locateHandler(loader, second, 2)
 	_, err := goja.New().RunProgram(pr)
 	if err == nil {
 		t.Fatal("expected an error")
 	}
 	msg := src.remap(err).Error()
-	if !strings.Contains(msg, "pb_hooks/main.pb.js:6:9") || strings.Contains(msg, defaultScriptPath) {
+	if !strings.Contains(msg, "pb_hooks/main.pb.js:6:9") || strings.Contains(msg, jsvm.ScriptPath()) {
 		t.Fatalf("remapped error: %q", msg)
 	}
 }
 
 func TestHookSourceWholeFileAndUnknown(t *testing.T) {
 	vm := goja.New()
-	_, err := vm.RunScript(defaultScriptPath, "let a = 1\nnull.x\n")
+	_, err := vm.RunScript(jsvm.ScriptPath(), "let a = 1\nnull.x\n")
 	if err == nil {
 		t.Fatal("expected an error")
 	}

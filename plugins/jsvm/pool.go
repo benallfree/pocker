@@ -13,11 +13,12 @@ type poolItem struct {
 }
 
 type vmsPool struct {
-	mux     sync.RWMutex
-	factory func() *goja.Runtime
-	items   []*poolItem
-	onCall  func(vm *goja.Runtime) (func(), error) // CE: Config.OnCall
-	max     int                                    // CE: newLazyPool grows up to max items
+	mux       sync.RWMutex
+	factory   func() *goja.Runtime
+	items     []*poolItem
+	onCall    func(vm *goja.Runtime) (func(), error)                               // CE: Config.OnCall
+	onCompile func(loader *goja.Runtime, src string, prefix int) func(error) error // CE: Config.OnCompile
+	max       int                                                                  // CE: newLazyPool grows up to max items
 }
 
 // CE: newLazyPool creates a pool that starts empty and keeps up to max vms, created on demand.

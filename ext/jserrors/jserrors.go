@@ -1,21 +1,69 @@
-package jsvm
-
-// CE: error positions that point at the customer's .pb.js file.
+// Package jserrors makes JS hook errors point at the .pb.js file they come from:
 //
-// Hook handlers are serialized (fn.toString()) and recompiled as separate programs under defaultScriptPath
-// (<cwd>/pb.js), which also anchors relative require() calls, so the name itself can't change. Instead each program
-// remembers where its handler came from, and errors thrown while it runs have their pb.js positions rewritten to
-// pb_hooks/<file>:<line>:<col>.
+//	jsvm.MustRegister(app, jserrors.Config(jsvm.Config{...}))
+//
+// jsvm serializes hook handlers (fn.toString()) and recompiles each as its own program under <cwd>/pb.js
+// (jsvm.ScriptPath), which also anchors relative require() calls, so its errors say pb.js:1:40. This plugin remembers
+// where each handler sits in the hooks file being loaded and rewrites those positions to pb_hooks/<file>:<line>:<col>;
+// errors while a hooks file itself loads name the file too.
+//
+// It plugs into jsvm's OnLoad and OnCompile options; PocketBase itself is unchanged.
+package jserrors
 
 import (
 	"errors"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 	"sync"
 
+	"ganigeorgiev.com/pocketbase/pocketbase/plugins/jsvm"
 	"github.com/dop251/goja"
 )
+
+// Config returns base with hook errors pointing at the hooks files. Handlers already set in base.OnLoad and
+// base.OnCompile still run, and their error mapping applies after this one.
+func Config(base jsvm.Config) jsvm.Config {
+	dir := "pb_hooks" // how errors name the hooks folder: its own name on disk, else pb_hooks (e.g. embedded)
+	if base.HookFiles == nil && base.HooksDir != "" {
+		dir = filepath.Base(base.HooksDir)
+	}
+	prevLoad, prevCompile := base.OnLoad, base.OnCompile
+
+	base.OnLoad = func(loader *goja.Runtime, file string, content []byte) (func(), func(error) error) {
+		name := filepath.ToSlash(filepath.Join(dir, file))
+		setLoadingFile(loader, name, string(content))
+		done, mapErr := func() {}, func(err error) error { return wholeFile(name).remap(err) }
+		if prevLoad != nil {
+			pd, pm := prevLoad(loader, file, content)
+			done, mapErr = chainDone(pd, done), chainMap(mapErr, pm)
+		}
+		return func() { done(); clearLoadingFile(loader) }, mapErr
+	}
+	base.OnCompile = func(loader *goja.Runtime, src string, prefix int) func(error) error {
+		mapErr := locateHandler(loader, src, prefix).remap
+		if prevCompile != nil {
+			mapErr = chainMap(mapErr, prevCompile(loader, src, prefix))
+		}
+		return mapErr
+	}
+	return base
+}
+
+func chainDone(a, b func()) func() {
+	if a == nil {
+		return b
+	}
+	return func() { b(); a() }
+}
+
+func chainMap(first, then func(error) error) func(error) error {
+	if then == nil {
+		return first
+	}
+	return func(err error) error { return then(first(err)) }
+}
 
 // loadingFile is the hooks file a loader VM is running, so handlers registered from it can be located.
 type loadingFile struct {
@@ -72,7 +120,7 @@ func locateHandler(loader *goja.Runtime, src string, prefix int) *hookSource {
 // wholeFile maps a top-level script (the program is the file itself).
 func wholeFile(name string) *hookSource { return &hookSource{file: name, line: 1, col: 1} }
 
-// defaultScriptPath is set in init (it depends on the working directory), so the pattern is built on first use.
+// jsvm.ScriptPath depends on the working directory, so the pattern is built on first use.
 var (
 	posPatternOnce sync.Once
 	posPattern     *regexp.Regexp
@@ -80,7 +128,7 @@ var (
 
 func scriptPosPattern() *regexp.Regexp {
 	posPatternOnce.Do(func() {
-		posPattern = regexp.MustCompile(regexp.QuoteMeta(defaultScriptPath) + `:(\d+):(\d+)(?:\(\d+\))?`)
+		posPattern = regexp.MustCompile(regexp.QuoteMeta(jsvm.ScriptPath()) + `:(\d+):(\d+)(?:\(\d+\))?`)
 	})
 	return posPattern
 }

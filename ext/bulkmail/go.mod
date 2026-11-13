@@ -63,3 +63,5 @@ replace github.com/pockethost/pocketbase/ext/edge => ../edge
 replace github.com/pockethost/pocketbase/ext/host => ../host
 
 replace github.com/pockethost/pocketbase/ext/ceplugin => ../ceplugin
+
+replace github.com/pockethost/pocketbase/ext/jserrors => ../jserrors

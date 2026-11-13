@@ -27,6 +27,7 @@ import (
 	"github.com/pockethost/pocketbase/ext/ceplugin"
 	"github.com/pockethost/pocketbase/ext/config"
 	"github.com/pockethost/pocketbase/ext/deploy"
+	"github.com/pockethost/pocketbase/ext/jserrors"
 	"github.com/pockethost/pocketbase/ext/mailtrap"
 	"github.com/pockethost/pocketbase/ext/mcp"
 	oauthserver "github.com/pockethost/pocketbase/ext/oauth-server"
@@ -232,8 +233,8 @@ func main() {
 	// Plugins and hooks:
 	// ---------------------------------------------------------------
 
-	// load jsvm (pb_hooks and pb_migrations)
-	jsvm.MustRegister(app, jsvm.Config{
+	// load jsvm (pb_hooks and pb_migrations); hook errors name pb_hooks/<file>:<line>:<col> (ext/jserrors)
+	jsvm.MustRegister(app, jserrors.Config(jsvm.Config{
 		MigrationsDir: migrationsDir,
 		HooksDir:      hooksDir,
 		HooksWatch:    hooksWatch,
@@ -242,7 +243,7 @@ func main() {
 			ceplugin.BindJS(app, vm, cePlugins...) // e.g. $bulkmail in pb_hooks
 			mcp.BindJS(vm, app)                    // $mcp.addTool in pb_hooks
 		},
-	})
+	}))
 
 	// PocketPages: serves pb_pages when the folder exists (page code runs in the jsvm above)
 	pages.MustRegister(app, pages.Config{Dir: pagesDir})

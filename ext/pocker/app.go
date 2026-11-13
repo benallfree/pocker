@@ -18,6 +18,7 @@ import (
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/security"
 	"ganigeorgiev.com/pocketbase/pocketbase/ui"
 	"github.com/dop251/goja"
+	"github.com/pockethost/pocketbase/ext/jserrors"
 	"github.com/pockethost/pocketbase/ext/sandbox"
 )
 
@@ -121,7 +122,7 @@ func startApp(opts appOptions, inst Instance) (r *runningApp, err error) {
 		Owner:              inst.ID,
 		Console:            openInstanceLog(dir).Write,
 	}
-	err = jsvm.Register(app, jsvm.Config{
+	err = jsvm.Register(app, jserrors.Config(jsvm.Config{ // hook errors name pb_hooks/<file>:<line>:<col> in the instance log
 		HooksDir:      filepath.Join(dir, "pb_hooks"),
 		MigrationsDir: filepath.Join(dir, "pb_migrations"),
 		HooksWatch:    false, // PocketBase's watcher would open an inotify instance per app; the Manager's shared watcher restarts just this app
@@ -133,7 +134,7 @@ func startApp(opts appOptions, inst Instance) (r *runningApp, err error) {
 			}
 		},
 		OnCall: sb.OnCall,
-	})
+	}))
 	if err != nil {
 		return nil, fmt.Errorf("load hooks: %w", err)
 	}

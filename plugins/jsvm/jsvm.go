@@ -69,6 +69,16 @@ type Config struct {
 	// call ends. Use it for per-call time limits, concurrency caps or tracing.
 	OnCall func(vm *goja.Runtime) (done func(), err error)
 
+	// CE: OnLoad, if set, is called before a hooks file runs (file: its name in the hooks dir) on the loader runtime
+	// that runs it; done runs after, and errors from the load go through mapErr (nil = unchanged). E.g. ext/jserrors
+	// remembers the file to point errors at it.
+	OnLoad func(loader *goja.Runtime, file string, content []byte) (done func(), mapErr func(error) error)
+
+	// CE: OnCompile, if set, is called for every handler jsvm recompiles (hook, route, middleware, cron) with the
+	// loader runtime that registered it, the handler's source and the length of the wrapper before it on the first
+	// line; errors the handler returns go through mapErr (nil = unchanged).
+	OnCompile func(loader *goja.Runtime, src string, prefix int) (mapErr func(error) error)
+
 	// CE: HookFiles, if set, supplies the hook files (name -> content, matching pattern) instead of reading HooksDir.
 	// The files are never written back to disk and HooksWatch is ignored. E.g. ext/jsembed serves them from an fs.FS.
 	HookFiles func(pattern string) (map[string][]byte, error)
@@ -373,6 +383,7 @@ func (p *plugin) registerHooks() error {
 		executors = newLazyPool(p.config.HooksPoolSize, executorFactory)
 	}
 	executors.onCall = p.config.OnCall              // POCKER
+	executors.onCompile = p.config.OnCompile        // CE
 	p.app.Store().Set(executorsStoreKey, executors) // CE: for Run
 
 	if len(files) == 0 {
@@ -406,12 +417,19 @@ func (p *plugin) registerHooks() error {
 				panic(callErr)
 			}
 			defer done()
-			name := p.hooksDisplayName(file) // CE: errors name the hooks file, not <cwd>/pb.js
-			setLoadingFile(loader, name, string(content))
-			defer clearLoadingFile(loader)
+			mapErr := func(err error) error { return err }
+			if p.config.OnLoad != nil { // CE
+				loadDone, m := p.config.OnLoad(loader, file, content)
+				if loadDone != nil {
+					defer loadDone()
+				}
+				if m != nil {
+					mapErr = m
+				}
+			}
 			_, err := loader.RunScript(defaultScriptPath, string(content))
 			if err != nil {
-				panic(wholeFile(name).remap(err))
+				panic(mapErr(err))
 			}
 		}()
 	}
@@ -656,15 +674,6 @@ func (p *plugin) onCall(vm *goja.Runtime) (func(), error) {
 	return p.config.OnCall(vm)
 }
 
-// CE: hooksDisplayName is how errors name a hooks file: pb_hooks/<file> (the hooks folder's own name on disk).
-func (p *plugin) hooksDisplayName(file string) string {
-	dir := "pb_hooks"
-	if p.config.HookFiles == nil && p.config.HooksDir != "" {
-		dir = filepath.Base(p.config.HooksDir)
-	}
-	return filepath.ToSlash(filepath.Join(dir, file))
-}
-
 // CE: hookFiles returns the hook files from HookFiles when set, otherwise from HooksDir.
 func (p *plugin) hookFiles() (map[string][]byte, error) {
 	if p.config.HookFiles != nil {
@@ -694,3 +703,7 @@ func (p *plugin) hooksRequire() (string, *require.Registry, error) {
 	}
 	return absHooksDir, new(require.Registry), nil
 }
+
+// CE: ScriptPath is the name handlers and hooks files are compiled under (<cwd>/pb.js): error positions in a
+// handler's program carry it (see Config.OnCompile).
+func ScriptPath() string { return defaultScriptPath }

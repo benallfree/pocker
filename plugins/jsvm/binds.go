@@ -59,7 +59,7 @@ func hooksBinds(app core.App, loader *goja.Runtime, executors *vmsPool) {
 		// register the hook to the loader
 		loader.Set(jsName, func(callback string, tags ...string) {
 			// overwrite the global $app with the hook scoped instance
-			pr, src := compileHandler(loader, "{(function(e) { $app = e.app; return (", callback, ").call(undefined, e) }).apply(undefined, __args)}")
+			pr, mapErr := compileHandler(executors, loader, "{(function(e) { $app = e.app; return (", callback, ").call(undefined, e) }).apply(undefined, __args)}")
 
 			tagsAsValues := make([]reflect.Value, len(tags))
 			for i, tag := range tags {
@@ -89,7 +89,7 @@ func hooksBinds(app core.App, loader *goja.Runtime, executors *vmsPool) {
 						return resErr
 					}
 
-					return src.remap(normalizeException(err))
+					return mapErr(normalizeException(err))
 				})
 
 				return []reflect.Value{reflect.ValueOf(&err).Elem()}
@@ -103,12 +103,12 @@ func hooksBinds(app core.App, loader *goja.Runtime, executors *vmsPool) {
 
 func cronBinds(app core.App, loader *goja.Runtime, executors *vmsPool) {
 	cronAdd := func(jobId, cronExpr, handler string) {
-		pr, src := compileHandler(loader, "{(", handler, ").apply(undefined)}")
+		pr, mapErr := compileHandler(executors, loader, "{(", handler, ").apply(undefined)}")
 
 		err := app.Cron().Add(jobId, cronExpr, func() {
 			err := executors.run(func(executor *goja.Runtime) error {
 				_, err := executor.RunProgram(pr)
-				return src.remap(err)
+				return mapErr(err)
 			})
 
 			if err != nil {
@@ -188,7 +188,7 @@ func wrapHandlerFunc(loader *goja.Runtime, executors *vmsPool, handler goja.Valu
 		// "native" handler func - no need to wrap
 		return h, nil
 	case func(goja.FunctionCall) goja.Value, string:
-		pr, src := compileHandler(loader, "{(", handler.String(), ").apply(undefined, __args)}")
+		pr, mapErr := compileHandler(executors, loader, "{(", handler.String(), ").apply(undefined, __args)}")
 
 		wrappedHandler := func(e *core.RequestEvent) error {
 			return executors.run(func(executor *goja.Runtime) error {
@@ -204,7 +204,7 @@ func wrapHandlerFunc(loader *goja.Runtime, executors *vmsPool, handler goja.Valu
 					return resErr
 				}
 
-				return src.remap(normalizeException(err))
+				return mapErr(normalizeException(err))
 			})
 		}
 
@@ -242,7 +242,7 @@ func wrapMiddlewares(loader *goja.Runtime, executors *vmsPool, rawMiddlewares ..
 				return nil, errors.New("missing or invalid Middleware function")
 			}
 
-			pr, src := compileHandler(loader, "{(", v.serializedFunc, ").apply(undefined, __args)}")
+			pr, mapErr := compileHandler(executors, loader, "{(", v.serializedFunc, ").apply(undefined, __args)}")
 
 			wrappedMiddlewares[i] = &hook.Handler[*core.RequestEvent]{
 				Id:       v.id,
@@ -261,12 +261,12 @@ func wrapMiddlewares(loader *goja.Runtime, executors *vmsPool, rawMiddlewares ..
 							return resErr
 						}
 
-						return src.remap(normalizeException(err))
+						return mapErr(normalizeException(err))
 					})
 				},
 			}
 		case func(goja.FunctionCall) goja.Value, string:
-			pr, src := compileHandler(loader, "{(", m.String(), ").apply(undefined, __args)}")
+			pr, mapErr := compileHandler(executors, loader, "{(", m.String(), ").apply(undefined, __args)}")
 
 			wrappedMiddlewares[i] = &hook.Handler[*core.RequestEvent]{
 				Func: func(e *core.RequestEvent) error {
@@ -283,7 +283,7 @@ func wrapMiddlewares(loader *goja.Runtime, executors *vmsPool, rawMiddlewares ..
 							return resErr
 						}
 
-						return src.remap(normalizeException(err))
+						return mapErr(normalizeException(err))
 					})
 				},
 			}
@@ -1284,9 +1284,14 @@ type shapeFieldInfo struct {
 	key       string
 }
 
-// CE: compileHandler compiles a serialized handler wrapped as prefix+src+suffix and locates it in the hooks file
-// being loaded, so errors it throws can point there ([hookSource.remap]).
-func compileHandler(loader *goja.Runtime, prefix, src, suffix string) (*goja.Program, *hookSource) {
+// CE: compileHandler compiles a serialized handler wrapped as prefix+src+suffix and returns how to map the errors it
+// throws (Config.OnCompile; identity when unset).
+func compileHandler(executors *vmsPool, loader *goja.Runtime, prefix, src, suffix string) (*goja.Program, func(error) error) {
 	pr := goja.MustCompile(defaultScriptPath, prefix+src+suffix, true)
-	return pr, locateHandler(loader, src, len(prefix))
+	if executors != nil && executors.onCompile != nil {
+		if m := executors.onCompile(loader, src, len(prefix)); m != nil {
+			return pr, m
+		}
+	}
+	return pr, func(err error) error { return err }
 }

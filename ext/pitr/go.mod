@@ -48,6 +48,7 @@ require (
 	github.com/pierrec/lz4/v4 v4.1.23 // indirect
 	github.com/pockethost/pocketbase/ext/ceplugin v0.0.0-00010101000000-000000000000 // indirect
 	github.com/pockethost/pocketbase/ext/host v0.0.0-00010101000000-000000000000 // indirect
+	github.com/pockethost/pocketbase/ext/jserrors v0.0.0-00010101000000-000000000000 // indirect
 	github.com/pockethost/pocketbase/ext/sandbox v0.0.0-00010101000000-000000000000 // indirect
 	github.com/prometheus/client_golang v1.17.0 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
@@ -87,3 +88,5 @@ replace github.com/pockethost/pocketbase/ext/edge => ../edge
 replace github.com/pockethost/pocketbase/ext/host => ../host
 
 replace github.com/pockethost/pocketbase/ext/ceplugin => ../ceplugin
+
+replace github.com/pockethost/pocketbase/ext/jserrors => ../jserrors
