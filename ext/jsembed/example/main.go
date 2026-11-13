@@ -25,7 +25,7 @@ func main() {
 	}
 	app := pocketbase.New()
 	devusers.Register(app)
-	jsvm.MustRegister(app, jsembed.Config(hooks, nil, jsvm.Config{}))
+	jsvm.MustRegister(app, jsvm.Config{Extensions: []jsvm.Extension{jsembed.Hooks(hooks)}})
 	if err := app.Start(); err != nil {
 		log.Fatal(err)
 	}

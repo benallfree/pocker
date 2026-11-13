@@ -26,7 +26,7 @@ func hooksDir(t *testing.T, files map[string]string) string {
 	return dir
 }
 
-// Through jsvm's OnCompile: an error a handler throws names pb_hooks/<file>:<line>:<col>, not <cwd>/pb.js.
+// Through jsvm's extension OnCompile: an error a handler throws names pb_hooks/<file>:<line>:<col>, not <cwd>/pb.js.
 func TestHandlerErrorPointsAtHooksFile(t *testing.T) {
 	for _, on := range []bool{true, false} {
 		t.Run(fmt.Sprintf("jserrors=%v", on), func(t *testing.T) {
@@ -38,7 +38,7 @@ func TestHandlerErrorPointsAtHooksFile(t *testing.T) {
 				"})\n"})
 			cfg := jsvm.Config{HooksDir: dir}
 			if on {
-				cfg = Config(cfg)
+				cfg.Extensions = []jsvm.Extension{New()}
 			}
 			if err := jsvm.Register(app, cfg); err != nil {
 				t.Fatal(err)
@@ -56,7 +56,7 @@ func TestHandlerErrorPointsAtHooksFile(t *testing.T) {
 	}
 }
 
-// Through jsvm's OnLoad: an error while a hooks file runs names the file.
+// Through jsvm's extension OnLoad: an error while a hooks file runs names the file.
 func TestLoadErrorPointsAtHooksFile(t *testing.T) {
 	app, _ := tests.NewTestApp()
 	defer app.Cleanup()
@@ -68,7 +68,7 @@ func TestLoadErrorPointsAtHooksFile(t *testing.T) {
 				got = fmt.Sprint(r)
 			}
 		}()
-		_ = jsvm.Register(app, Config(jsvm.Config{HooksDir: dir}))
+		_ = jsvm.Register(app, jsvm.Config{HooksDir: dir, Extensions: []jsvm.Extension{New()}})
 	}()
 	if !strings.Contains(got, "pb_hooks/bad.pb.js:2:") {
 		t.Fatalf("load error %q", got)

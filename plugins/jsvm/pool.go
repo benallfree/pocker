@@ -13,12 +13,12 @@ type poolItem struct {
 }
 
 type vmsPool struct {
-	mux       sync.RWMutex
-	factory   func() *goja.Runtime
-	items     []*poolItem
-	onCall    func(vm *goja.Runtime) (func(), error)                               // CE: Config.OnCall
-	onCompile func(loader *goja.Runtime, src string, prefix int) func(error) error // CE: Config.OnCompile
-	max       int                                                                  // CE: newLazyPool grows up to max items
+	mux     sync.RWMutex
+	factory func() *goja.Runtime
+	items   []*poolItem
+	ext     extensions    // CE: Config.Extensions (OnCall around every call, OnCompile per handler)
+	loader  *goja.Runtime // CE: the runtime that registers handlers, passed to OnCompile
+	max     int           // CE: newLazyPool grows up to max items
 }
 
 // CE: newLazyPool creates a pool that starts empty and keeps up to max vms, created on demand.
@@ -97,14 +97,7 @@ func (p *vmsPool) run(call func(vm *goja.Runtime) error) error {
 	return execErr
 }
 
-// CE: call runs fn on vm, wrapped by Config.OnCall when set.
+// CE: call runs fn on vm inside the extensions' OnCall.
 func (p *vmsPool) call(fn func(vm *goja.Runtime) error, vm *goja.Runtime) error {
-	if p.onCall != nil {
-		done, err := p.onCall(vm)
-		if err != nil {
-			return err
-		}
-		defer done()
-	}
-	return fn(vm)
+	return p.ext.call(vm, func() error { return fn(vm) })
 }

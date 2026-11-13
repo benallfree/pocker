@@ -59,7 +59,7 @@ func hooksBinds(app core.App, loader *goja.Runtime, executors *vmsPool) {
 		// register the hook to the loader
 		loader.Set(jsName, func(callback string, tags ...string) {
 			// overwrite the global $app with the hook scoped instance
-			pr, mapErr := compileHandler(executors, loader, "{(function(e) { $app = e.app; return (", callback, ").call(undefined, e) }).apply(undefined, __args)}")
+			pr, mapErr := compileHandler(executors, "{(function(e) { $app = e.app; return (", callback, ").call(undefined, e) }).apply(undefined, __args)}")
 
 			tagsAsValues := make([]reflect.Value, len(tags))
 			for i, tag := range tags {
@@ -103,7 +103,7 @@ func hooksBinds(app core.App, loader *goja.Runtime, executors *vmsPool) {
 
 func cronBinds(app core.App, loader *goja.Runtime, executors *vmsPool) {
 	cronAdd := func(jobId, cronExpr, handler string) {
-		pr, mapErr := compileHandler(executors, loader, "{(", handler, ").apply(undefined)}")
+		pr, mapErr := compileHandler(executors, "{(", handler, ").apply(undefined)}")
 
 		err := app.Cron().Add(jobId, cronExpr, func() {
 			err := executors.run(func(executor *goja.Runtime) error {
@@ -148,12 +148,12 @@ func cronBinds(app core.App, loader *goja.Runtime, executors *vmsPool) {
 
 func routerBinds(app core.App, loader *goja.Runtime, executors *vmsPool) {
 	loader.Set("routerAdd", func(method string, path string, handler goja.Value, middlewares ...goja.Value) {
-		wrappedMiddlewares, err := wrapMiddlewares(loader, executors, middlewares...)
+		wrappedMiddlewares, err := wrapMiddlewares(executors, middlewares...)
 		if err != nil {
 			panic("[routerAdd] failed to wrap middlewares: " + err.Error())
 		}
 
-		wrappedHandler, err := wrapHandlerFunc(loader, executors, handler)
+		wrappedHandler, err := wrapHandlerFunc(executors, handler)
 		if err != nil {
 			panic("[routerAdd] failed to wrap handler: " + err.Error())
 		}
@@ -166,7 +166,7 @@ func routerBinds(app core.App, loader *goja.Runtime, executors *vmsPool) {
 	})
 
 	loader.Set("routerUse", func(middlewares ...goja.Value) {
-		wrappedMiddlewares, err := wrapMiddlewares(loader, executors, middlewares...)
+		wrappedMiddlewares, err := wrapMiddlewares(executors, middlewares...)
 		if err != nil {
 			panic("[routerUse] failed to wrap middlewares: " + err.Error())
 		}
@@ -178,7 +178,7 @@ func routerBinds(app core.App, loader *goja.Runtime, executors *vmsPool) {
 	})
 }
 
-func wrapHandlerFunc(loader *goja.Runtime, executors *vmsPool, handler goja.Value) (func(*core.RequestEvent) error, error) {
+func wrapHandlerFunc(executors *vmsPool, handler goja.Value) (func(*core.RequestEvent) error, error) {
 	if handler == nil {
 		return nil, errors.New("handler must be non-nil")
 	}
@@ -188,7 +188,7 @@ func wrapHandlerFunc(loader *goja.Runtime, executors *vmsPool, handler goja.Valu
 		// "native" handler func - no need to wrap
 		return h, nil
 	case func(goja.FunctionCall) goja.Value, string:
-		pr, mapErr := compileHandler(executors, loader, "{(", handler.String(), ").apply(undefined, __args)}")
+		pr, mapErr := compileHandler(executors, "{(", handler.String(), ").apply(undefined, __args)}")
 
 		wrappedHandler := func(e *core.RequestEvent) error {
 			return executors.run(func(executor *goja.Runtime) error {
@@ -220,7 +220,7 @@ type gojaHookHandler struct {
 	priority       int
 }
 
-func wrapMiddlewares(loader *goja.Runtime, executors *vmsPool, rawMiddlewares ...goja.Value) ([]*hook.Handler[*core.RequestEvent], error) {
+func wrapMiddlewares(executors *vmsPool, rawMiddlewares ...goja.Value) ([]*hook.Handler[*core.RequestEvent], error) {
 	wrappedMiddlewares := make([]*hook.Handler[*core.RequestEvent], len(rawMiddlewares))
 
 	for i, m := range rawMiddlewares {
@@ -242,7 +242,7 @@ func wrapMiddlewares(loader *goja.Runtime, executors *vmsPool, rawMiddlewares ..
 				return nil, errors.New("missing or invalid Middleware function")
 			}
 
-			pr, mapErr := compileHandler(executors, loader, "{(", v.serializedFunc, ").apply(undefined, __args)}")
+			pr, mapErr := compileHandler(executors, "{(", v.serializedFunc, ").apply(undefined, __args)}")
 
 			wrappedMiddlewares[i] = &hook.Handler[*core.RequestEvent]{
 				Id:       v.id,
@@ -266,7 +266,7 @@ func wrapMiddlewares(loader *goja.Runtime, executors *vmsPool, rawMiddlewares ..
 				},
 			}
 		case func(goja.FunctionCall) goja.Value, string:
-			pr, mapErr := compileHandler(executors, loader, "{(", m.String(), ").apply(undefined, __args)}")
+			pr, mapErr := compileHandler(executors, "{(", m.String(), ").apply(undefined, __args)}")
 
 			wrappedMiddlewares[i] = &hook.Handler[*core.RequestEvent]{
 				Func: func(e *core.RequestEvent) error {
@@ -891,14 +891,17 @@ func BindApis(vm *goja.Runtime) {
 // for sending HTTP requests.
 //
 // See https://pocketbase.io/jsvm/modules/_http.html.
-// CE: HTTPClientKey is the global property $http.send takes its *http.Client from, when set (e.g. by a sandbox in
-// Config.OnInit, to cap timeouts and response sizes for that app). Without it, http.DefaultClient is used.
-const HTTPClientKey = "__jsvm_http_client"
+// CE: httpClientKey is the global property $http.send takes its *http.Client from: an extension's HTTPClient (e.g.
+// a sandbox capping timeouts and response sizes for that app). Without it, http.DefaultClient is used.
+const httpClientKey = "__jsvm_http_client"
+
+// httpClientBox holds the client in an unexported field, so JS sees an empty object it can't modify.
+type httpClientBox struct{ c *http.Client }
 
 func httpClient(vm *goja.Runtime) *http.Client {
-	if v := vm.GlobalObject().Get(HTTPClientKey); v != nil {
-		if c, ok := v.Export().(*http.Client); ok && c != nil {
-			return c
+	if v := vm.GlobalObject().Get(httpClientKey); v != nil {
+		if b, ok := v.Export().(httpClientBox); ok && b.c != nil {
+			return b.c
 		}
 	}
 	return http.DefaultClient
@@ -1018,7 +1021,7 @@ func BindHTTP(vm *goja.Runtime) {
 			req.Header.Set("content-type", contentType)
 		}
 
-		res, err := httpClient(vm).Do(req) // CE: the app's client when set (HTTPClientKey)
+		res, err := httpClient(vm).Do(req) // CE: the app's client when an extension sets one
 		if err != nil {
 			return nil, err
 		}
@@ -1285,13 +1288,11 @@ type shapeFieldInfo struct {
 }
 
 // CE: compileHandler compiles a serialized handler wrapped as prefix+src+suffix and returns how to map the errors it
-// throws (Config.OnCompile; identity when unset).
-func compileHandler(executors *vmsPool, loader *goja.Runtime, prefix, src, suffix string) (*goja.Program, func(error) error) {
+// throws (the extensions' OnCompile; identity without any).
+func compileHandler(executors *vmsPool, prefix, src, suffix string) (*goja.Program, func(error) error) {
 	pr := goja.MustCompile(defaultScriptPath, prefix+src+suffix, true)
-	if executors != nil && executors.onCompile != nil {
-		if m := executors.onCompile(loader, src, len(prefix)); m != nil {
-			return pr, m
-		}
+	if executors == nil {
+		return pr, func(err error) error { return err }
 	}
-	return pr, func(err error) error { return err }
+	return pr, executors.ext.compile(executors.loader, src, len(prefix))
 }

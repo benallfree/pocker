@@ -1,12 +1,13 @@
 package jsvm
 
-// CE: $http.send uses the runtime's own *http.Client when one is set under HTTPClientKey.
+// CE: $http.send uses the runtime's own *http.Client when one is set under httpClientKey.
 
 import (
 	"io"
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dop251/goja"
 )
@@ -23,14 +24,29 @@ func (c *cannedTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	}, nil
 }
 
-func TestBindHTTPUsesRuntimeClient(t *testing.T) {
+type clientExtension struct{ c *http.Client }
+
+func (e clientExtension) HTTPClient(*goja.Runtime) *http.Client { return e.c }
+
+// $http.send uses the client an extension supplies, and JS can't reach that client's fields to lift its limits.
+func TestBindHTTPUsesExtensionClient(t *testing.T) {
 	vm := goja.New()
+	vm.SetFieldNameMapper(FieldMapper{})
 	BindHTTP(vm)
 	tr := &cannedTransport{}
-	vm.Set(HTTPClientKey, &http.Client{Transport: tr})
+	c := &http.Client{Transport: tr, Timeout: 5 * time.Second}
+	extensions{clientExtension{c}}.onInit(vm)
 
-	// no field mapper on this bare runtime, so the Go field name
-	v, err := vm.RunString(`$http.send({ url: "http://example.invalid/x", timeout: 3 }).Raw`)
+	// the attacks: replace the property, or reach into the client to zero the timeout or drop the transport
+	_, _ = vm.RunString(`try { __jsvm_http_client = null } catch (e) {}`)
+	_, _ = vm.RunString(`try { __jsvm_http_client.timeout = 0 } catch (e) {}`)
+	_, _ = vm.RunString(`try { __jsvm_http_client.transport = null } catch (e) {}`)
+	_, _ = vm.RunString(`try { __jsvm_http_client.c = null } catch (e) {}`)
+	if c.Timeout != 5*time.Second || c.Transport != tr {
+		t.Fatalf("JS changed the client: timeout %v, transport replaced %v", c.Timeout, c.Transport != tr)
+	}
+
+	v, err := vm.RunString(`$http.send({ url: "http://example.invalid/x", timeout: 3 }).raw`)
 	if err != nil {
 		t.Fatal(err)
 	}

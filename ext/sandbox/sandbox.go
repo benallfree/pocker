@@ -2,7 +2,7 @@
 //
 // It plugs into PocketBase's jsvm plugin through two hooks:
 //
-//	jsvm.Register(app, jsvm.Config{OnInit: sb.OnInit, OnCall: sb.OnCall})
+//	jsvm.Register(app, jsvm.Config{Extensions: []jsvm.Extension{sb}})
 package sandbox
 
 import (
@@ -192,8 +192,8 @@ func (s *Sandbox) requireLoader(p string) ([]byte, error) {
 	return b, nil
 }
 
-// OnInit replaces the host-reaching bindings on vm. Use it as (or call it from) jsvm.Config.OnInit, which runs
-// after jsvm's standard binds.
+// OnInit replaces the host-reaching bindings on vm (a jsvm.Extension method: it runs after jsvm's standard binds and
+// before Config.OnInit).
 func (s *Sandbox) OnInit(vm *goja.Runtime) {
 	if err := s.open(); err != nil {
 		panic(err)
@@ -472,9 +472,6 @@ func (s *Sandbox) OnInit(vm *goja.Runtime) {
 		vm.Set("console", con)
 	}
 
-	// $http.send uses this app's client (timeout and body caps), pinned read-only on the VM (jsvm.HTTPClientKey)
-	_ = vm.GlobalObject().DefineDataProperty(jsvm.HTTPClientKey, vm.ToValue(s.httpClient()),
-		goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_FALSE)
 
 	// sleep: capped, so a hook can't park a goroutine forever
 	maxSleep := s.maxSleep()
@@ -768,8 +765,8 @@ func (s *Sandbox) acquire() (func(), error) {
 	}
 }
 
-// OnCall limits one JS call: it takes a concurrency slot (MaxConcurrent) and arms the MaxExecution interrupt. Use it
-// as jsvm.Config.OnCall.
+// OnCall limits one JS call: it takes a concurrency slot (MaxConcurrent) and arms the MaxExecution interrupt (a
+// jsvm.Extension method, like OnInit and HTTPClient).
 func (s *Sandbox) OnCall(vm *goja.Runtime) (func(), error) {
 	release, err := s.acquire()
 	if err != nil {

@@ -12,10 +12,12 @@ Run an app's JS hooks and migrations from an `fs.FS`, for example files embedded
 var files embed.FS
 
 hooks, _ := fs.Sub(files, "hooks")
-jsvm.MustRegister(app, jsembed.Config(hooks, migrations, jsvm.Config{OnInit: ...}))
+jsvm.MustRegister(app, jsvm.Config{
+	Extensions: []jsvm.Extension{jsembed.Hooks(hooks), jsembed.Migrations(migrations)},
+})
 ```
 
-Either FS may be nil to keep jsvm's own behavior for that half. [`example/`](example/main.go) serves a route from
+List only the half you embed; the other stays on disk. [`example/`](example/main.go) serves a route from
 embedded hooks: `go run ./example serve`, then `curl http://127.0.0.1:8090/hello`.
 
 ## What it does
@@ -32,6 +34,6 @@ embedded hooks: `go run ./example serve`, then `curl http://127.0.0.1:8090/hello
 
 ## No change to PocketBase's behavior
 
-It plugs into three optional `jsvm.Config` fields, `HookFiles`, `MigrationFiles` and `Require` (PocketBase CE's
-small seam; unset, jsvm behaves like upstream). It used to live inside jsvm (`HooksFS`/`MigrationsFS`); it moved
+`Hooks` and `Migrations` are jsvm extensions (`jsvm.Config.Extensions`) with `HookFiles`, `Require` and
+`MigrationFiles` methods (PocketBase CE's small seam; with no extensions, jsvm behaves like upstream). It used to live inside jsvm (`HooksFS`/`MigrationsFS`); it moved
 here on 2026-11-13.

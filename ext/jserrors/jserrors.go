@@ -1,13 +1,13 @@
 // Package jserrors makes JS hook errors point at the .pb.js file they come from:
 //
-//	jsvm.MustRegister(app, jserrors.Config(jsvm.Config{...}))
+//	jsvm.MustRegister(app, jsvm.Config{Extensions: []jsvm.Extension{jserrors.New()}})
 //
 // jsvm serializes hook handlers (fn.toString()) and recompiles each as its own program under <cwd>/pb.js
 // (jsvm.ScriptPath), which also anchors relative require() calls, so its errors say pb.js:1:40. This plugin remembers
 // where each handler sits in the hooks file being loaded and rewrites those positions to pb_hooks/<file>:<line>:<col>;
 // errors while a hooks file itself loads name the file too.
 //
-// It plugs into jsvm's OnLoad and OnCompile options; PocketBase itself is unchanged.
+// It's a jsvm extension (OnLoad and OnCompile methods); PocketBase itself is unchanged.
 package jserrors
 
 import (
@@ -22,47 +22,22 @@ import (
 	"github.com/dop251/goja"
 )
 
-// Config returns base with hook errors pointing at the hooks files. Handlers already set in base.OnLoad and
-// base.OnCompile still run, and their error mapping applies after this one.
-func Config(base jsvm.Config) jsvm.Config {
-	dir := "pb_hooks" // how errors name the hooks folder: its own name on disk, else pb_hooks (e.g. embedded)
-	if base.HookFiles == nil && base.HooksDir != "" {
-		dir = filepath.Base(base.HooksDir)
-	}
-	prevLoad, prevCompile := base.OnLoad, base.OnCompile
+// New returns the jsvm extension: list it in jsvm.Config.Extensions.
+func New() jsvm.Extension { return extension{} }
 
-	base.OnLoad = func(loader *goja.Runtime, file string, content []byte) (func(), func(error) error) {
-		name := filepath.ToSlash(filepath.Join(dir, file))
-		setLoadingFile(loader, name, string(content))
-		done, mapErr := func() {}, func(err error) error { return wholeFile(name).remap(err) }
-		if prevLoad != nil {
-			pd, pm := prevLoad(loader, file, content)
-			done, mapErr = chainDone(pd, done), chainMap(mapErr, pm)
-		}
-		return func() { done(); clearLoadingFile(loader) }, mapErr
-	}
-	base.OnCompile = func(loader *goja.Runtime, src string, prefix int) func(error) error {
-		mapErr := locateHandler(loader, src, prefix).remap
-		if prevCompile != nil {
-			mapErr = chainMap(mapErr, prevCompile(loader, src, prefix))
-		}
-		return mapErr
-	}
-	return base
+type extension struct{}
+
+// OnLoad remembers the hooks file while it runs (named <hooks folder>/<file>, e.g. pb_hooks/main.pb.js) and names it
+// in errors from the load.
+func (extension) OnLoad(loader *goja.Runtime, hooksRoot, file string, content []byte) (func(), func(error) error) {
+	name := filepath.ToSlash(filepath.Join(filepath.Base(hooksRoot), file))
+	setLoadingFile(loader, name, string(content))
+	return func() { clearLoadingFile(loader) }, wholeFile(name).remap
 }
 
-func chainDone(a, b func()) func() {
-	if a == nil {
-		return b
-	}
-	return func() { b(); a() }
-}
-
-func chainMap(first, then func(error) error) func(error) error {
-	if then == nil {
-		return first
-	}
-	return func(err error) error { return then(first(err)) }
+// OnCompile locates a handler in the file being loaded, so errors it throws point there.
+func (extension) OnCompile(loader *goja.Runtime, src string, prefix int) func(error) error {
+	return locateHandler(loader, src, prefix).remap
 }
 
 // loadingFile is the hooks file a loader VM is running, so handlers registered from it can be located.

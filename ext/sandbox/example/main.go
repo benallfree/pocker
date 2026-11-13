@@ -30,9 +30,8 @@ func main() {
 	}
 
 	jsvm.MustRegister(app, jsvm.Config{
-		HooksDir: filepath.Join(dir, "pb_hooks"),
-		OnInit:   sb.OnInit,
-		OnCall:   sb.OnCall,
+		HooksDir:   filepath.Join(dir, "pb_hooks"),
+		Extensions: []jsvm.Extension{sb}, // OnInit, OnCall and HTTPClient
 	})
 
 	if err := app.Start(); err != nil {

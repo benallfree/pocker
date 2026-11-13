@@ -1,6 +1,7 @@
 package jsembed
 
 import (
+	"io/fs"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -122,7 +123,7 @@ func TestEmbeddedNilKeepsDiskBehavior(t *testing.T) {
 	})
 
 	rec := &recorder{}
-	if err := jsvm.Register(app, Config(nil, nil, jsvm.Config{HooksDir: hooksDir, MigrationsDir: migrationsDir, OnInit: rec.onInit})); err != nil {
+	if err := jsvm.Register(app, withEmbedded(nil, nil, jsvm.Config{HooksDir: hooksDir, MigrationsDir: migrationsDir, OnInit: rec.onInit})); err != nil {
 		t.Fatal(err)
 	}
 
@@ -174,7 +175,7 @@ func TestEmbeddedHooksAndMigrationsFromFS(t *testing.T) {
 	})
 
 	rec := &recorder{}
-	err := jsvm.Register(app, Config(hooksFS, migrationsFS, jsvm.Config{
+	err := jsvm.Register(app, withEmbedded(hooksFS, migrationsFS, jsvm.Config{
 		HooksDir:      hooksDir,
 		MigrationsDir: migrationsDir,
 		HooksWatch:    true,
@@ -228,7 +229,7 @@ func TestEmbeddedRequireIsSealed(t *testing.T) {
 		"lib/escape.js":              `module.exports = require("../../x.js");`,
 	}))
 	// no hook files: the lazy executors still use the sealed registry
-	if err := jsvm.Register(app, Config(hooksFS, nil, jsvm.Config{OnInit: (&recorder{}).onInit})); err != nil {
+	if err := jsvm.Register(app, withEmbedded(hooksFS, nil, jsvm.Config{OnInit: (&recorder{}).onInit})); err != nil {
 		t.Fatal(err)
 	}
 
@@ -270,7 +271,7 @@ func TestEmbeddedRealDirAtVirtualRootIsIgnored(t *testing.T) {
 	app, _ := tests.NewTestApp()
 	defer app.Cleanup()
 
-	if err := jsvm.Register(app, Config(mapFS(embeddedLib), nil, jsvm.Config{})); err != nil {
+	if err := jsvm.Register(app, withEmbedded(mapFS(embeddedLib), nil, jsvm.Config{})); err != nil {
 		t.Fatal(err)
 	}
 
@@ -300,7 +301,7 @@ func TestEmbeddedRouteAndCronRun(t *testing.T) {
 	})
 
 	rec := &recorder{}
-	if err := jsvm.Register(app, Config(hooksFS, nil, jsvm.Config{OnInit: rec.onInit})); err != nil {
+	if err := jsvm.Register(app, withEmbedded(hooksFS, nil, jsvm.Config{OnInit: rec.onInit})); err != nil {
 		t.Fatal(err)
 	}
 
@@ -338,4 +339,15 @@ func TestEmbeddedRouteAndCronRun(t *testing.T) {
 	if !rec.has("cron ran") {
 		t.Fatalf("cron handler didn't run the embedded module: %v", rec.list())
 	}
+}
+
+// withEmbedded lists the extensions for the given file systems (nil = that half stays on disk) on c.
+func withEmbedded(hooksFS, migrationsFS fs.FS, c jsvm.Config) jsvm.Config {
+	if hooksFS != nil {
+		c.Extensions = append(c.Extensions, Hooks(hooksFS))
+	}
+	if migrationsFS != nil {
+		c.Extensions = append(c.Extensions, Migrations(migrationsFS))
+	}
+	return c
 }

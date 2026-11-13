@@ -122,19 +122,19 @@ func startApp(opts appOptions, inst Instance) (r *runningApp, err error) {
 		Owner:              inst.ID,
 		Console:            openInstanceLog(dir).Write,
 	}
-	err = jsvm.Register(app, jserrors.Config(jsvm.Config{ // hook errors name pb_hooks/<file>:<line>:<col> in the instance log
+	err = jsvm.Register(app, jsvm.Config{
 		HooksDir:      filepath.Join(dir, "pb_hooks"),
 		MigrationsDir: filepath.Join(dir, "pb_migrations"),
 		HooksWatch:    false, // PocketBase's watcher would open an inotify instance per app; the Manager's shared watcher restarts just this app
 		HooksPoolSize: opts.HooksPoolSize,
+		// the sandbox (OnInit, OnCall, HTTPClient); hook errors name pb_hooks/<file>:<line>:<col> in the instance log
+		Extensions: []jsvm.Extension{sb, jserrors.New()},
 		OnInit: func(vm *goja.Runtime) {
-			sb.OnInit(vm)
 			if opts.InitJS != nil {
 				opts.InitJS(inst, app, vm)
 			}
 		},
-		OnCall: sb.OnCall,
-	}))
+	})
 	if err != nil {
 		return nil, fmt.Errorf("load hooks: %w", err)
 	}

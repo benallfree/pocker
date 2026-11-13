@@ -1,17 +1,17 @@
 // Package jsembed runs an app's JS hooks and migrations from an fs.FS (for example files embedded in the binary)
 // instead of pb_hooks and pb_migrations on disk:
 //
-//	jsvm.MustRegister(app, jsembed.Config(hooksFS, migrationsFS, jsvm.Config{OnInit: ...}))
+//	jsvm.MustRegister(app, jsvm.Config{Extensions: []jsvm.Extension{jsembed.Hooks(hooksFS), jsembed.Migrations(migrationsFS)}})
 //
 // .pb.js files come only from hooksFS's root (HooksDir is ignored, nothing is written to disk, no watching) and
-// migrations only from migrationsFS's root; either may be nil to keep jsvm's own behavior for that half.
+// migrations only from migrationsFS's root; list only the half you embed.
 //
 // require() under __hooks resolves inside a sealed virtual namespace, [Root], that is never looked up on disk: paths
 // under it are served from hooksFS, a module's relative requires stay inside, a relative require from a .pb.js
 // handler is anchored at __hooks, and everything else (absolute disk paths, `..` escapes, node_modules) is "module not
 // found". JS that reads files itself ($os.readFile(__hooks + ...)) gets "no such file": the root doesn't exist on disk.
 //
-// It plugs into jsvm's HookFiles, MigrationFiles and Require options; PocketBase itself is unchanged.
+// They are jsvm extensions (HookFiles, Require and MigrationFiles methods); PocketBase itself is unchanged.
 package jsembed
 
 import (
@@ -33,17 +33,24 @@ const Root = "/pb_embedded/pb_hooks"
 // root is Root; tests point it at a real directory to prove the disk is ignored.
 var root = Root
 
-// Config returns base with its hooks and/or migrations served from the given file systems (nil = unchanged).
-func Config(hooks, migrations fs.FS, base jsvm.Config) jsvm.Config {
-	if hooks != nil {
-		base.HookFiles = func(pattern string) (map[string][]byte, error) { return filesContent(hooks, pattern) }
-		base.Require = func() (string, *require.Registry) { return root, requireRegistry(hooks) }
-		base.HooksWatch = false
-	}
-	if migrations != nil {
-		base.MigrationFiles = func(pattern string) (map[string][]byte, error) { return filesContent(migrations, pattern) }
-	}
-	return base
+// Hooks is a jsvm extension serving the hook files from fsys's root, with require() under __hooks sealed to fsys.
+// HooksDir is then ignored, nothing is written to disk and hook watching is off.
+func Hooks(fsys fs.FS) jsvm.Extension { return hooks{fsys} }
+
+// Migrations is a jsvm extension serving the migration files from fsys's root; MigrationsDir is then ignored.
+func Migrations(fsys fs.FS) jsvm.Extension { return migrations{fsys} }
+
+type hooks struct{ fs fs.FS }
+
+func (h hooks) HookFiles(pattern string) (map[string][]byte, error) {
+	return filesContent(h.fs, pattern)
+}
+func (h hooks) Require() (string, *require.Registry) { return root, requireRegistry(h.fs) }
+
+type migrations struct{ fs fs.FS }
+
+func (m migrations) MigrationFiles(pattern string) (map[string][]byte, error) {
+	return filesContent(m.fs, pattern)
 }
 
 // requireRegistry returns a require registry sealed to fsys mounted at root.

@@ -9,10 +9,10 @@ JS hook errors that point at the `.pb.js` file they come from: `pb_hooks/main.pb
 ## Use
 
 ```go
-jsvm.MustRegister(app, jserrors.Config(jsvm.Config{HooksDir: "pb_hooks", OnInit: ...}))
+jsvm.MustRegister(app, jsvm.Config{HooksDir: "pb_hooks", Extensions: []jsvm.Extension{jserrors.New()}})
 ```
 
-It composes with other wrappers, for example `jserrors.Config(jsembed.Config(hooks, migrations, jsvm.Config{...}))`
+It combines with other extensions, for example `Extensions: []jsvm.Extension{jsembed.Hooks(hooks), jserrors.New()}`
 (embedded files are named `pb_hooks/<file>`). [`example/`](example/main.go): `cd example && go run . serve --dev`, then
 `curl http://127.0.0.1:8090/boom` and read the log.
 
@@ -30,6 +30,6 @@ A handler it can't place (built from a string, registered at runtime) keeps jsvm
 
 ## No change to PocketBase's behavior
 
-It plugs into two optional `jsvm.Config` callbacks, `OnLoad` and `OnCompile`, plus `jsvm.ScriptPath()` (PocketBase
-CE's small seam; unset, jsvm behaves like upstream). It used to live inside jsvm (`hooksource.go`); it moved here on
+It's a jsvm extension (`jsvm.Config.Extensions`) with `OnLoad` and `OnCompile` methods, plus `jsvm.ScriptPath()`
+(PocketBase CE's small seam; with no extensions, jsvm behaves like upstream). It used to live inside jsvm (`hooksource.go`); it moved here on
 2026-11-13.

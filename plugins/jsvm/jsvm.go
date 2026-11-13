@@ -64,31 +64,9 @@ type Config struct {
 	// attach custom Go variables and functions.
 	OnInit func(vm *goja.Runtime)
 
-	// CE: OnCall is an optional function that wraps every call into a JS runtime: hook, route and cron
-	// handlers, migrations and loading a hooks file. A non-nil error refuses the call; otherwise done runs when the
-	// call ends. Use it for per-call time limits, concurrency caps or tracing.
-	OnCall func(vm *goja.Runtime) (done func(), err error)
-
-	// CE: OnLoad, if set, is called before a hooks file runs (file: its name in the hooks dir) on the loader runtime
-	// that runs it; done runs after, and errors from the load go through mapErr (nil = unchanged). E.g. ext/jserrors
-	// remembers the file to point errors at it.
-	OnLoad func(loader *goja.Runtime, file string, content []byte) (done func(), mapErr func(error) error)
-
-	// CE: OnCompile, if set, is called for every handler jsvm recompiles (hook, route, middleware, cron) with the
-	// loader runtime that registered it, the handler's source and the length of the wrapper before it on the first
-	// line; errors the handler returns go through mapErr (nil = unchanged).
-	OnCompile func(loader *goja.Runtime, src string, prefix int) (mapErr func(error) error)
-
-	// CE: HookFiles, if set, supplies the hook files (name -> content, matching pattern) instead of reading HooksDir.
-	// The files are never written back to disk and HooksWatch is ignored. E.g. ext/jsembed serves them from an fs.FS.
-	HookFiles func(pattern string) (map[string][]byte, error)
-
-	// CE: MigrationFiles, if set, supplies the migration files instead of reading MigrationsDir.
-	MigrationFiles func(pattern string) (map[string][]byte, error)
-
-	// CE: Require, if set, supplies the value of __hooks and the require() registry for the hook and migration
-	// runtimes, instead of the absolute HooksDir and a disk registry (e.g. a namespace sealed to embedded files).
-	Require func() (hooksRoot string, registry *require.Registry)
+	// CE: Extensions extend jsvm: each implements any of the optional methods listed on [Extension] (call wrappers,
+	// file sources, require registries, error mapping, the $http client). Empty = upstream behavior.
+	Extensions []Extension
 
 	// HooksWatch enables auto app restarts when a JS app hook file changes.
 	//
@@ -155,7 +133,8 @@ func MustRegister(app core.App, config Config) {
 func Register(app core.App, config Config) error {
 	p := &plugin{app: app, config: config}
 
-	if p.config.HookFiles != nil {
+	p.ext = extensions(p.config.Extensions)
+	if p.ext.hookFiles() != nil {
 		p.config.HooksWatch = false // CE: the files don't come from HooksDir, so there's nothing to watch
 	}
 
@@ -208,6 +187,7 @@ func Register(app core.App, config Config) error {
 type plugin struct {
 	app    core.App
 	config Config
+	ext    extensions // CE: config.Extensions
 }
 
 // registerMigrations registers the JS migrations loader.
@@ -255,12 +235,7 @@ func (p *plugin) registerMigrations() error {
 						if up == nil {
 							return nil
 						}
-						done, err := p.onCall(vm) // POCKER
-						if err != nil {
-							return err
-						}
-						defer done()
-						return up(txApp)
+						return p.ext.call(vm, func() error { return up(txApp) }) // CE: Extensions' OnCall
 					})()
 				},
 				func(txApp core.App) error {
@@ -268,18 +243,14 @@ func (p *plugin) registerMigrations() error {
 						if down == nil {
 							return nil
 						}
-						done, err := p.onCall(vm) // POCKER
-						if err != nil {
-							return err
-						}
-						defer done()
-						return down(txApp)
+						return p.ext.call(vm, func() error { return down(txApp) }) // CE: Extensions' OnCall
 					})()
 				},
 				file,
 			)
 		})
 
+		p.ext.onInit(vm) // CE
 		if p.config.OnInit != nil {
 			p.config.OnInit(vm)
 		}
@@ -307,7 +278,7 @@ func (p *plugin) registerHooks() error {
 	// the case when the HooksWatch option is enabled and the application
 	// restart on newly created file
 	for name, content := range files {
-		if p.config.HookFiles != nil {
+		if p.ext.hookFiles() != nil {
 			break // CE: the files aren't in HooksDir; never write them there
 		}
 		if len(content) != 0 {
@@ -364,6 +335,7 @@ func (p *plugin) registerHooks() error {
 		vm.Set("$template", templateRegistry)
 		vm.Set("__hooks", absHooksDir)
 
+		p.ext.onInit(vm) // CE
 		if p.config.OnInit != nil {
 			p.config.OnInit(vm)
 		}
@@ -382,8 +354,7 @@ func (p *plugin) registerHooks() error {
 	} else {
 		executors = newLazyPool(p.config.HooksPoolSize, executorFactory)
 	}
-	executors.onCall = p.config.OnCall              // POCKER
-	executors.onCompile = p.config.OnCompile        // CE
+	executors.ext = p.ext                           // CE: Extensions (OnCall, OnCompile)
 	p.app.Store().Set(executorsStoreKey, executors) // CE: for Run
 
 	if len(files) == 0 {
@@ -394,6 +365,7 @@ func (p *plugin) registerHooks() error {
 	// initialize the loader vm
 	loader := goja.New()
 	sharedBinds(loader)
+	executors.loader = loader // CE: the runtime registering handlers, for Extensions' OnCompile
 	hooksBinds(p.app, loader, executors)
 	cronBinds(p.app, loader, executors)
 	routerBinds(p.app, loader, executors)
@@ -412,24 +384,15 @@ func (p *plugin) registerHooks() error {
 				}
 			}()
 
-			done, callErr := p.onCall(loader) // POCKER
-			if callErr != nil {
-				panic(callErr)
-			}
-			defer done()
-			mapErr := func(err error) error { return err }
-			if p.config.OnLoad != nil { // CE
-				loadDone, m := p.config.OnLoad(loader, file, content)
-				if loadDone != nil {
-					defer loadDone()
-				}
-				if m != nil {
-					mapErr = m
-				}
-			}
-			_, err := loader.RunScript(defaultScriptPath, string(content))
+			// CE: Extensions' OnCall and OnLoad wrap running the file
+			err := p.ext.call(loader, func() error {
+				done, mapErr := p.ext.load(loader, absHooksDir, file, content)
+				defer done()
+				_, err := loader.RunScript(defaultScriptPath, string(content))
+				return mapErr(err)
+			})
 			if err != nil {
-				panic(mapErr(err))
+				panic(err)
 			}
 		}()
 	}
@@ -666,35 +629,27 @@ func appMigrations(app core.App) *core.MigrationsList {
 	return &core.AppMigrations
 }
 
-// CE: onCall runs Config.OnCall for one call into vm, if set.
-func (p *plugin) onCall(vm *goja.Runtime) (func(), error) {
-	if p.config.OnCall == nil {
-		return func() {}, nil
-	}
-	return p.config.OnCall(vm)
-}
-
-// CE: hookFiles returns the hook files from HookFiles when set, otherwise from HooksDir.
+// CE: hookFiles returns the hook files from an extension's HookFiles, otherwise from HooksDir.
 func (p *plugin) hookFiles() (map[string][]byte, error) {
-	if p.config.HookFiles != nil {
-		return p.config.HookFiles(p.config.HooksFilesPattern)
+	if h := p.ext.hookFiles(); h != nil {
+		return h.HookFiles(p.config.HooksFilesPattern)
 	}
 	return filesContent(p.config.HooksDir, p.config.HooksFilesPattern)
 }
 
-// CE: migrationFiles returns the migration files from MigrationFiles when set, otherwise from MigrationsDir.
+// CE: migrationFiles returns the migration files from an extension's MigrationFiles, otherwise from MigrationsDir.
 func (p *plugin) migrationFiles() (map[string][]byte, error) {
-	if p.config.MigrationFiles != nil {
-		return p.config.MigrationFiles(p.config.MigrationsFilesPattern)
+	if m := p.ext.migrationFiles(); m != nil {
+		return m.MigrationFiles(p.config.MigrationsFilesPattern)
 	}
 	return filesContent(p.config.MigrationsDir, p.config.MigrationsFilesPattern)
 }
 
-// CE: hooksRequire returns the __hooks value and the require registry: from Require when set, otherwise the
+// CE: hooksRequire returns the __hooks value and the require registry: from an extension's Require, otherwise the
 // absolute HooksDir and a default (disk) registry.
 func (p *plugin) hooksRequire() (string, *require.Registry, error) {
-	if p.config.Require != nil {
-		root, reg := p.config.Require()
+	if r := p.ext.require(); r != nil {
+		root, reg := r.Require()
 		return root, reg, nil
 	}
 	absHooksDir, err := filepath.Abs(p.config.HooksDir)
@@ -705,5 +660,5 @@ func (p *plugin) hooksRequire() (string, *require.Registry, error) {
 }
 
 // CE: ScriptPath is the name handlers and hooks files are compiled under (<cwd>/pb.js): error positions in a
-// handler's program carry it (see Config.OnCompile).
+// handler's program carry it (see the OnCompile method on [Extension]).
 func ScriptPath() string { return defaultScriptPath }

@@ -17,7 +17,7 @@ import (
 func main() {
 	app := pocketbase.New()
 	devusers.Register(app)
-	jsvm.MustRegister(app, jserrors.Config(jsvm.Config{HooksDir: "pb_hooks"}))
+	jsvm.MustRegister(app, jsvm.Config{HooksDir: "pb_hooks", Extensions: []jsvm.Extension{jserrors.New()}})
 	if err := app.Start(); err != nil {
 		log.Fatal(err)
 	}

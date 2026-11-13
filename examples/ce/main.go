@@ -234,7 +234,7 @@ func main() {
 	// ---------------------------------------------------------------
 
 	// load jsvm (pb_hooks and pb_migrations); hook errors name pb_hooks/<file>:<line>:<col> (ext/jserrors)
-	jsvm.MustRegister(app, jserrors.Config(jsvm.Config{
+	jsvm.MustRegister(app, jsvm.Config{
 		MigrationsDir: migrationsDir,
 		HooksDir:      hooksDir,
 		HooksWatch:    hooksWatch,
@@ -243,7 +243,8 @@ func main() {
 			ceplugin.BindJS(app, vm, cePlugins...) // e.g. $bulkmail in pb_hooks
 			mcp.BindJS(vm, app)                    // $mcp.addTool in pb_hooks
 		},
-	}))
+		Extensions: []jsvm.Extension{jserrors.New()},
+	})
 
 	// PocketPages: serves pb_pages when the folder exists (page code runs in the jsvm above)
 	pages.MustRegister(app, pages.Config{Dir: pagesDir})
