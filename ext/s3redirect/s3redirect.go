@@ -141,14 +141,14 @@ func (p *Plugin) handle(e *core.FileDownloadRequestEvent, ttl time.Duration) err
 	// the signed URL itself is unique per signing, so the browser may keep the bytes as long as PocketBase would
 	overrides.Set("response-cache-control", "max-age=2592000, stale-while-revalidate=86400")
 
-	fsys := e.Filesystem // the one PocketBase serves from
-	if fsys == nil {     // event triggered by other code
-		var err error
-		if fsys, err = e.App.NewFilesystem(); err != nil {
-			return e.Next() // PocketBase will report it while streaming
-		}
-		defer fsys.Close()
+	if !e.App.Settings().S3.Enabled && e.App.OnFilesystemCreate().Length() == 0 {
+		return e.Next() // local disk and nothing supplying another filesystem: stream as usual, open nothing
 	}
+	fsys, err := e.App.NewFilesystem() // the files filesystem (S3 settings, or one OnFilesystemCreate supplies)
+	if err != nil {
+		return e.Next() // PocketBase will report it while streaming
+	}
+	defer fsys.Close()
 	signer := signerFor(e.App, fsys)
 	if signer == nil {
 		return e.Next() // local disk (or a filesystem that can't sign): stream as usual

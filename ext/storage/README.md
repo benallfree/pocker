@@ -37,7 +37,7 @@ instances:
 Each app gets `<backend prefix><root><kind>/` per mounted kind and can't reach anything outside it. The root is chosen
 by the caller and opaque to the plugin: under pocker it's `instances/<id>/`; a single app calls `Bind(app, "")` (or any
 name). Deployments sharing one bucket keep apart with their own backend `prefix` (or roots). Any kind a plugin asks core for
-(`app.NewFilesystemOfKind(kind, ...)`) is served when it's mounted; uploads and backups step aside when the app turned
+(a plugin triggering `OnFilesystemCreate` with its own kind, as ext/pitr does) is served when it's mounted; uploads and backups step aside when the app turned
 on its own S3. `Plugin.FS(root, kind)` returns the same fenced filesystem outside a hook.
 
 The old shape (`bucket:` + `uploads:` / `backups:`) still works, with a warning: it becomes backend `default` mounted

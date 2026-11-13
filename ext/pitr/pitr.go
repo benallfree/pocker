@@ -179,7 +179,7 @@ func (a *appPITR) destination() (*destination, error) {
 		return &destination{client: newBucketClient(fsys, s.S3.prefix()), kind: "s3", label: s.S3.Bucket + "/" + s.S3.prefix(),
 			close: func() { fsys.Close() }}, nil
 	}
-	fsys, err := a.app.NewFilesystemOfKind(Kind, nil)
+	fsys, err := filesystemOfKind(a.app, Kind)
 	if err != nil {
 		return nil, err
 	}
@@ -392,4 +392,17 @@ var _ io.Closer = (*filesystem.System)(nil)
 func (a *appPITR) reattach() error {
 	a.detach()
 	return a.attach()
+}
+
+// filesystemOfKind asks app's OnFilesystemCreate handlers (e.g. ext/storage's "litestream" mount) for a filesystem of
+// kind; nil and no error when none supplies one. Close the result when done.
+func filesystemOfKind(app core.App, kind string) (*filesystem.System, error) {
+	e := &core.FilesystemCreateEvent{App: app, Kind: kind}
+	if err := app.OnFilesystemCreate().Trigger(e); err != nil {
+		if e.Filesystem != nil {
+			e.Filesystem.Close()
+		}
+		return nil, err
+	}
+	return e.Filesystem, nil
 }

@@ -206,8 +206,8 @@ func TestEncryptionKeyIsExplicit(t *testing.T) {
 		t.Fatal(err)
 	}
 	// the settings are stored encrypted with encryption_key
-	if running.app.EncryptionKey() != key {
-		t.Fatalf("app encryption key: %q", running.app.EncryptionKey())
+	if got := os.Getenv(running.app.EncryptionEnv()); got != key {
+		t.Fatalf("app encryption key: %q (env %q)", got, running.app.EncryptionEnv())
 	}
 	w := httptest.NewRecorder()
 	running.handler.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/env", nil))

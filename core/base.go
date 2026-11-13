@@ -73,9 +73,6 @@ type BaseAppConfig struct {
 
 	// CE: per-app settings so several apps can share one process.
 
-	// EncryptionKey, when set, is used instead of reading the EncryptionEnv variable from the process environment.
-	EncryptionKey string
-
 	// AppMigrations, when set, is used instead of the global [AppMigrations] list
 	// (JS migrations registered by the jsvm plugin go here too).
 	AppMigrations *MigrationsList
@@ -640,14 +637,6 @@ func (app *BaseApp) AppMigrationsList() *MigrationsList {
 	return &AppMigrations
 }
 
-// CE: EncryptionKey returns the configured app encryption key, falling back to the EncryptionEnv variable.
-func (app *BaseApp) EncryptionKey() string {
-	if app.config.EncryptionKey != "" {
-		return app.config.EncryptionKey
-	}
-	return os.Getenv(app.config.EncryptionEnv)
-}
-
 // EncryptionEnv returns the name of the app secret env key
 // (currently used primarily for optional settings encryption but this may change in the future).
 func (app *BaseApp) EncryptionEnv() string {
@@ -873,15 +862,6 @@ func (app *BaseApp) attachFilesystemHooks(fsys *filesystem.System) *filesystem.S
 // after you are done working with it.
 func (app *BaseApp) NewBackupsFilesystem() (*filesystem.System, error) {
 	return app.createFilesystem(FilesystemKindBackups, app.defaultBackupsFilesystem)
-}
-
-// CE: NewFilesystemOfKind asks the OnFilesystemCreate handlers for a filesystem of any kind; def is the fallback
-// (nil def = none: returns nil, nil). See [App.NewFilesystemOfKind].
-func (app *BaseApp) NewFilesystemOfKind(kind string, def func() (*filesystem.System, error)) (*filesystem.System, error) {
-	if def == nil {
-		def = func() (*filesystem.System, error) { return nil, nil }
-	}
-	return app.createFilesystem(kind, def)
 }
 
 func (app *BaseApp) defaultBackupsFilesystem() (*filesystem.System, error) {

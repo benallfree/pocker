@@ -16,7 +16,7 @@ import (
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/types"
 )
 
-// Kind is the filesystem kind PITR asks core for (app.NewFilesystemOfKind): the operator's fall-through storage
+// Kind is the filesystem kind PITR asks the OnFilesystemCreate handlers for: the operator's fall-through storage
 // (ext/storage mount `litestream`) serves it when mounted.
 const Kind = "litestream"
 

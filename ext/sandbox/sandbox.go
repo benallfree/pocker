@@ -472,7 +472,6 @@ func (s *Sandbox) OnInit(vm *goja.Runtime) {
 		vm.Set("console", con)
 	}
 
-
 	// sleep: capped, so a hook can't park a goroutine forever
 	maxSleep := s.maxSleep()
 	vm.Set("sleep", func(ms int64) {
@@ -681,7 +680,7 @@ var hiddenMethods = map[string]map[string]bool{
 		"Restart": true, "RestoreBackup": true, "Bootstrap": true, "ResetBootstrapState": true,
 		"RunAllMigrations": true, "RunSystemMigrations": true, "RunAppMigrations": true,
 		// per-app internals (DataDir stays: it is inside the confined app folder)
-		"EncryptionKey": true, "AppMigrationsList": true,
+		"AppMigrationsList": true,
 		// server-level hooks and the cron scheduler (JS functions run on other goroutines; use cronAdd)
 		"OnServe": true, "OnTerminate": true, "OnBootstrap": true, "Cron": true,
 		// hookless copy of the app bypasses every hook, including the platform's

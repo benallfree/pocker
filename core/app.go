@@ -109,11 +109,6 @@ type App interface {
 	// after you are done working with it.
 	NewBackupsFilesystem() (*filesystem.System, error)
 
-	// CE: NewFilesystemOfKind asks the OnFilesystemCreate handlers for a filesystem of any kind (e.g. "litestream" for
-	// point-in-time restore history). def is the fallback when no handler supplies one; a nil def means "none" and
-	// returns a nil filesystem and no error. Close the result when done.
-	NewFilesystemOfKind(kind string, def func() (*filesystem.System, error)) (*filesystem.System, error)
-
 	// ReloadSettings reinitializes and reloads the stored application settings.
 	ReloadSettings() error
 
@@ -1283,9 +1278,9 @@ type App interface {
 	// Filesystem event hooks
 	// ---------------------------------------------------------------
 
-	// OnFilesystemCreate hook is triggered every time app.NewFilesystem(),
-	// app.NewBackupsFilesystem() or (CE) app.NewFilesystemOfKind() creates a filesystem, before the default one.
-	// A handler may supply its own (see [FilesystemCreateEvent]).
+	// CE: OnFilesystemCreate hook is triggered every time app.NewFilesystem() or app.NewBackupsFilesystem()
+	// creates a filesystem, before the default one. A handler may supply its own (see [FilesystemCreateEvent]).
+	// Plugins may trigger it for their own kinds too.
 	OnFilesystemCreate() *hook.Hook[*FilesystemCreateEvent]
 
 	// (the hooks below are not publicly exposed until file_field refactoring)

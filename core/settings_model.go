@@ -262,7 +262,7 @@ func (s *Settings) DBExport(app App) (map[string]any, error) {
 		return nil, err
 	}
 
-	encryptionKey := appEncryptionKey(app)
+	encryptionKey := os.Getenv(app.EncryptionEnv())
 	if encryptionKey != "" {
 		encryptVal, encryptErr := security.Encrypt(encoded, encryptionKey)
 		if encryptErr != nil {
@@ -739,12 +739,4 @@ func (c RateLimitRule) String() string {
 	}
 
 	return string(raw)
-}
-
-// CE: appEncryptionKey prefers an app-provided key (see [BaseApp.EncryptionKey]) over the process environment.
-func appEncryptionKey(app App) string {
-	if k, ok := app.UnsafeWithoutHooks().(interface{ EncryptionKey() string }); ok {
-		return k.EncryptionKey()
-	}
-	return os.Getenv(app.EncryptionEnv())
 }

@@ -160,7 +160,6 @@ func (api *fileApi) download(e *core.RequestEvent) error {
 	event.FileField = fileField
 	event.ServedPath = originalPath
 	event.ServedName = filename
-	event.Filesystem = fsys
 
 	// check for valid thumb size param
 	thumbSize := e.Request.URL.Query().Get("thumb")

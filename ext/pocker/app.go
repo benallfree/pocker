@@ -1,6 +1,7 @@
 package pocker
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"net"
@@ -81,7 +82,7 @@ func startApp(opts appOptions, inst Instance) (r *runningApp, err error) {
 		DBConnect:     sandbox.GuardedDBConnect(lim.MaxQueryDuration), // SQL stays inside this app's files
 		DataDir:       filepath.Join(dir, "pb_data"),
 		IsDev:         inst.Dev || opts.ForceDev,
-		EncryptionKey: inst.EncryptionKey,
+		EncryptionEnv: encryptionEnv(inst),
 		AppMigrations: &core.MigrationsList{}, // this app's JS migrations only
 		OnLog:         appLogToInstanceLog(openInstanceLog(dir)),
 	})
@@ -251,3 +252,16 @@ type idleListener struct{}
 func (idleListener) Accept() (net.Conn, error) { return nil, net.ErrClosed }
 func (idleListener) Close() error              { return nil }
 func (idleListener) Addr() net.Addr            { return &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1)} }
+
+// encryptionEnv puts the instance's settings encryption key in a process environment variable of its own and returns
+// its name, for upstream's per-app BaseAppConfig.EncryptionEnv; "" (no encryption) without a key. JS never sees it:
+// the sandbox gives JS only the instance's own Env. The variable stays set until the process exits (a restart of the
+// same instance reuses it).
+func encryptionEnv(inst Instance) string {
+	if inst.EncryptionKey == "" {
+		return ""
+	}
+	name := "POCKER_ENC_" + hex.EncodeToString([]byte(inst.ID))
+	_ = os.Setenv(name, inst.EncryptionKey)
+	return name
+}

@@ -4,11 +4,13 @@ import (
 	"strings"
 	"testing"
 
+	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"ganigeorgiev.com/pocketbase/pocketbase/tests"
+	"ganigeorgiev.com/pocketbase/pocketbase/tools/filesystem"
 )
 
 // Named backends + mounts: each kind goes to its own backend and folder; a plugin's own kind (litestream) is served
-// through core's NewFilesystemOfKind; instances can't see each other; a single app has no instances/ segment.
+// by triggering OnFilesystemCreate with that kind (as ext/pitr does); instances can't see each other; a single app has no instances/ segment.
 func TestMountsPerKind(t *testing.T) {
 	b := startMinio(t)
 	cold := *b
@@ -62,13 +64,13 @@ func TestMountsPerKind(t *testing.T) {
 		Upload([]byte, string) error
 		Close() error
 	}, error) {
-		return app1.NewFilesystemOfKind("litestream", nil)
+		return filesystemOfKind(app1, "litestream")
 	}, "gen/1.ltx")
 	up("single", func() (interface {
 		Upload([]byte, string) error
 		Close() error
 	}, error) {
-		return single.NewFilesystemOfKind("litestream", nil)
+		return filesystemOfKind(single, "litestream")
 	}, "gen/2.ltx")
 
 	for bucket, key := range map[string]string{
@@ -89,7 +91,7 @@ func TestMountsPerKind(t *testing.T) {
 	}
 
 	// inst2 sees nothing of inst1's history
-	fs2, err := app2.NewFilesystemOfKind("litestream", nil)
+	fs2, err := filesystemOfKind(app2, "litestream")
 	if err != nil || fs2 == nil {
 		t.Fatal(fs2, err)
 	}
@@ -99,7 +101,7 @@ func TestMountsPerKind(t *testing.T) {
 	}
 
 	// an unmounted kind isn't served
-	if fsys, err := app1.NewFilesystemOfKind("other", nil); err != nil || fsys != nil {
+	if fsys, err := filesystemOfKind(app1, "other"); err != nil || fsys != nil {
 		t.Fatalf("unmounted kind: %v %v", fsys, err)
 	}
 
@@ -130,4 +132,13 @@ func TestMountConfigErrors(t *testing.T) {
 	if err := New(Config{Logger: quiet}).Bind(app, "i"); err != nil {
 		t.Error("no mounts: nothing to do", err)
 	}
+}
+
+// filesystemOfKind triggers OnFilesystemCreate for kind, the way ext/pitr asks for its "litestream" filesystem.
+func filesystemOfKind(app core.App, kind string) (*filesystem.System, error) {
+	e := &core.FilesystemCreateEvent{App: app, Kind: kind}
+	if err := app.OnFilesystemCreate().Trigger(e); err != nil {
+		return nil, err
+	}
+	return e.Filesystem, nil
 }

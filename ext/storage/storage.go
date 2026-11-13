@@ -12,7 +12,7 @@
 //	  mounts:              # kind → backend
 //	    storage:    r2-eu  # record uploads (app.NewFilesystem)
 //	    backups:    r2-eu  # backup zips (app.NewBackupsFilesystem)
-//	    litestream: r2-eu  # PITR history (app.NewFilesystemOfKind("litestream", …))
+//	    litestream: r2-eu  # PITR history (ext/pitr asks for kind "litestream")
 //
 // Each app gets <backend prefix><root><kind>/ per mounted kind and can't reach anything outside it. The root is the
 // caller's choice and opaque to the plugin: under pocker, InitApp passes "instances/<id>/"; a single app passes "" (or
