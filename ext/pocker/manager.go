@@ -143,8 +143,12 @@ func (m *Manager) Run(ctx context.Context) error {
 func (m *Manager) Sync(c Change, prev *Instance) {
 	switch c.Kind {
 	case Upsert:
+		// A blocked instance (powered off, suspended, unpaid) must not keep running: its cron jobs and other
+		// background work stop with the app, and unblocking starts a fresh app (re-reading pb_hooks) on the next
+		// request or StartInstance.
+		blocked := c.Instance.Blocked != nil
 		var stale *appSlot
-		if prev != nil && !sameRuntime(*prev, c.Instance) {
+		if prev != nil && (blocked || !sameRuntime(*prev, c.Instance)) {
 			m.mu.Lock()
 			stale = m.apps[c.Instance.ID]
 			delete(m.apps, c.Instance.ID)
@@ -152,7 +156,11 @@ func (m *Manager) Sync(c Change, prev *Instance) {
 		}
 		m.log.Info("pocker: instance updated", "id", c.Instance.ID)
 		if stale != nil {
-			m.emit(Event{Kind: EventRestarted, InstanceID: c.Instance.ID, Reason: "settings changed"})
+			if blocked {
+				m.emit(Event{Kind: EventStopped, InstanceID: c.Instance.ID, Reason: c.Instance.Blocked.Message})
+			} else {
+				m.emit(Event{Kind: EventRestarted, InstanceID: c.Instance.ID, Reason: "settings changed"})
+			}
 			go retire(stale)
 		}
 	case Delete:
@@ -317,6 +325,7 @@ const (
 	EventRestarted EventKind = "restarted"     // settings changed: the app restarts on its next request
 	EventStarted   EventKind = "started"       // the app started and serves requests
 	EventFailed    EventKind = "failed"        // the app failed to start (Reason has the error)
+	EventStopped   EventKind = "stopped"       // the instance became blocked (e.g. powered off): its app was stopped
 )
 
 func (m *Manager) emit(e Event) {

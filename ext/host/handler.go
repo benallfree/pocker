@@ -117,7 +117,25 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		defer release() // long-lived responses (realtime) hold their admission until they end
 	}
+	if cr, ok := h.Gate.(ClientIPResolver); ok {
+		r = withClientAddr(r, cr.ClientIP(r))
+	}
 	rt.ServeInstance(w, r, inst)
+}
+
+// withClientAddr returns r with RemoteAddr set to client (keeping the peer's port), or r itself when client is
+// invalid or already the peer.
+func withClientAddr(r *http.Request, client netip.Addr) *http.Request {
+	if !client.IsValid() || client == PeerAddr(r) {
+		return r
+	}
+	_, port, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		port = "0"
+	}
+	r2 := r.WithContext(r.Context())
+	r2.RemoteAddr = net.JoinHostPort(client.String(), port)
+	return r2
 }
 
 func versionNote(inst Instance) string {

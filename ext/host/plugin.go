@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"net/http"
+	"net/netip"
 )
 
 // Gate admits requests (e.g. a firewall). AllowPeer runs before routing and refuses with 403; Admit runs before an
@@ -12,6 +13,14 @@ import (
 type Gate interface {
 	AllowPeer(r *http.Request) bool
 	Admit(w http.ResponseWriter, r *http.Request, inst Instance) (release func(), ok bool)
+}
+
+// ClientIPResolver is an optional [Gate] extension: the request's real client (e.g. from CF-Connecting-IP when the
+// peer is a trusted proxy). When the gate implements it, a request served here reaches the app with RemoteAddr set
+// to that client, so PocketBase's logs, e.RealIP() and its own rate limits see the visitor instead of the proxy,
+// without the app having to trust any header.
+type ClientIPResolver interface {
+	ClientIP(r *http.Request) netip.Addr
 }
 
 // TLSProvider supplies the main listener's TLS (e.g. automatic certificates). served reports whether a hostname
@@ -64,6 +73,16 @@ func (c gateChain) Admit(w http.ResponseWriter, r *http.Request, inst Instance) 
 		releases = append(releases, rel)
 	}
 	return releaseAll, true
+}
+
+// ClientIP is the first gate's answer that implements [ClientIPResolver] (the zero Addr when none does).
+func (c gateChain) ClientIP(r *http.Request) netip.Addr {
+	for _, g := range c {
+		if cr, ok := g.(ClientIPResolver); ok {
+			return cr.ClientIP(r)
+		}
+	}
+	return netip.Addr{}
 }
 
 // ChainGates combines gates into one (nil when there are none).
