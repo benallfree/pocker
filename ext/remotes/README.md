@@ -1,6 +1,6 @@
 # remotes
 
-Named remotes for the `pocketbase` command: the instances a project deploys to, signed in once.
+Named remotes for the `pocketone` command: the instances a project deploys to, signed in once.
 
 ```
 pocketbase remote add prod https://myapp.example.com
@@ -8,7 +8,7 @@ pocketbase login prod
 pocketbase deploy prod          # ext/deploy
 ```
 
-**Runs on:** the `pocketbase` command (client) and any app (server half: `GET /_pocker/whoami`).
+**Runs on:** the `pocketone` command (client) and any app (server half: `GET /_pocker/whoami`).
 
 ```go
 remotes.MustRegister(app, remotes.Config{}) // whoami route; on *pocketbase.PocketBase also the commands

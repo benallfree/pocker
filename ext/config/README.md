@@ -1,6 +1,6 @@
 # config
 
-PocketOne's config file: `pocketbase.yaml`, with secrets in a `.env` beside it. Linked by default in the `pocketbase`
+PocketOne's config file: `pocketbase.yaml`, with secrets in a `.env` beside it. Linked by default in the `pocketone`
 binary.
 
 > **Status.** Working: Go module `github.com/pockethost/pocketone/ext/config`. Sections today: `server`, `app`,

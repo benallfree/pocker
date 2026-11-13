@@ -2,7 +2,7 @@
 
 Bulk mail: campaigns to an app's own users with one-click unsubscribe, bounce and complaint handling, and a dashboard page.
 
-**Runs on:** every level. It's in the standard `pocketbase` binary, and the same plugin value runs on every
+**Runs on:** every level. It's in the standard `pocketone` binary, and the same plugin value runs on every
 instance under [pocker](../pocker/README.md) (so the mothership and multitenant levels get it too). It follows the
 PocketOne plugin contract ([`ceplugin`](../ceplugin/ceplugin.go)).
 

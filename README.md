@@ -8,7 +8,7 @@ endorsed by the PocketBase project.
 ## Install
 
 ```bash
-brew install pockethost/tap/pocketbase
+brew install pockethost/tap/pocketone
 ```
 
 That's [Homebrew](https://brew.sh) on macOS or Linux (the formula lives in
@@ -41,7 +41,7 @@ choose not to use them.
 | **[S3 Redirect](ext/s3redirect/README.md)** | File downloads as short-lived signed S3 redirects. | Beta |
 | **[Tokens](ext/tokens/README.md)** | Long-lived API tokens (`pbt_…`) with scopes. | Beta |
 | **[Deploy](ext/deploy/README.md)** | `pocketbase deploy \| dev \| pull \| logs` and the deploy API. | Beta |
-| **[Remotes](ext/remotes/README.md)** | Named remotes and saved logins for the `pocketbase` command. | Beta |
+| **[Remotes](ext/remotes/README.md)** | Named remotes and saved logins for the `pocketone` command. | Beta |
 
 ## Community Plugins
 

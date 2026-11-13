@@ -4,7 +4,7 @@ A development mail catcher (like MailDev or Mailpit): in dev mode, an app whose 
 instead of the host's `sendmail`, and you read it at http://127.0.0.1:8025.
 
 **Runs on:** Single app, or many under [pocker](../pocker/README.md) (one inbox for every dev instance, labeled by
-instance). Ships in the standard `pocketbase` binary.
+instance). Ships in the standard `pocketone` binary.
 
 ## What it does
 

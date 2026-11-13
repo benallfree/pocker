@@ -3,7 +3,7 @@
 Automatic certificates through ACME, with CertMagic (Caddy's certificate engine): on demand for every served
 hostname, wildcards through DNS-01, more CAs.
 
-**Runs on:** Single app (in the standard `pocketbase` binary), or many under [pocker](../pocker/README.md).
+**Runs on:** Single app (in the standard `pocketone` binary), or many under [pocker](../pocker/README.md).
 
 > **Status.** Stable under pocker; Beta on a single app. Go module `github.com/pockethost/pocketone/ext/autotls`.
 

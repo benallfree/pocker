@@ -5,7 +5,7 @@
 #
 version: 2
 
-project_name: pocketbase
+project_name: pocketone
 
 dist: .builds
 
@@ -19,7 +19,7 @@ builds:
     # the standard CE binary: examples/base + the default CE plugins, in its own module
     dir: examples/ce
     main: .
-    binary: pocketbase
+    binary: pocketone
     ldflags:
       - -s -w -X ganigeorgiev.com/pocketbase/pocketbase.Version={{ .Version }}
     env:
@@ -58,15 +58,15 @@ release:
     ## Install
 
     ```bash
-    brew install pockethost/tap/pocketbase
+    brew install pockethost/tap/pocketone
     ```
 
-    Homebrew on macOS or Linux; the formula comes from [pockethost/homebrew-tap](https://github.com/pockethost/homebrew-tap). Or download the zip for your platform below and run `./pocketbase serve`.
+    Homebrew on macOS or Linux; the formula comes from [pockethost/homebrew-tap](https://github.com/pockethost/homebrew-tap). Or download the zip for your platform below and run `./pocketone serve`.
 
 # the Homebrew formula in pockethost/homebrew-tap, updated on every release. brews is deprecated in favor of
 # homebrew_casks, but casks are macOS-only and quarantine unsigned binaries; the formula works on macOS and Linux.
 brews:
-  - name: pocketbase
+  - name: pocketone
     ids: [archive_noncgo]
     repository:
       owner: pockethost
@@ -79,9 +79,9 @@ brews:
       name: PocketHost
       email: noreply@pockethost.io
     install: |
-      bin.install "pocketbase"
+      bin.install "pocketone"
     test: |
-      system "#{bin}/pocketbase", "--version"
+      system "#{bin}/pocketone", "--version"
 
 archives:
   - id: archive_noncgo

@@ -11,7 +11,7 @@ part of [PocketOne](https://github.com/pockethost/pocketone), a community fork o
 PocketHost maintains. Put a `pb_pages` folder next to `pb_data` and it's served.
 
 ```bash
-brew install pockethost/tap/pocketbase
+brew install pockethost/tap/pocketone
 pocketbase pages create myapp --starter daisyui-docs
 cd myapp
 pocketbase serve --dir ./pb_data

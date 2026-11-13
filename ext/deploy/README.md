@@ -9,7 +9,7 @@ pocketbase deploy                              # upload what changed; the remote
 pocketbase logs
 ```
 
-**Runs on:** the `pocketbase` command (client) and a single app (server). PocketHost runs the same server code under
+**Runs on:** the `pocketone` command (client) and a single app (server). PocketHost runs the same server code under
 pocker with its own backend.
 
 ```go
