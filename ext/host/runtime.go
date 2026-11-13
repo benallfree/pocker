@@ -1,6 +1,7 @@
 package host
 
 import (
+	"context"
 	"net/http"
 )
 
@@ -54,4 +55,10 @@ func pick(runtimes []Runtime, inst Instance) Runtime {
 		}
 	}
 	return nil
+}
+
+// RuntimeStarter is an optional runtime hook [Host.Run] calls once before it listens, e.g. to adopt containers that
+// kept running across a restart. An error stops the host from starting.
+type RuntimeStarter interface {
+	Start(ctx context.Context) error
 }

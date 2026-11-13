@@ -1,0 +1,33 @@
+{
+ "hosts": {
+  "gani": "https://ganigeorgiev.com/meta/pocketbase/pocketbase/download/v{version}/{file}",
+  "github": "https://github.com/pocketbase/pocketbase/releases/download/v{version}/{file}",
+  "pbce": "https://github.com/pockethost/pocketbase/releases/download/v{version}/{file}"
+ },
+ "versions": {
+  "0.23.12": {
+   "host": "github",
+   "sha256": {
+    "linux_amd64": "af00ee3cb6c3575075bee4e2adb86ab6878598fda30e79b15f89f948c602aacc",
+    "linux_arm64": "f5a77bd6ec046bd374f8cac77586af899212796bab96d3ed7f9df4d67a741a44"
+   }
+  },
+  "0.36.9": {
+   "host": "github",
+   "sha256": {
+    "linux_amd64": "514441ad69eeba4e5da6e4728dae7483c6e5328b109fed9c67f66909a006fb5a",
+    "linux_arm64": "97f8f2337a1041b54153d63c4eea02df1bca4b4e68907052c0ab9ce89a0df855"
+   }
+  }
+ },
+ "ce": {
+  "0.0.1": {
+   "host": "pbce",
+   "base": "0.41.1",
+   "sha256": {
+    "linux_amd64": "6569aeee2d84bd4114122bffafddce2fcadea2c844eb8417fff3ec7b4304df91",
+    "linux_arm64": "6bc5bc423e292f3c705a1c3bd564c76cfbc1d094f04d0ab2638f40b7a818cf5a"
+   }
+  }
+ }
+}

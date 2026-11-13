@@ -3,6 +3,7 @@ package host
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 )
@@ -82,6 +83,11 @@ func (h *Host) Run(ctx context.Context) error {
 
 	runCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	if st, ok := h.Runtime.(RuntimeStarter); ok {
+		if err := st.Start(runCtx); err != nil {
+			return fmt.Errorf("host: runtime %s: %w", h.Runtime.Name(), err)
+		}
+	}
 	sourceErr := make(chan error, 1)
 	go func() { sourceErr <- dir.Run(runCtx, h.Source, h.First) }()
 	for _, bg := range h.Background {
