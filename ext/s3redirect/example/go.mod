@@ -59,3 +59,5 @@ replace (
 	github.com/pockethost/pocketbase/ext/s3redirect => ..
 	github.com/pockethost/pocketbase/ext/sandbox => ../../sandbox
 )
+
+replace github.com/pockethost/pocketbase/ext/host => ../../host

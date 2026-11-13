@@ -7,7 +7,7 @@ require (
 	ganigeorgiev.com/pocketbase/pocketbase v0.0.0-00010101000000-000000000000
 	github.com/dop251/goja v0.0.0-20261023121931-6ace4dde0b29
 	github.com/pockethost/pocketbase/ext/devusers v0.0.0-00010101000000-000000000000
-	github.com/pockethost/pocketbase/ext/edge v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketbase/ext/host v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketbase/ext/sandbox v0.0.0-00010101000000-000000000000
 	golang.org/x/crypto v0.58.0
 	gopkg.in/yaml.v3 v3.0.1
@@ -58,4 +58,4 @@ replace (
 
 replace github.com/pockethost/pocketbase/ext/devusers => ../devusers
 
-replace github.com/pockethost/pocketbase/ext/edge => ../edge
+replace github.com/pockethost/pocketbase/ext/host => ../host

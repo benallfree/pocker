@@ -75,7 +75,7 @@ http_send_max_timeout: 60s
 http_send_max_body: 10MiB
 quarantine: { strikes: 3, window: 10m, first_pause: 30s, max_pause: 15m, reset_after: 1h }   # or: quarantine: off
 max_concurrent_js: 16     # JS calls an instance runs at once; more wait up to max_js_execution, then fail
-# the keys below are read by plugins: rate_limits/firewall/edges by ext/edge, tls.auto... by ext/autotls
+# the keys below are read by plugins: rate_limits/firewall by ext/firewall, edges by ext/edge, tls.auto... by ext/autotls
 rate_limits:              # per client IP and per instance; trusted clients get the trusted set
   ip_hourly: 1000
   instance_hourly: 10000
@@ -106,7 +106,7 @@ tls:
   http_listen: ":80"            # optional: plain HTTP redirects to HTTPS (and answers ACME HTTP-01 challenges)
 ```
 
-**Firewall** ([ext/edge](../edge/README.md); `Server.Firewall`, on in the `pocker` command and whenever the config has `firewall:` or `rate_limits:`). Peers outside `allow_cidrs` get 403. The client IP comes from `client_ip_headers` only when the peer is
+**Firewall** ([ext/firewall](../firewall/README.md); `Server.Firewall`, on in the `pocker` command and whenever the config has `firewall:` or `rate_limits:`). Peers outside `allow_cidrs` get 403. The client IP comes from `client_ip_headers` only when the peer is
 a trusted proxy, otherwise it is the peer. Rate-limited requests get 429 with `Retry-After` and a message naming the
 limit; every routed response carries `<prefix>-{Ip,Instance}-{Hourly,Concurrent}-{Limit,Remaining}` and
 `<prefix>-{Ip,Instance}-Hourly-Reset`, listed in `Access-Control-Expose-Headers`. Long-lived responses (realtime) hold
@@ -155,7 +155,7 @@ instances:
 Per-instance settings for a plugin go under the instance's `plugins.<name>` (read them with `pocker.DecodePluginConfig`).
 `app.Restart()` (PocketBase's backup restore, pitr) restarts only that instance, not the process.
 Timings for the Server-Timing header are registered with `pocker.Timing(ctx, fn)`. The `pocker` command
-([`cmd/pocker`](cmd/pocker)) bundles [servertiming](../servertiming/README.md), the [edge](../edge/README.md) firewall and
+([`cmd/pocker`](cmd/pocker)) bundles [servertiming](../servertiming/README.md), the [firewall](../firewall/README.md) and
 [autotls](../autotls/README.md).
 
 ## Platform values and logs

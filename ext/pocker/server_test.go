@@ -10,7 +10,6 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"errors"
-	"fmt"
 	"io"
 	"log/slog"
 	"math/big"
@@ -362,61 +361,5 @@ func TestServerSnapshotsOnce(t *testing.T) {
 	defer src.mu.Unlock()
 	if src.calls != 1 {
 		t.Fatalf("Snapshot calls: %d, want 1", src.calls)
-	}
-}
-
-// A config file's `edges:` section routes instances owned by another edge through an edge.Router.
-func TestServerEdgesFromYAML(t *testing.T) {
-	root := t.TempDir()
-	ownerSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == HealthPath {
-			_, _ = io.WriteString(w, `{"status":"ok"}`)
-			return
-		}
-		_, _ = io.WriteString(w, "owner "+r.Host+" via "+r.Header.Get("X-Edge-Forwarded-By"))
-	}))
-	defer ownerSrv.Close()
-	addr := freeAddr(t)
-	instances := filepath.Join(root, "instances.yaml")
-	if err := os.WriteFile(instances, []byte("instances:\n  - id: away\n    hosts: [away.test]\n    remote: \"edge:@sgp-1\"\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	cfgPath := filepath.Join(root, "pocker.yaml")
-	if err := os.WriteFile(cfgPath, []byte(fmt.Sprintf(`listen: %q
-pb_root: %q
-instances_file: %q
-memory_soft_limit: -1
-edges:
-  self: lax-1
-  list:
-    - { id: sgp-1, internal_url: %q }
-`, addr, filepath.Join(root, "pb"), instances, ownerSrv.URL)), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	cfg, err := LoadConfig(cfgPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	srv := &Server{Config: cfg, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))}
-	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan error, 1)
-	go func() { done <- srv.Run(ctx) }()
-	defer func() { cancel(); <-done }()
-	client := &http.Client{Transport: &http.Transport{}} // its own transport: the server's egress policy guards the default one
-	var res *http.Response
-	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
-		req, _ := http.NewRequest(http.MethodGet, "http://"+addr+"/x", nil)
-		req.Host = "away.test"
-		if res, err = client.Do(req); err == nil {
-			break
-		}
-	}
-	if err != nil {
-		t.Fatal(err)
-	}
-	body, _ := io.ReadAll(res.Body)
-	res.Body.Close()
-	if res.StatusCode != 200 || string(body) != "owner away.test via lax-1" {
-		t.Fatalf("forwarded: %d %q", res.StatusCode, body)
 	}
 }

@@ -56,7 +56,9 @@ own custom PocketBase experience.
 | **[Schedules](ext/schedules/README.md)** | Scheduled webhooks that wake sleeping instances (headed into Pocker). | Planned |
 | **[Mothership](ext/mothership/README.md)** | A control plane and its edges, across regions. Needs Pocker. | Planned |
 | **[Sandbox](ext/sandbox/README.md)** | Confines untrusted JS hooks, SQL and outbound network ([how is this safe?](ext/sandbox/README.md#how-is-this-safe)). Required for Multitenant. | Stable |
-| **[Edge](ext/edge/README.md)** | The front door: firewall (peer allow-lists, trusted proxies, rate limits), then forward to the owner edge or serve locally. | Stable |
+| **[Host](ext/host/README.md)** | Many instances behind one listener, routed by hostname, run by one provider (Pocker or Docker). | Stable |
+| **[Firewall](ext/firewall/README.md)** | Peer allow-lists, trusted proxies and rate limits for a host. | Stable |
+| **[Edge](ext/edge/README.md)** | The fleet layer: forward to the edge that owns an instance. | Stable |
 
 **Services for your instances**
 

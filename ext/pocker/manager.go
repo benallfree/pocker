@@ -10,33 +10,33 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pockethost/pocketbase/ext/edge"
+	"github.com/pockethost/pocketbase/ext/host"
 
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/hook"
 	"github.com/dop251/goja"
 )
 
-// HealthPath answers on any host with the engine's status (see [edge.DefaultHealthPath]).
-const HealthPath = edge.DefaultHealthPath
+// HealthPath answers on any host with the engine's status (see [host.DefaultHealthPath]).
+const HealthPath = host.DefaultHealthPath
 
-// ValidID reports whether id is a safe instance id (see [edge.ValidID]).
-func ValidID(id string) bool { return edge.ValidID(id) }
+// ValidID reports whether id is a safe instance id (see [host.ValidID]).
+func ValidID(id string) bool { return host.ValidID(id) }
 
-// DevID is the id dev mode gives an unmapped hostname (see [edge.DevID]).
-func DevID(host string) string { return edge.DevID(host) }
+// DevID is the id dev mode gives an unmapped hostname (see [host.DevID]).
+func DevID(h string) string { return host.DevID(h) }
 
-// Manager runs instances in-process: an [edge.Runtime] that starts each instance's app on its first request and
-// keeps it running. It reads instances from an [edge.Directory] (its own, fed by the source, unless one is shared in
+// Manager runs instances in-process: an [host.Runtime] that starts each instance's app on its first request and
+// keeps it running. It reads instances from an [host.Directory] (its own, fed by the source, unless one is shared in
 // [ManagerOptions.Directory]); as an http.Handler it serves the whole edge pipeline with itself as the only runtime.
 type Manager struct {
 	source InstanceSource
 	opts   appOptions
 	log    *slog.Logger
 
-	dir     *edge.Directory
+	dir     *host.Directory
 	ownsDir bool
-	handler *edge.Handler
+	handler *host.Handler
 
 	defaults Limits
 	onEvent  func(Event)
@@ -51,11 +51,11 @@ type Manager struct {
 }
 
 var (
-	_ edge.Runtime    = (*Manager)(nil)
-	_ edge.Prechecker = (*Manager)(nil)
-	_ edge.Syncer     = (*Manager)(nil)
-	_ edge.Shutdowner = (*Manager)(nil)
-	_ edge.Statser    = (*Manager)(nil)
+	_ host.Runtime    = (*Manager)(nil)
+	_ host.Prechecker = (*Manager)(nil)
+	_ host.Syncer     = (*Manager)(nil)
+	_ host.Shutdowner = (*Manager)(nil)
+	_ host.Statser    = (*Manager)(nil)
 )
 
 // appSlot holds one app: a start in progress (done not yet closed) or a finished start (app or err set).
@@ -92,7 +92,7 @@ type ManagerOptions struct {
 	Forward func(w http.ResponseWriter, r *http.Request, inst Instance)
 	// Directory, when set, is shared with the rest of the edge (the host feeds it); the Manager then doesn't load
 	// the source itself and [Manager.Run] only waits.
-	Directory *edge.Directory
+	Directory *host.Directory
 	// Logger defaults to slog.Default().
 	Logger *slog.Logger
 }
@@ -117,16 +117,16 @@ func NewManager(source InstanceSource, opts ManagerOptions) *Manager {
 		dir:      opts.Directory,
 	}
 	if m.dir == nil {
-		m.dir = edge.NewDirectory(opts.Logger)
+		m.dir = host.NewDirectory(opts.Logger)
 		m.ownsDir = true
+		m.dir.Subscribe(m.Sync) // with a shared directory, the host subscribes its runtime
 	}
-	m.dir.Subscribe(m.Sync)
-	m.handler = &edge.Handler{Dir: m.dir, Gate: opts.Gate, Runtimes: []edge.Runtime{m}, Forward: opts.Forward, Dev: opts.Dev, Logger: opts.Logger}
+	m.handler = &host.Handler{Dir: m.dir, Gate: opts.Gate, Runtimes: []host.Runtime{m}, Forward: opts.Forward, Dev: opts.Dev, Logger: opts.Logger}
 	return m
 }
 
 // Directory is the instance directory the Manager reads.
-func (m *Manager) Directory() *edge.Directory { return m.dir }
+func (m *Manager) Directory() *host.Directory { return m.dir }
 
 // Run loads the snapshot, marks the manager ready and applies changes until ctx is done. With a shared directory
 // ([ManagerOptions.Directory]) the host feeds it and Run only waits for ctx.
@@ -138,7 +138,7 @@ func (m *Manager) Run(ctx context.Context) error {
 	return m.dir.Run(ctx, m.source, nil)
 }
 
-// Sync implements [edge.Syncer]: a changed instance (env, limits, dev mode, folder) gets a fresh app on its next
+// Sync implements [host.Syncer]: a changed instance (env, limits, dev mode, folder) gets a fresh app on its next
 // request; a removed one is stopped.
 func (m *Manager) Sync(c Change, prev *Instance) {
 	switch c.Kind {
@@ -175,10 +175,10 @@ func (m *Manager) Sync(c Change, prev *Instance) {
 // Lookup returns the instance that serves host.
 func (m *Manager) Lookup(host string) (Instance, bool) { return m.dir.Lookup(host) }
 
-// Name implements [edge.Runtime].
+// Name implements [host.Runtime].
 func (m *Manager) Name() string { return "pocker" }
 
-// Serves implements [edge.Runtime]: every instance that doesn't ask for another runtime.
+// Serves implements [host.Runtime]: every instance that doesn't ask for another runtime.
 func (m *Manager) Serves(inst Instance) bool { return inst.Runtime == "" || inst.Runtime == "pocker" }
 
 // app returns the instance's running app, starting it (once, shared by concurrent callers) if needed.
@@ -218,7 +218,7 @@ func (m *Manager) app(inst Instance) (*runningApp, error) {
 // ServeHTTP serves the edge pipeline (resolve by Host, gates, forwarding) with the Manager as the only runtime.
 func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) { m.handler.ServeHTTP(w, r) }
 
-// Precheck implements [edge.Prechecker]: instances under maintenance or paused answer 503 before the gates.
+// Precheck implements [host.Prechecker]: instances under maintenance or paused answer 503 before the gates.
 func (m *Manager) Precheck(w http.ResponseWriter, r *http.Request, inst Instance) bool {
 	if err := m.waitHeld(r.Context(), inst.ID); err != nil {
 		w.Header().Set("Retry-After", "5")
@@ -233,7 +233,7 @@ func (m *Manager) Precheck(w http.ResponseWriter, r *http.Request, inst Instance
 	return true
 }
 
-// ServeInstance implements [edge.Runtime]: start the app on demand and serve the request.
+// ServeInstance implements [host.Runtime]: start the app on demand and serve the request.
 func (m *Manager) ServeInstance(w http.ResponseWriter, r *http.Request, inst Instance) {
 	wakeStart := time.Now()
 	app, err := m.app(inst)
@@ -262,7 +262,7 @@ func (m *Manager) LogInstance(id, stream, message string) {
 	openInstanceLog(dir).Write(stream, message)
 }
 
-// RunningCount implements [edge.Statser]: apps currently running.
+// RunningCount implements [host.Statser]: apps currently running.
 func (m *Manager) RunningCount() int {
 	m.mu.RLock()
 	defer m.mu.RUnlock()

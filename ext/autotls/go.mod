@@ -39,7 +39,7 @@ require (
 	github.com/mholt/acmez/v3 v3.1.7 // indirect
 	github.com/miekg/dns v1.1.73 // indirect
 	github.com/ncruces/go-strftime v1.1.0 // indirect
-	github.com/pockethost/pocketbase/ext/edge v0.0.0-00010101000000-000000000000 // indirect
+	github.com/pockethost/pocketbase/ext/host v0.0.0-00010101000000-000000000000 // indirect
 	github.com/pockethost/pocketbase/ext/sandbox v0.0.0-00010101000000-000000000000 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/spf13/cast v1.10.0 // indirect
@@ -68,3 +68,5 @@ replace (
 )
 
 replace github.com/pockethost/pocketbase/ext/edge => ../edge
+
+replace github.com/pockethost/pocketbase/ext/host => ../host

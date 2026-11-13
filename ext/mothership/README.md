@@ -7,7 +7,7 @@ One operator (level 3): owners and accounts are the [tenants](../tenants/README.
 the mothership through its schema and mirror extensions. Billing extends tenants. Each layer is optional: an
 [edge](../edge/README.md) runs without a mothership, a mothership without tenants.
 
-**Runs on:** edges built on [ext/edge](../edge/README.md) ([pocker](../pocker/README.md) today).
+**Runs on:** a [host](../host/README.md) with the [edge](../edge/README.md) fleet layer.
 
 > **Status.** Early: Go module `github.com/pockethost/pocketbase/ext/mothership`. Built: the canonical `edges` and
 > `instances` collections (`mothership.EnsureCollections`) and the edge side (`mirror`). Not yet: the mothership's own
@@ -15,7 +15,7 @@ the mothership through its schema and mirror extensions. Billing extends tenants
 
 ## The edge side: `mirror`
 
-Follows the mothership over PocketBase's realtime stream (no polling) and serves ext/edge as both its
+Follows the mothership over PocketBase's realtime stream (no polling) and serves the host and ext/edge as both their
 `InstanceSource` and its `EdgeSource`. Each edge subscribes to filtered views, so it only receives what concerns it:
 
 | View | Collection | Filter / fields | Why |

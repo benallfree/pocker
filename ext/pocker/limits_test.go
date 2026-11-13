@@ -16,7 +16,9 @@ import (
 )
 
 func TestLimitsYAMLAndMerge(t *testing.T) {
-	var f yamlFile
+	var f struct {
+		Instances []Instance `yaml:"instances"`
+	}
 	err := yaml.Unmarshal([]byte(`
 instances:
   - id: shop

@@ -60,7 +60,7 @@ require (
 	github.com/miekg/dns v1.1.73 // indirect
 	github.com/ncruces/go-strftime v1.1.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.23 // indirect
-	github.com/pockethost/pocketbase/ext/edge v0.0.0-00010101000000-000000000000 // indirect
+	github.com/pockethost/pocketbase/ext/host v0.0.0-00010101000000-000000000000 // indirect
 	github.com/pockethost/pocketbase/ext/pocker v0.0.0-00010101000000-000000000000 // indirect
 	github.com/pockethost/pocketbase/ext/sandbox v0.0.0-00010101000000-000000000000 // indirect
 	github.com/prometheus/client_golang v1.17.0 // indirect
@@ -127,3 +127,5 @@ replace (
 replace github.com/pockethost/pocketbase/ext/config => ../../ext/config
 
 replace github.com/pockethost/pocketbase/ext/edge => ../../ext/edge
+
+replace github.com/pockethost/pocketbase/ext/host => ../../ext/host

@@ -1,4 +1,4 @@
-package edge
+package host
 
 import "gopkg.in/yaml.v3"
 

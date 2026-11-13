@@ -1,4 +1,4 @@
-package edge
+package host
 
 import (
 	"crypto/tls"

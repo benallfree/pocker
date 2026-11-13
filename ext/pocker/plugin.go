@@ -3,7 +3,7 @@ package pocker
 import (
 	"context"
 
-	"github.com/pockethost/pocketbase/ext/edge"
+	"github.com/pockethost/pocketbase/ext/host"
 
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"github.com/dop251/goja"
@@ -67,8 +67,8 @@ type Starter interface {
 	Start(ctx context.Context, m *Manager)
 }
 
-// DecodePluginConfig is [edge.DecodePluginConfig].
-func DecodePluginConfig[T any](v any, out *T) error { return edge.DecodePluginConfig(v, out) }
+// DecodePluginConfig is [host.DecodePluginConfig].
+func DecodePluginConfig[T any](v any, out *T) error { return host.DecodePluginConfig(v, out) }
 
-// TopLevel is [edge.TopLevel].
-func TopLevel(doc *yaml.Node, key string) *yaml.Node { return edge.TopLevel(doc, key) }
+// TopLevel is [host.TopLevel].
+func TopLevel(doc *yaml.Node, key string) *yaml.Node { return host.TopLevel(doc, key) }

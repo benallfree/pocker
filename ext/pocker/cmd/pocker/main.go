@@ -17,6 +17,7 @@ import (
 
 	"github.com/pockethost/pocketbase/ext/autotls"
 	"github.com/pockethost/pocketbase/ext/edge"
+	"github.com/pockethost/pocketbase/ext/firewall"
 	"github.com/pockethost/pocketbase/ext/mothership/mirror"
 	"github.com/pockethost/pocketbase/ext/pocker"
 	"github.com/pockethost/pocketbase/ext/servertiming"
@@ -58,22 +59,32 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	srv := &pocker.Server{Config: cfg, Firewall: &edge.Firewall{}, Plugins: []pocker.Plugin{
+	srv := &pocker.Server{Config: cfg, Firewall: &firewall.Firewall{}, Plugins: []pocker.Plugin{
 		servertiming.New(), // outermost, so its header includes everything below
 		autotls.New(),
 	}}
-	// a `mothership:` section: instances and the other edges come from the mothership (a config `edges.list` adds
-	// fixed edges in front)
+	// the fleet: an `edges:` section and/or a `mothership:` section (instances and the other edges from the
+	// mothership; fixed edges.list entries go in front) route instances other edges own through edge.Router
+	edges, err := edge.EdgesFromConfig(edge.TopLevel(cfg.Doc(), "edges"), slog.Default())
+	if err != nil {
+		slog.Error("pocker: edges", "error", err)
+		os.Exit(1)
+	}
 	if m, err := mirror.FromConfig(cfg.Doc(), slog.Default()); err != nil {
 		slog.Error("pocker: mothership", "error", err)
 		os.Exit(1)
 	} else if m != nil {
-		srv.Source, srv.Edges = m, m
-		if fixed, err := edge.EdgesFromConfig(edge.TopLevel(cfg.Doc(), "edges"), slog.Default()); err != nil {
-			slog.Error("pocker: edges", "error", err)
-			os.Exit(1)
-		} else if fixed != nil {
-			srv.Edges = edge.MultiProvider{fixed, m}
+		srv.Source = m
+		if edges != nil {
+			edges = edge.MultiProvider{edges, m}
+		} else {
+			edges = m
+		}
+	}
+	if edges != nil {
+		srv.Forward = edge.NewRouter(edge.RouterConfig{Edges: edges, Logger: slog.Default()}).Forward
+		if r, ok := edges.(edge.Runner); ok {
+			srv.Background = append(srv.Background, r.Run)
 		}
 	}
 	if err := srv.Run(ctx); err != nil {

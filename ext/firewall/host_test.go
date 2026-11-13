@@ -1,4 +1,4 @@
-package pocker
+package firewall
 
 import (
 	"context"
@@ -13,11 +13,23 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pockethost/pocketbase/ext/edge"
+	"github.com/pockethost/pocketbase/ext/host"
+	"gopkg.in/yaml.v3"
 )
 
-// The whole path: pocker.yaml keys, per-instance plugins.firewall from instances.yaml, header names, 429.
-func TestServerFirewall(t *testing.T) {
+// okRuntime answers every request 200: the firewall's headers and 429s are what's under test.
+type okRuntime struct{}
+
+func (okRuntime) Name() string              { return "ok" }
+func (okRuntime) Serves(host.Instance) bool { return true }
+func (okRuntime) Ready() bool               { return true }
+func (okRuntime) ServeInstance(w http.ResponseWriter, r *http.Request, _ host.Instance) {
+	_, _ = io.WriteString(w, "ok")
+}
+
+// The whole path on a host: config sections turn the registered firewall on, per-instance plugins.firewall from the
+// instances file, header names, 429.
+func TestHostWithFirewall(t *testing.T) {
 	root := t.TempDir()
 	instances := filepath.Join(root, "instances.yaml")
 	if err := os.WriteFile(instances, []byte(`
@@ -30,37 +42,36 @@ instances:
 `), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	var doc yaml.Node
+	if err := yaml.Unmarshal([]byte("firewall: { rate_limit_header_prefix: X-PocketHost-RateLimit }\n"), &doc); err != nil {
+		t.Fatal(err)
+	}
+	gates := host.ConfiguredGates(&doc)
+	if len(gates) != 1 {
+		t.Fatalf("registered gates turned on by the config: %d", len(gates))
+	}
+	if err := gates[0].Configure(&doc, false); err != nil {
+		t.Fatal(err)
+	}
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
 	addr := ln.Addr().String()
 	_ = ln.Close()
-	confPath := filepath.Join(root, "pocker.yaml")
-	if err := os.WriteFile(confPath, []byte(fmt.Sprintf(`
-listen: %q
-pb_root: %q
-instances_file: %q
-memory_soft_limit: -1
-firewall: { rate_limit_header_prefix: X-PocketHost-RateLimit }
-`, addr, root, instances)), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	cfg, err := LoadConfig(confPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	srv := &Server{Config: cfg, Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), Firewall: &edge.Firewall{}}
+	h := &host.Host{Source: &host.YAMLSource{Path: instances, Required: true}, Runtime: okRuntime{},
+		Gates: []host.Gate{gates[0]}, Listeners: host.Listeners{Listen: addr}, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))}
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
-	go func() { done <- srv.Run(ctx) }()
+	go func() { done <- h.Run(ctx) }()
 	defer func() { cancel(); <-done }()
 
-	get := func(host string) *http.Response {
+	client := &http.Client{Transport: &http.Transport{}}
+	get := func(hostname string) *http.Response {
 		t.Helper()
 		req, _ := http.NewRequest(http.MethodGet, "http://"+addr+"/api/health", nil)
-		req.Host = host
-		res, err := fwTestClient.Do(req)
+		req.Host = hostname
+		res, err := client.Do(req)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -68,25 +79,18 @@ firewall: { rate_limit_header_prefix: X-PocketHost-RateLimit }
 		res.Body.Close()
 		return res
 	}
-	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(100 * time.Millisecond) {
-		req, _ := http.NewRequest(http.MethodGet, "http://"+addr+"/api/health", nil)
-		req.Host = "relaxed.test"
-		if res, err := fwTestClient.Do(req); err == nil {
+	for deadline := time.Now().Add(5 * time.Second); ; time.Sleep(50 * time.Millisecond) {
+		req, _ := http.NewRequest(http.MethodGet, "http://"+addr+"/_pocker/health", nil)
+		if res, err := client.Do(req); err == nil {
 			res.Body.Close()
 			if res.StatusCode == 200 {
 				break
 			}
 		}
-		select {
-		case err := <-done:
-			t.Fatalf("server stopped: %v", err)
-		default:
-		}
 		if time.Now().After(deadline) {
-			t.Fatal("server did not come up")
+			t.Fatal("host did not come up")
 		}
 	}
-
 	for i := 1; i <= 3; i++ {
 		res := get("limited.test")
 		if res.StatusCode != 200 || res.Header.Get("X-PocketHost-RateLimit-Ip-Hourly-Limit") != "3" ||
@@ -100,11 +104,7 @@ firewall: { rate_limit_header_prefix: X-PocketHost-RateLimit }
 	if res := get("limited.test"); res.StatusCode != http.StatusTooManyRequests || res.Header.Get("Retry-After") == "" {
 		t.Fatalf("4th request: %d (Retry-After %q)", res.StatusCode, res.Header.Get("Retry-After"))
 	}
-	// the other instance keeps the default budget; the first request to it was the readiness probe
 	if res := get("relaxed.test"); res.Header.Get("X-PocketHost-RateLimit-Ip-Hourly-Limit") != "1000" {
 		t.Fatalf("default limit: %v", res.Header)
 	}
 }
-
-
-var fwTestClient = &http.Client{Transport: &http.Transport{}}

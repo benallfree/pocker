@@ -58,3 +58,5 @@ replace (
 replace github.com/pockethost/pocketbase/ext/devusers => ../devusers
 
 replace github.com/pockethost/pocketbase/ext/edge => ../edge
+
+replace github.com/pockethost/pocketbase/ext/host => ../host

@@ -1,4 +1,4 @@
-package edge
+package firewall
 
 import (
 	"io"
@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/pockethost/pocketbase/ext/host"
 )
 
 func fwRequest(remote, path string, hdr map[string]string) *http.Request {
@@ -18,7 +20,7 @@ func fwRequest(remote, path string, hdr map[string]string) *http.Request {
 }
 
 func TestFirewallPeersAndClientIP(t *testing.T) {
-	fw, err := NewFirewall(FirewallConfig{
+	fw, err := NewFirewall(Config{
 		AllowCIDRs:     []string{"173.245.48.0/20", "127.0.0.1"},
 		TrustedProxies: []string{"173.245.48.0/20"},
 	})
@@ -42,9 +44,9 @@ func TestFirewallPeersAndClientIP(t *testing.T) {
 	}
 
 	// through the Handler: a refused peer gets 403 before anything else
-	dir := NewDirectory(slog.New(slog.NewTextHandler(io.Discard, nil)))
-	dir.Load([]Instance{{ID: "a", Hosts: []string{"a.test"}}})
-	h := &Handler{Dir: dir, Gate: fw}
+	dir := host.NewDirectory(slog.New(slog.NewTextHandler(io.Discard, nil)))
+	dir.Load([]host.Instance{{ID: "a", Hosts: []string{"a.test"}}})
+	h := &host.Handler{Dir: dir, Gate: fw}
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodGet, "http://a.test/api/health", nil)
 	r.RemoteAddr = "8.8.8.8:1"
@@ -55,11 +57,11 @@ func TestFirewallPeersAndClientIP(t *testing.T) {
 }
 
 func TestRateLimitsTrustedWeightsConcurrency(t *testing.T) {
-	fw, _ := NewFirewall(FirewallConfig{TrustedClients: []string{"198.51.100.0/24"}})
-	withLimits := func(id string, rl RateLimits, trusted ...string) Instance {
-		return Instance{ID: id, Plugins: map[string]any{"firewall": FirewallInstanceConfig{RateLimits: &rl, TrustedIPs: trusted}}}
+	fw, _ := NewFirewall(Config{TrustedClients: []string{"198.51.100.0/24"}})
+	withLimits := func(id string, rl RateLimits, trusted ...string) host.Instance {
+		return host.Instance{ID: id, Plugins: map[string]any{"firewall": InstanceConfig{RateLimits: &rl, TrustedIPs: trusted}}}
 	}
-	check := func(remote, path string, inst Instance) (int, func()) {
+	check := func(remote, path string, inst host.Instance) (int, func()) {
 		w := httptest.NewRecorder()
 		rel, ok := fw.Admit(w, fwRequest(remote, path, nil), inst)
 		if !ok {

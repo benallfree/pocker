@@ -9,7 +9,7 @@ import (
 	"runtime/debug"
 	"time"
 
-	"github.com/pockethost/pocketbase/ext/edge"
+	"github.com/pockethost/pocketbase/ext/host"
 	"github.com/pockethost/pocketbase/ext/sandbox"
 
 	"ganigeorgiev.com/pocketbase/pocketbase/ceplugin"
@@ -38,19 +38,13 @@ type Server struct {
 	// Forward, if set, serves requests for instances another server runs (see [ManagerOptions.Forward]).
 	Forward func(w http.ResponseWriter, r *http.Request, inst Instance)
 
-	// Edges, when Forward is nil, forwards requests for instances other edges run ([Instance.Remote]) through an
-	// [edge.Router]: a host application's provider, or several ([edge.MultiProvider]). Without it, a config file
-	// `edges:` section does the same ([edge.EdgesFromConfig]: a fixed list and/or a mothership). With neither, Remote
-	// is a URL and requests are proxied to it. A provider that is an [edge.Runner] runs until shutdown.
-	Edges edge.EdgeSource
+	// Firewall is the first gate every request passes (e.g. ext/firewall: allowed peers, client IPs, rate limits). It is
+	// configured from the config file. When nil, every gate registered with the host whose section the config file
+	// has is turned on (linking ext/firewall registers it for `firewall:` / `rate_limits:`).
+	Firewall host.ConfigurableGate
 
-	// EdgeRoute tunes forwarding through Edges (header name, health path, timings); Edges is filled in.
-	EdgeRoute edge.RouterConfig
-
-	// Firewall is the edge firewall ([edge.Firewall]): allowed peers, client IPs and rate limits, the first gate every
-	// request passes. When nil, one is created if the config file has a `firewall:` or `rate_limits:` section. Either
-	// way the config file's sections are applied ([edge.Firewall.Configure]).
-	Firewall *edge.Firewall
+	// Background work run until shutdown (e.g. an edge provider's refresh).
+	Background []func(ctx context.Context)
 
 	// Plugins extend the server (see [Plugin]): settings from the config file, a request gate (e.g. the firewall
 	// plugin), TLS (e.g. the autotls plugin), handler wrappers and background work. Order matters for wrappers: the
@@ -102,12 +96,11 @@ func (s *Server) Run(ctx context.Context) error {
 		initers   []AppIniter
 		jsIniters []JSIniter
 	)
-	fw := s.Firewall
-	if fw == nil && (TopLevel(s.Config.Doc(), "firewall") != nil || TopLevel(s.Config.Doc(), "rate_limits") != nil) {
-		fw = &edge.Firewall{}
-		s.Firewall = fw
+	fws := host.ConfiguredGates(s.Config.Doc())
+	if s.Firewall != nil {
+		fws = []host.ConfigurableGate{s.Firewall}
 	}
-	if fw != nil {
+	for _, fw := range fws {
 		if err := fw.Configure(s.Config.Doc(), s.Config.Dev); err != nil {
 			return err
 		}
@@ -152,64 +145,36 @@ func (s *Server) Run(ctx context.Context) error {
 			jsIniters = append(jsIniters, js)
 		}
 	}
-	forward := s.Forward
-	var edgeRunner edge.Runner
-	if forward == nil {
-		edges := s.Edges
-		if edges == nil {
-			if edges, err = edge.EdgesFromConfig(TopLevel(s.Config.Doc(), "edges"), log); err != nil {
-				return err
-			}
-		}
-		if edges != nil {
-			rc := s.EdgeRoute
-			rc.Edges = edges
-			if rc.Logger == nil {
-				rc.Logger = log
-			}
-			forward = edge.NewRouter(rc).Forward
-			edgeRunner, _ = edges.(edge.Runner)
-		}
-	}
-	dir := edge.NewDirectory(log)
+	dir := host.NewDirectory(log)
 	s.Manager = NewManager(source, ManagerOptions{
 		PBRoot:        s.Config.PBRoot,
 		Dev:           s.Config.Dev,
 		HooksPoolSize: pool,
 		Logger:        log,
 		Defaults:      s.Config.Limits,
-		Gate:          edge.ChainGates(gates...),
+		Gate:          host.ChainGates(gates...),
 		OnEvent:       s.onEvent(source, log),
 		Init:          chainIniters(initers),
 		InitJS:        chainJSIniters(jsIniters),
 		Setup:         s.SetupApp,
-		Forward:       forward,
+		Forward:       s.Forward,
 		Directory:     dir,
 	})
-
 	if s.OnStart != nil {
 		s.OnStart(s.Manager)
 	}
 
-	var handler http.Handler = s.Manager
+	var wrap []func(http.Handler) http.Handler // outermost first: plugin wrappers, then the host application's
+	for _, wr := range wrappers {
+		wrap = append(wrap, wr.Wrap)
+	}
 	if s.Wrap != nil {
-		handler = s.Wrap(handler)
+		wrap = append(wrap, s.Wrap)
 	}
-	for i := len(wrappers) - 1; i >= 0; i-- {
-		handler = wrappers[i].Wrap(handler)
-	}
-
-	runCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	sourceErr := make(chan error, 1)
-	go func() { sourceErr <- dir.Run(runCtx, source, first) }() // first: already loaded above (fail fast), not loaded twice
-	if edgeRunner != nil {
-		go edgeRunner.Run(runCtx)
-	}
+	background := append([]func(context.Context){}, s.Background...)
 	for _, st := range starters {
-		go st.Start(runCtx, s.Manager)
+		background = append(background, func(ctx context.Context) { st.Start(ctx, s.Manager) })
 	}
-
 	if s.Config.MemoryLimit > 0 {
 		debug.SetMemoryLimit(s.Config.MemoryLimit)
 	}
@@ -222,36 +187,23 @@ func (s *Server) Run(ctx context.Context) error {
 	}
 	if soft > 0 {
 		watch := &sandbox.MemoryWatch{SoftLimit: uint64(soft), OnStrike: s.Manager.Strike, Logger: log}
-		go watch.Run(runCtx)
+		background = append(background, func(ctx context.Context) { watch.Run(ctx) })
 	}
 
-	serveCtx, stopServe := context.WithCancel(ctx)
-	defer stopServe()
-	go func() {
-		select {
-		case <-serveCtx.Done():
-		case err := <-sourceErr:
-			if err != nil {
-				log.Error("pocker: instance source stopped", "error", err)
+	h := &host.Host{
+		Source: source, Runtime: s.Manager, Directory: dir, First: first,
+		Gates: gates, Wrappers: wrap, TLS: tlsProv, Forward: s.Forward, Dev: s.Config.Dev,
+		Listeners:  host.Listeners{Listen: s.Config.Listen, PlainListen: s.Config.PlainListen, TLS: s.Config.TLS, ShutdownTimeout: s.Config.ShutdownTimeout},
+		Background: background, Logger: log,
+		OnListen: func(addr string) {
+			log.Info("pocker: listening", "addr", addr, "pb_root", s.Config.PBRoot, "dev", s.Config.Dev)
+			if s.Config.Dev {
+				// instances start on their first request; start the dev mail trap now so its notice shows at startup
+				_, _ = mailer.DevTrap("Dev mode: instances without SMTP")
 			}
-			stopServe()
-		}
-	}()
-	served := func(host string) bool {
-		_, ok := dir.Lookup(host)
-		return ok
+		},
 	}
-	listeners := edge.Listeners{Listen: s.Config.Listen, PlainListen: s.Config.PlainListen, TLS: s.Config.TLS, ShutdownTimeout: s.Config.ShutdownTimeout}
-	err = edge.Serve(serveCtx, runCtx, listeners, handler, tlsProv, served, log, func(addr string) {
-		log.Info("pocker: listening", "addr", addr, "pb_root", s.Config.PBRoot, "dev", s.Config.Dev)
-		if s.Config.Dev {
-			// instances start on their first request; start the dev mail trap now so its notice shows at startup
-			_, _ = mailer.DevTrap("Dev mode: instances without SMTP")
-		}
-	})
-	cancel() // ends long-lived requests such as realtime SSE
-	s.Manager.Shutdown()
-	return err
+	return h.Run(ctx)
 }
 
 // EventSink is implemented by instance sources that want instance events (e.g. to notify the owner).

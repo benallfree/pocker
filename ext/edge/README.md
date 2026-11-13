@@ -1,38 +1,22 @@
 # edge
 
-The front door of a server that runs PocketBase instances: the firewall, then dispatch. Each request is checked
-(allowed peers, client IP, rate limits), matched to an instance by hostname, and either forwarded to the edge that
-owns that instance or served by a local runtime.
+The fleet layer for a multi-instance host ([ext/host](../host/README.md)): requests for instances another edge owns
+are forwarded there over the private network. Works with either runtime provider.
 
-**Runs on:** any host of many instances: [pocker](../pocker/README.md) today; docker and standalone runtimes plug in
-the same way.
-
-> **Status.** Working: Go module `github.com/pockethost/pocketbase/ext/edge`. pocker builds on it and the `pocker`
-> command turns the firewall on.
+> **Status.** Working: Go module `github.com/pockethost/pocketbase/ext/edge`. The host core moved to ext/host and the
+> firewall to [ext/firewall](../firewall/README.md) (2026-11-13); ext/edge still re-exports the host names for one
+> release.
 
 ## Pieces
 
 | Piece | What it does |
 |---|---|
-| `Directory` | Instances by hostname and id, kept current from an `InstanceSource` (`instances.yaml`, or a control plane). |
-| `Firewall` | A `Gate`: `allow_cidrs`, `trusted_proxies` + `client_ip_headers`, per-IP and per-instance rate limits (`rate_limits:`, per instance `plugins.firewall`). |
-| `Handler` | Health path → peer check → hostname → blocked → **remote** (forward) or **local** (pick a `Runtime`) → admit → serve. |
-| `Runtime` | Where a local instance runs: `pocker` (in-process), `docker`, `standalone` (one CE process). An instance can name one (`runtime:`); otherwise the first that serves it. |
-| `Router` | Forwards a request for an instance another edge owns over the private network: holds and retries while that edge is healthy, fails fast once it is down, never bounces a forwarded request. |
-| Edge providers | Where the other edges are (`EdgeSource`). Built in: `YAMLProvider` (`edges.list`); combine several with `MultiProvider`. [ext/mothership](../mothership/README.md)'s mirror is one from a mothership; bring your own by implementing `EdgeSource`. |
-| `Serve` | Listeners: plain, TLS (a `TLSProvider` such as autotls, or a cert/key pair reloaded on change), HTTP → HTTPS redirect, graceful shutdown. |
+| `Router` | Forwards a request for an instance another edge owns: holds and retries while that edge is healthy, fails fast once it is down, never bounces a forwarded request, CORS at the entry edge. Plug `Router.Forward` into `host.Host.Forward`. |
+| Edge providers | Where the other edges are (`EdgeSource`). Built in: `YAMLProvider` (`edges.list`); combine several with `MultiProvider`. [ext/mothership](../mothership/README.md)'s mirror is one from a mothership. |
 
 ## Config
 
 ```yaml
-firewall:
-  allow_cidrs: []                 # peers allowed to connect (empty = everyone)
-  trusted_proxies: []             # peers whose client-IP headers are believed
-  client_ip_headers: [CF-Connecting-IP, True-Client-IP, X-Forwarded-For, X-Real-IP]
-  trusted_clients: []             # client IPs that get the trusted rate limits on every instance
-  rate_limit_header_prefix: X-RateLimit
-rate_limits: { ip_hourly: 1000 }  # defaults; per instance under plugins.firewall.rate_limits
-
 edges:
   self: lax-1
   list:                           # fixed entries (with a mothership too, they win for the same edge)

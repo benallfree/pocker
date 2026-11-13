@@ -1,9 +1,8 @@
-package edge
-
-// The edge firewall: an allowed-peers list, trusted proxies and client IPs, and per-IP and per-instance rate limits
-// (hourly budgets and concurrency caps, with higher limits for trusted clients). It is a [Gate]. Settings come from
-// the config file's `firewall:` and `rate_limits:` sections ([Firewall.Configure]) and, per instance,
-// `plugins.firewall` ([FirewallInstanceConfig]).
+// Package firewall is PBCE's request firewall for a multi-instance host (ext/host): an allowed-peers list, trusted
+// proxies and client IPs, and per-IP and per-instance rate limits (hourly budgets and concurrency caps, with higher
+// limits for trusted clients). It is a host [host.Gate]; settings come from the config's `firewall:` and
+// `rate_limits:` sections and, per instance, `plugins.firewall`. It works with or without ext/edge.
+package firewall
 
 import (
 	"fmt"
@@ -15,11 +14,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pockethost/pocketbase/ext/host"
+
 	"gopkg.in/yaml.v3"
 )
 
-// FirewallConfig is the process-wide part of the firewall (the config file `firewall:`). Rate limits are `rate_limits:` (the
-// defaults, see [RateLimits]) and, per instance, `plugins.firewall` (see [FirewallInstanceConfig]).
+// Config is the process-wide part of the firewall (the config file `firewall:`). Rate limits are `rate_limits:` (the
+// defaults, see [RateLimits]) and, per instance, `plugins.firewall` (see [InstanceConfig]).
 //
 //	firewall:
 //	  allow_cidrs: []                 # peers allowed to connect (empty = everyone)
@@ -27,7 +28,7 @@ import (
 //	  client_ip_headers: [CF-Connecting-IP, True-Client-IP, X-Forwarded-For, X-Real-IP]
 //	  trusted_clients: []             # client IPs that get the trusted rate limits on every instance
 //	  rate_limit_header_prefix: X-RateLimit
-type FirewallConfig struct {
+type Config struct {
 	AllowCIDRs            []string `yaml:"allow_cidrs"`
 	TrustedProxies        []string `yaml:"trusted_proxies"`
 	ClientIPHeaders       []string `yaml:"client_ip_headers"`
@@ -38,23 +39,23 @@ type FirewallConfig struct {
 // DefaultClientIPHeaders are read, in order, from trusted proxies.
 var DefaultClientIPHeaders = []string{"CF-Connecting-IP", "True-Client-IP", "X-Forwarded-For", "X-Real-IP"}
 
-// FirewallInstanceConfig is an instance's firewall settings (`plugins.firewall`): its own rate limits over the defaults,
+// InstanceConfig is an instance's firewall settings (`plugins.firewall`): its own rate limits over the defaults,
 // and client IPs/CIDRs that get the trusted limits on this instance (e.g. the owner's own list).
-type FirewallInstanceConfig struct {
+type InstanceConfig struct {
 	RateLimits *RateLimits `yaml:"rate_limits,omitempty"`
 	TrustedIPs []string    `yaml:"trusted_ips,omitempty"`
 }
 
 // Firewall checks the connecting peer, works out the client IP, and applies per-instance rate limits. It is a
-// [Gate]. The zero value allows every peer and applies [DefaultRateLimits] once configured.
+// [host.Gate]. The zero value allows every peer and applies [DefaultRateLimits] once configured.
 type Firewall struct {
 	// Config and RateLimits may be set before the server starts; the config file adds to them.
-	Config     FirewallConfig
+	Config     Config
 	RateLimits *RateLimits
 
 	// Adjust, if set, runs after the config file is read, e.g. for a host application that adds settings from its
 	// own environment.
-	Adjust func(cfg *FirewallConfig, defaults **RateLimits)
+	Adjust func(cfg *Config, defaults **RateLimits)
 
 	once     sync.Once
 	setupErr error
@@ -81,7 +82,7 @@ type hourlyBucket struct {
 const microPerRequest = 10
 
 // NewFirewall returns a ready firewall for cfg with the default rate limits, for direct use without a server.
-func NewFirewall(cfg FirewallConfig) (*Firewall, error) {
+func NewFirewall(cfg Config) (*Firewall, error) {
 	f := &Firewall{Config: cfg}
 	return f, f.setup()
 }
@@ -92,8 +93,8 @@ func (f *Firewall) Name() string { return "firewall" }
 // Configure reads `firewall:` and `rate_limits:` from the config file. List fields add to what was set before;
 // other fields fill in what wasn't. In dev mode, rate limiting is off unless rate_limits is set somewhere.
 func (f *Firewall) Configure(doc *yaml.Node, dev bool) error {
-	if n := TopLevel(doc, "firewall"); n != nil {
-		var c FirewallConfig
+	if n := host.TopLevel(doc, "firewall"); n != nil {
+		var c Config
 		if err := n.Decode(&c); err != nil {
 			return fmt.Errorf("firewall: %w", err)
 		}
@@ -107,7 +108,7 @@ func (f *Firewall) Configure(doc *yaml.Node, dev bool) error {
 			f.Config.RateLimitHeaderPrefix = c.RateLimitHeaderPrefix
 		}
 	}
-	if n := TopLevel(doc, "rate_limits"); n != nil && f.RateLimits == nil {
+	if n := host.TopLevel(doc, "rate_limits"); n != nil && f.RateLimits == nil {
 		var rl RateLimits
 		if err := n.Decode(&rl); err != nil {
 			return fmt.Errorf("rate_limits: %w", err)
@@ -205,19 +206,19 @@ func (f *Firewall) AllowPeer(r *http.Request) bool {
 	if f.setup() != nil {
 		return false
 	}
-	return len(f.allow) == 0 || containsAddr(f.allow, PeerAddr(r))
+	return len(f.allow) == 0 || containsAddr(f.allow, host.PeerAddr(r))
 }
 
 // Admit applies the instance's rate limits (its `plugins.firewall` over the defaults). Over a limit it answers 429
 // itself; otherwise the returned function frees the concurrency slots when the response ends.
-func (f *Firewall) Admit(w http.ResponseWriter, r *http.Request, inst Instance) (func(), bool) {
+func (f *Firewall) Admit(w http.ResponseWriter, r *http.Request, inst host.Instance) (func(), bool) {
 	if err := f.setup(); err != nil {
 		http.Error(w, "firewall misconfigured", http.StatusInternalServerError)
 		return nil, false
 	}
-	var ic FirewallInstanceConfig
-	if err := DecodePluginConfig(inst.PluginConfig("firewall"), &ic); err != nil {
-		ic = FirewallInstanceConfig{}
+	var ic InstanceConfig
+	if err := host.DecodePluginConfig(inst.PluginConfig("firewall"), &ic); err != nil {
+		ic = InstanceConfig{}
 	}
 	rl := RateLimits{}
 	if ic.RateLimits != nil {
@@ -231,7 +232,7 @@ func (f *Firewall) Admit(w http.ResponseWriter, r *http.Request, inst Instance) 
 // the peer itself.
 func (f *Firewall) ClientIP(r *http.Request) netip.Addr {
 	_ = f.setup()
-	peer := PeerAddr(r)
+	peer := host.PeerAddr(r)
 	if !containsAddr(f.proxies, peer) {
 		return peer
 	}
@@ -295,7 +296,7 @@ func (f *Firewall) rateCheck(w http.ResponseWriter, r *http.Request, instID stri
 	}
 	retryIn := func(b *hourlyBucket) int { return int(math.Ceil(time.Until(b.reset).Seconds())) }
 	who := func() string {
-		if peer := PeerAddr(r); peer != client {
+		if peer := host.PeerAddr(r); peer != client {
 			return fmt.Sprintf("IP %s (connecting IP %s)", client, peer)
 		}
 		return "IP " + client.String()
@@ -465,3 +466,11 @@ func (r RateLimits) merged(def RateLimits) RateLimits {
 	out.Trusted.InstanceConcurrent = max(out.Trusted.InstanceConcurrent, out.InstanceConcurrent)
 	return out
 }
+
+// Linking this package makes the firewall available to every host (ext/host): a host turns it on when its config has
+// a `firewall:` or `rate_limits:` section.
+func init() {
+	host.RegisterGate("firewall", []string{"firewall", "rate_limits"}, func() host.ConfigurableGate { return &Firewall{} })
+}
+
+var _ host.ConfigurableGate = (*Firewall)(nil)
