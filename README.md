@@ -29,19 +29,19 @@ you read it at http://127.0.0.1:8025 ([mailtrap](ext/mailtrap/README.md)).
 These are extensions to the PocketBase core that ship with every binary. They do not add runtime overhead if you
 choose not to use them.
 
-| Plugin | Description | Status |
-|---|---|---|
-| **[PITR](ext/pitr/README.md)** (Litestream) | Point-in-time restore of your database, from Settings → Backups or `pocketone pitr restore`. On by default; `--pitr=false` turns it off. | Stable |
-| **[Auto TLS](ext/autotls/README.md)** | On-demand certificates and wildcards through ACME. | Stable under Pocker; Beta on a single app (`--autotls`) |
-| **[Bulk Mail](ext/bulkmail/README.md)** | Campaigns to your app's own users, with audiences from a collection, a view or SQL. | Beta |
-| **[Pages](ext/pages/README.md)** (formerly PocketPages) | Server-rendered pages from a `pb_pages` folder. | Beta |
-| **[Vacuum](ext/vacuum/README.md)** | Scheduled SQLite VACUUM. | Planned |
-| **[MCP](ext/mcp/README.md)** | An MCP endpoint at `/mcp` so agents can manage your app and call its tools. | Beta |
-| **[OAuth Server](ext/oauth-server/README.md)** | Your app as an OAuth provider; `pocketone login` and MCP sign-in use it. | Beta |
-| **[S3 Redirect](ext/s3redirect/README.md)** | File downloads as short-lived signed S3 redirects. | Beta |
-| **[Tokens](ext/tokens/README.md)** | Long-lived API tokens (`pbt_…`) with scopes. | Beta |
-| **[Deploy](ext/deploy/README.md)** | `pocketone deploy \| dev \| pull \| logs` and the deploy API. | Beta |
-| **[Remotes](ext/remotes/README.md)** | Named remotes and saved logins for the `pocketone` command. | Beta |
+| Plugin | Description |
+|---|---|
+| **[PITR](ext/pitr/README.md)** (Litestream) | Point-in-time restore of your database, from Settings → Backups or `pocketone pitr restore`. On by default; `--pitr=false` turns it off. |
+| **[Auto TLS](ext/autotls/README.md)** | On-demand certificates and wildcards through ACME. |
+| **[Bulk Mail](ext/bulkmail/README.md)** | Campaigns to your app's own users, with audiences from a collection, a view or SQL. |
+| **[Pages](ext/pages/README.md)** (formerly PocketPages) | Server-rendered pages from a `pb_pages` folder. |
+| **[Vacuum](ext/vacuum/README.md)** | Scheduled SQLite VACUUM. |
+| **[MCP](ext/mcp/README.md)** | An MCP endpoint at `/mcp` so agents can manage your app and call its tools. |
+| **[OAuth Server](ext/oauth-server/README.md)** | Your app as an OAuth provider; `pocketone login` and MCP sign-in use it. |
+| **[S3 Redirect](ext/s3redirect/README.md)** | File downloads as short-lived signed S3 redirects. |
+| **[Tokens](ext/tokens/README.md)** | Long-lived API tokens (`pbt_…`) with scopes. |
+| **[Deploy](ext/deploy/README.md)** | `pocketone deploy \| dev \| pull \| logs` and the deploy API. |
+| **[Remotes](ext/remotes/README.md)** | Named remotes and saved logins for the `pocketone` command. |
 
 ## Community Plugins
 
@@ -50,38 +50,38 @@ own custom PocketBase experience.
 
 **Run many instances**
 
-| Plugin | Description | Status |
-|---|---|---|
-| **[Pocker](ext/pocker/README.md)** | Hundreds of PocketBase instances in one Go process, routed by hostname. | Stable |
-| **[Schedules](ext/schedules/README.md)** | Scheduled webhooks that wake sleeping instances (headed into Pocker). | Planned |
-| **[Mothership](ext/mothership/README.md)** | A control plane and its edges, across regions. Needs Pocker. | Planned |
-| **[Sandbox](ext/sandbox/README.md)** | Confines untrusted JS hooks, SQL and outbound network ([how is this safe?](ext/sandbox/README.md#how-is-this-safe)). Required for Multitenant. | Stable |
-| **[Host](ext/host/README.md)** | Many instances behind one listener, routed by hostname, run by one provider (Pocker or Docker). | Stable |
-| **[Firewall](ext/firewall/README.md)** | Peer allow-lists, trusted proxies and rate limits for a host. | Stable |
-| **[Edge](ext/edge/README.md)** | The fleet layer: forward to the edge that owns an instance. | Stable |
+| Plugin | Description |
+|---|---|
+| **[Pocker](ext/pocker/README.md)** | Hundreds of PocketBase instances in one Go process, routed by hostname. |
+| **[Schedules](ext/schedules/README.md)** | Scheduled webhooks that wake sleeping instances (headed into Pocker). |
+| **[Mothership](ext/mothership/README.md)** | A control plane and its edges, across regions. Needs Pocker. |
+| **[Sandbox](ext/sandbox/README.md)** | Confines untrusted JS hooks, SQL and outbound network ([how is this safe?](ext/sandbox/README.md#how-is-this-safe)). Required for Multitenant. |
+| **[Host](ext/host/README.md)** | Many instances behind one listener, routed by hostname, run by one provider (Pocker or Docker). |
+| **[Firewall](ext/firewall/README.md)** | Peer allow-lists, trusted proxies and rate limits for a host. |
+| **[Edge](ext/edge/README.md)** | The fleet layer: forward to the edge that owns an instance. |
 
 **Services for your instances**
 
-| Plugin | Description | Status |
-|---|---|---|
-| **[Mail Relay](ext/mailrelay/README.md)** | Outgoing mail for instances without SMTP, sent as `<instance>@<your domain>` through your relay, with limits. | Alpha |
-| **[S3 Fallback](ext/storage/README.md)** | A default bucket for uploads and backups when an instance hasn't set its own S3. | Alpha |
-| **[Server Timing](ext/servertiming/README.md)** | `Server-Timing` headers for each step of a request. | Stable |
+| Plugin | Description |
+|---|---|
+| **[Mail Relay](ext/mailrelay/README.md)** | Outgoing mail for instances without SMTP, sent as `<instance>@<your domain>` through your relay, with limits. |
+| **[S3 Fallback](ext/storage/README.md)** | A default bucket for uploads and backups when an instance hasn't set its own S3. |
+| **[Server Timing](ext/servertiming/README.md)** | `Server-Timing` headers for each step of a request. |
 
 **Sell it as a service**
 
-| Plugin | Description | Status |
-|---|---|---|
-| **[Multitenant](ext/tenants/README.md)** | Accounts that own instances: quotas, owner logins, tokens, and the API for your own dashboard. | Planned |
-| **[Multitenant Billing](ext/tenant-billing/README.md)** | Plans, quotas and the billing provider hook for Multitenant. | Planned |
-| **[Multitenant Billing LemonSqueezy Adapter](ext/tenant-billing-ls/README.md)** | Lemon Squeezy as the billing provider. | Planned |
+| Plugin | Description |
+|---|---|
+| **[Multitenant](ext/tenants/README.md)** | Accounts that own instances: quotas, owner logins, tokens, and the API for your own dashboard. |
+| **[Multitenant Billing](ext/tenant-billing/README.md)** | Plans, quotas and the billing provider hook for Multitenant. |
+| **[Multitenant Billing LemonSqueezy Adapter](ext/tenant-billing-ls/README.md)** | Lemon Squeezy as the billing provider. |
 
 **For plugin authors**
 
-| Plugin | Description | Status |
-|---|---|---|
-| **[Mail Trap](ext/mailtrap/README.md)** | Dev mode: an app without SMTP sends to a built-in inbox at http://127.0.0.1:8025 instead of `sendmail`. | Beta |
-| **[Dev Users](ext/devusers/devusers.go)** | Local testing only: a superuser and a user with password `password`. Every plugin's `example/` uses it. | Stable |
+| Plugin | Description |
+|---|---|
+| **[Mail Trap](ext/mailtrap/README.md)** | Dev mode: an app without SMTP sends to a built-in inbox at http://127.0.0.1:8025 instead of `sendmail`. |
+| **[Dev Users](ext/devusers/devusers.go)** | Local testing only: a superuser and a user with password `password`. Every plugin's `example/` uses it. |
 
 **Stable** runs in PocketHost production · **Beta** complete and tested, not yet in production · **Alpha** working
 code, still changing · **Planned** a plan and a README so far.
@@ -96,6 +96,8 @@ every level: on a single app and on every instance under pocker. Keep changes to
 MIT, like PocketBase.
 
 ---
+
+<!-- Do not modify beyond this point -->
 
 <p align="center">
     <a href="https://pocketbase.io" target="_blank" rel="noopener">
@@ -137,7 +139,7 @@ You could also check the recommendations in https://pocketbase.io/docs/how-to-us
 You could download the prebuilt executable for your platform from the [Releases page](https://ganigeorgiev.com/pocketbase/pocketbase/releases).
 Once downloaded, extract the archive and run `./pocketbase serve` in the extracted directory.
 
-The prebuilt executables are built from [`examples/ce`](examples/ce/main.go): PocketBase's `examples/base` plus the CE plugins that ship by default. They come with the JS VM plugin enabled, which lets you extend PocketBase with JavaScript (_see [Extend with JavaScript](https://pocketbase.io/docs/js-overview/)_), and with the [Core Extensions](#core-extensions) above.
+The prebuilt executables are based on the [`examples/base/main.go` file](https://ganigeorgiev.com/pocketbase/pocketbase/files/examples/base/main.go) and comes with the JS VM plugin enabled by default which allows to extend PocketBase with JavaScript (_for more details please refer to [Extend with JavaScript](https://pocketbase.io/docs/js-overview/)_).
 
 ### Use as a Go framework/toolkit
 
@@ -187,14 +189,14 @@ _For more details please refer to [Extend with Go](https://pocketbase.io/docs/go
 
 ### Building and running the repo main.go example
 
-To build the standalone executable, like the prebuilt ones in the releases page, run `go build` inside the `examples/ce` directory (`examples/base` builds plain PocketBase without the CE plugins):
+To build the minimal standalone executable, like the prebuilt ones in the releases page, you can simply run `go build` inside the `examples/base` directory:
 
 0. [Install Go 1.27+](https://go.dev/doc/install) (_if you haven't already_)
 1. Clone/download the repo
-2. Navigate to `examples/ce`
-3. Run `CGO_ENABLED=0 go build -o pocketbase` to build a binary for your current environment
-   _(or to target other platforms use `GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o pocketbase`; see https://go.dev/doc/install/source#environment)_
-4. Start the created executable by running `./pocketbase serve`.
+2. Navigate to `examples/base`
+3. Run `CGO_ENABLED=0 go build` to build a binary for your current environment
+   _(or to target other platforms use `GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build`; see https://go.dev/doc/install/source#environment)_
+4. Start the created executable by running `./base serve`.
 
 Note that the supported build targets by the pure Go SQLite driver at the moment are:
 
