@@ -1,7 +1,7 @@
 # PocketOne
 
 PocketOne is PocketBase plus plugins. **PocketBase's own code ("core") changes only for hooks that let `ext/`
-extend or override behavior; the features themselves live in `ext/`.** Core is every path outside what CE owns:
+extend or override behavior; the features themselves live in `ext/`.** Core is every path outside what PocketOne owns:
 `ext/`, `examples/ce/`, `docs/`, `README.md`, `CLAUDE.md`, `.github/`, `.claude/`. Each core change is marked
 `// CE:` so upstream merges stay easy.
 
@@ -13,7 +13,7 @@ context from the change's session, or a human), and must record the result in a 
 
 1. Get the core diff: `.github/core-audit/core-diff.sh origin/main HEAD` (or `<sha>^ <sha>` for one commit).
 2. Give the reviewer only that diff, this section, and the commit message. For each changed hunk it answers:
-   - **Necessary:** could this live in `ext/` instead, using hooks core already has (upstream's own, or CE's existing
+   - **Necessary:** could this live in `ext/` instead, using hooks core already has (upstream's own, or PocketOne's existing
      seams such as `OnFilesystemCreate`, `jsvm.Config.Extensions`, `BaseAppConfig.AppMigrations`/`OnLog`)?
    - **Minimal:** is it the smallest seam that works, with no feature logic, policy or plugin-specific names in core?
    - **Sensible:** marked `// CE:`, documented on the hook, upstream behavior unchanged when nothing uses it, tested?
@@ -27,7 +27,7 @@ Core-Audit: upstream-merge v0.x.y
 ```
 
 `upstream-merge` is only for merging a PocketBase release; resolve conflicts in the `// CE:` spots and audit any
-CE change the merge forced.
+PocketOne change the merge forced.
 
 ## Core changes that aren't hooks
 

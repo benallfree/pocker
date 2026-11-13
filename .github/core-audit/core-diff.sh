@@ -4,7 +4,7 @@
 #   .github/core-audit/core-diff.sh <base> <head>     # e.g. origin/main HEAD, or <sha>^ <sha>
 #   .github/core-audit/core-diff.sh --files <base> <head>
 #
-# CE-owned (not core): ext/, examples/ce/, docs/, README.md, CLAUDE.md, .github/, .claude/.
+# PocketOne-owned (not core): ext/, examples/ce/, docs/, README.md, CLAUDE.md, .github/, .claude/.
 # Everything else is PocketBase's own code and needs a core audit (see CLAUDE.md).
 set -euo pipefail
 files_only=0
