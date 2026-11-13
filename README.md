@@ -16,10 +16,10 @@ That's [Homebrew](https://brew.sh) on macOS or Linux (the formula lives in
 [Releases](https://github.com/pockethost/pocketone/releases). Then:
 
 ```bash
-pocketbase serve
+pocketone serve
 ```
 
-Start a site from a starter kit with `pocketbase pages create myapp` ([pages](ext/pages/README.md)).
+Start a site from a starter kit with `pocketone pages create myapp` ([pages](ext/pages/README.md)).
 
 In dev mode (`serve --dev`), an app without SMTP doesn't use the host's `sendmail`: its mail is caught in-process and
 you read it at http://127.0.0.1:8025 ([mailtrap](ext/mailtrap/README.md)).
@@ -31,16 +31,16 @@ choose not to use them.
 
 | Plugin | Description | Status |
 |---|---|---|
-| **[PITR](ext/pitr/README.md)** (Litestream) | Point-in-time restore of your database, from Settings → Backups or `pocketbase pitr restore`. On by default; `--pitr=false` turns it off. | Stable |
+| **[PITR](ext/pitr/README.md)** (Litestream) | Point-in-time restore of your database, from Settings → Backups or `pocketone pitr restore`. On by default; `--pitr=false` turns it off. | Stable |
 | **[Auto TLS](ext/autotls/README.md)** | On-demand certificates and wildcards through ACME. | Stable under Pocker; Beta on a single app (`--autotls`) |
 | **[Bulk Mail](ext/bulkmail/README.md)** | Campaigns to your app's own users, with audiences from a collection, a view or SQL. | Beta |
 | **[Pages](ext/pages/README.md)** (formerly PocketPages) | Server-rendered pages from a `pb_pages` folder. | Beta |
 | **[Vacuum](ext/vacuum/README.md)** | Scheduled SQLite VACUUM. | Planned |
 | **[MCP](ext/mcp/README.md)** | An MCP endpoint at `/mcp` so agents can manage your app and call its tools. | Beta |
-| **[OAuth Server](ext/oauth-server/README.md)** | Your app as an OAuth provider; `pocketbase login` and MCP sign-in use it. | Beta |
+| **[OAuth Server](ext/oauth-server/README.md)** | Your app as an OAuth provider; `pocketone login` and MCP sign-in use it. | Beta |
 | **[S3 Redirect](ext/s3redirect/README.md)** | File downloads as short-lived signed S3 redirects. | Beta |
 | **[Tokens](ext/tokens/README.md)** | Long-lived API tokens (`pbt_…`) with scopes. | Beta |
-| **[Deploy](ext/deploy/README.md)** | `pocketbase deploy \| dev \| pull \| logs` and the deploy API. | Beta |
+| **[Deploy](ext/deploy/README.md)** | `pocketone deploy \| dev \| pull \| logs` and the deploy API. | Beta |
 | **[Remotes](ext/remotes/README.md)** | Named remotes and saved logins for the `pocketone` command. | Beta |
 
 ## Community Plugins
