@@ -14,6 +14,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pockethost/pocketone/ext/ceplugin"
+
 	"github.com/pockethost/pocketone/ext/host"
 
 	"gopkg.in/yaml.v3"
@@ -93,11 +95,27 @@ func (f *Firewall) Name() string { return "firewall" }
 // Configure reads `firewall:` and `rate_limits:` from the config file. List fields add to what was set before;
 // other fields fill in what wasn't. In dev mode, rate limiting is off unless rate_limits is set somewhere.
 func (f *Firewall) Configure(doc *yaml.Node, dev bool) error {
-	if n := host.TopLevel(doc, "firewall"); n != nil {
-		var c Config
+	var c Config
+	n := host.TopLevel(doc, "firewall")
+	if n != nil {
 		if err := n.Decode(&c); err != nil {
 			return fmt.Errorf("firewall: %w", err)
 		}
+	}
+	var rl RateLimits
+	m := host.TopLevel(doc, "rate_limits")
+	if m != nil {
+		if err := m.Decode(&rl); err != nil {
+			return fmt.Errorf("rate_limits: %w", err)
+		}
+	}
+	return f.apply(c, n != nil, rl, m != nil, dev)
+}
+
+// apply adds the config file's sections to what was set before (lists add, other fields fill in), runs Adjust and
+// builds the firewall.
+func (f *Firewall) apply(c Config, haveConfig bool, rl RateLimits, haveLimits bool, dev bool) error {
+	if haveConfig {
 		f.Config.AllowCIDRs = append(c.AllowCIDRs, f.Config.AllowCIDRs...)
 		f.Config.TrustedProxies = append(c.TrustedProxies, f.Config.TrustedProxies...)
 		f.Config.TrustedClients = append(c.TrustedClients, f.Config.TrustedClients...)
@@ -108,11 +126,7 @@ func (f *Firewall) Configure(doc *yaml.Node, dev bool) error {
 			f.Config.RateLimitHeaderPrefix = c.RateLimitHeaderPrefix
 		}
 	}
-	if n := host.TopLevel(doc, "rate_limits"); n != nil && f.RateLimits == nil {
-		var rl RateLimits
-		if err := n.Decode(&rl); err != nil {
-			return fmt.Errorf("rate_limits: %w", err)
-		}
+	if haveLimits && f.RateLimits == nil {
 		f.RateLimits = &rl
 	}
 	if f.Adjust != nil {
@@ -467,10 +481,39 @@ func (r RateLimits) merged(def RateLimits) RateLimits {
 	return out
 }
 
-// Linking this package makes the firewall available to every host (ext/host): a host turns it on when its config has
-// a `firewall:` or `rate_limits:` section.
+// Section and RateLimitsSection are the firewall's pocketbase.yaml sections (ext/config).
+var (
+	Section           = ceplugin.NewSection("firewall", Config{}, "Peers allowed to connect, trusted proxies and client-IP headers, trusted clients, the rate-limit header prefix. Turns the firewall on.")
+	RateLimitsSection = ceplugin.NewSection("rate_limits", RateLimits{}, "Default rate limits for every instance (per instance: plugins.firewall.rate_limits). Turns the firewall on.")
+)
+
+// SectionAdjust, if set, runs on a firewall built from config sections, like [Firewall.Adjust] (e.g. a host
+// application adding settings of its own).
+var SectionAdjust func(cfg *Config, defaults **RateLimits)
+
+// FromSections builds a firewall from the `firewall` and `rate_limits` sections; enabled is false when neither is in
+// the config file.
+func FromSections(dev bool) (fw *Firewall, enabled bool, err error) {
+	c, haveConfig := Section.Get()
+	rl, haveLimits := RateLimitsSection.Get()
+	if !haveConfig && !haveLimits {
+		return nil, false, nil
+	}
+	fw = &Firewall{Adjust: SectionAdjust}
+	return fw, true, fw.apply(c, haveConfig, rl, haveLimits, dev)
+}
+
+// Linking this package makes the firewall available to every host (ext/host): it turns on when the config has a
+// `firewall` or `rate_limits` section (pocketbase.yaml through ext/config, or a pocker.yaml document).
 func init() {
 	host.RegisterGate("firewall", []string{"firewall", "rate_limits"}, func() host.ConfigurableGate { return &Firewall{} })
+	host.RegisterSectionGate(host.SectionGate{Name: "firewall", New: func(dev bool) (host.Gate, bool, error) {
+		fw, enabled, err := FromSections(dev)
+		if fw == nil {
+			return nil, enabled, err
+		}
+		return fw, enabled, err
+	}})
 }
 
 var _ host.ConfigurableGate = (*Firewall)(nil)

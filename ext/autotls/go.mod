@@ -40,6 +40,7 @@ require (
 	github.com/mholt/acmez/v3 v3.1.7 // indirect
 	github.com/miekg/dns v1.1.73 // indirect
 	github.com/ncruces/go-strftime v1.1.0 // indirect
+	github.com/pockethost/pocketone/ext/config v0.0.0-00010101000000-000000000000 // indirect
 	github.com/pockethost/pocketone/ext/host v0.0.0-00010101000000-000000000000 // indirect
 	github.com/pockethost/pocketone/ext/jserrors v0.0.0-00010101000000-000000000000 // indirect
 	github.com/pockethost/pocketone/ext/sandbox v0.0.0-00010101000000-000000000000 // indirect
@@ -76,3 +77,5 @@ replace github.com/pockethost/pocketone/ext/host => ../host
 replace github.com/pockethost/pocketone/ext/ceplugin => ../ceplugin
 
 replace github.com/pockethost/pocketone/ext/jserrors => ../jserrors
+
+replace github.com/pockethost/pocketone/ext/config => ../config

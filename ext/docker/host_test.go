@@ -39,7 +39,7 @@ instances:
     version: "pb:0.23.*"
   - id: cehostce
     hosts: [ce.test]
-    version: "ce:0.0.*"
+    version: "p1:0.0.*"
   - id: cehostoff
     hosts: [off.test]
     version: "pb:0.23.*"

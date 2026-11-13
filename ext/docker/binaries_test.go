@@ -14,11 +14,15 @@ import (
 	"testing"
 )
 
-func fakeRelease(t *testing.T, content string) ([]byte, string) {
+func fakeRelease(t *testing.T, content string, binary ...string) ([]byte, string) {
 	t.Helper()
 	var buf bytes.Buffer
 	zw := zip.NewWriter(&buf)
-	w, _ := zw.Create("pocketbase")
+	name := "pocketbase"
+	if len(binary) > 0 {
+		name = binary[0]
+	}
+	w, _ := zw.Create(name)
 	_, _ = w.Write([]byte(content))
 	_, _ = zw.Create("CHANGELOG.md")
 	_ = zw.Close()
@@ -28,14 +32,14 @@ func fakeRelease(t *testing.T, content string) ([]byte, string) {
 
 func TestBinaries(t *testing.T) {
 	zipPB, sumPB := fakeRelease(t, "pb 0.30.2")
-	zipCE, sumCE := fakeRelease(t, "ce 0.0.2")
+	zipCE, sumCE := fakeRelease(t, "ce 0.0.2", "pocketone")
 	hits := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hits++
 		switch r.URL.Path {
 		case "/pb/v0.30.2/pocketbase_0.30.2_linux_amd64.zip":
 			_, _ = w.Write(zipPB)
-		case "/ce/v0.0.2/pocketbase_0.0.2_linux_amd64.zip":
+		case "/p1/v0.0.2/pocketone_0.0.2_linux_amd64.zip":
 			_, _ = w.Write(zipCE)
 		default:
 			http.NotFound(w, r)
@@ -56,27 +60,27 @@ func TestBinaries(t *testing.T) {
 	cache("0.22.21/linux_amd64/pocketbase", "cached 0.22.21")
 
 	b := &Binaries{Root: root, Platform: "linux_amd64", Manifest: &Manifest{
-		Hosts: map[string]string{"gh": srv.URL + "/pb/v{version}/{file}", "pbce": srv.URL + "/ce/v{version}/{file}"},
+		Hosts: map[string]string{"gh": srv.URL + "/pb/v{version}/{file}", "pocketone": srv.URL + "/p1/v{version}/{file}"},
 		Versions: map[string]ManifestEntry{
 			"0.30.2": {Host: "gh", SHA256: map[string]string{"linux_amd64": sumPB}},
 			"0.30.1": {Host: "gh", SHA256: map[string]string{"linux_amd64": "00"}},
 			"0.31.0": {Host: "gh", SHA256: map[string]string{"linux_arm64": "00"}}, // no amd64 build
 			"0.22.5": {Host: "gh", SHA256: map[string]string{"linux_amd64": "00"}}, // sunset
 		},
-		CE: map[string]ManifestEntry{
-			"0.0.2": {Host: "pbce", Base: "0.41.1", SHA256: map[string]string{"linux_amd64": sumCE}},
-			"0.0.1": {Host: "pbce", Base: "0.41.1", SHA256: map[string]string{"linux_amd64": "00"}},
+		PocketOne: map[string]ManifestEntry{
+			"0.0.2": {Host: "pocketone", Base: "0.41.1", SHA256: map[string]string{"linux_amd64": sumCE}},
+			"0.0.1": {Host: "pocketone", Base: "0.41.1", SHA256: map[string]string{"linux_amd64": "00"}},
 		},
 	}}
 	if got := strings.Join(b.Versions(LinePB), ","); got != "0.30.2,0.30.1,0.24.0" {
 		t.Fatalf("pb versions (0.22 excluded): %v", got)
 	}
-	if got := strings.Join(b.Versions(LineCE), ","); got != "0.0.2,0.0.1" {
+	if got := strings.Join(b.Versions(LineP1), ","); got != "0.0.2,0.0.1" {
 		t.Fatalf("ce versions: %v", got)
 	}
 	for want, exp := range map[string]string{
 		"0.30.*": "pb:0.30.2", "pb:0.30.*": "pb:0.30.2", "~0.30.1": "pb:0.30.2", "pb:^0.24": "pb:0.24.0", "v0.24.0": "pb:0.24.0",
-		"ce:0.0.*": "ce:0.0.2", "ce:0.0.1": "ce:0.0.1", "ce:~0.0.1": "ce:0.0.2",
+		"p1:0.0.*": "p1:0.0.2", "p1:0.0.1": "p1:0.0.1", "p1:~0.0.1": "p1:0.0.2",
 	} {
 		line, v, err := b.Match(want)
 		if err != nil || line+":"+v != exp {
@@ -104,14 +108,14 @@ func TestBinaries(t *testing.T) {
 	if got, _ := os.ReadFile(path); err != nil || string(got) != "pb 0.30.2" || path != filepath.Join(root, "0.30.2", "linux_amd64", "pocketbase") {
 		t.Fatalf("pb download at %s: %q %v", path, got, err)
 	}
-	_, _, path, err = b.Resolve(ctx, "ce:0.0.*")
-	if got, _ := os.ReadFile(path); err != nil || string(got) != "ce 0.0.2" || path != filepath.Join(root, "ce", "0.0.2", "linux_amd64", "pocketbase") {
-		t.Fatalf("ce download at %s: %q %v", path, got, err)
+	_, _, path, err = b.Resolve(ctx, "p1:0.0.*")
+	if got, _ := os.ReadFile(path); err != nil || string(got) != "ce 0.0.2" || path != filepath.Join(root, "p1", "0.0.2", "linux_amd64", "pocketone") {
+		t.Fatalf("p1 download at %s: %q %v", path, got, err)
 	}
 	if fi, _ := os.Stat(path); fi.Mode()&0o111 == 0 {
 		t.Fatal("not executable")
 	}
-	if _, _, _, err := b.Resolve(ctx, "ce:0.0.2"); err != nil || hits != 2 {
+	if _, _, _, err := b.Resolve(ctx, "p1:0.0.2"); err != nil || hits != 2 {
 		t.Fatalf("second resolve downloaded again (hits %d, %v)", hits, err)
 	}
 	// a bad download (404 or checksum) is refused and nothing is cached

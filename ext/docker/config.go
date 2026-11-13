@@ -1,22 +1,25 @@
 package docker
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
 
+	"github.com/pockethost/pocketone/ext/ceplugin"
 	"github.com/pockethost/pocketone/ext/host"
-	"gopkg.in/yaml.v3"
 )
 
-// FileConfig is a config file's `docker:` section.
+// SectionConfig is the `docker` section (pocketbase.yaml, ext/config): settings for running each instance in its
+// own container. Listeners, instances and the firewall are the host's sections.
 //
 //	docker:
 //	  image: alpine:3.20                    # base image the binaries run in
-//	  binaries: /var/lib/pocketbase         # binary cache (<binaries>/<version>/linux_amd64/pocketbase; PocketOne under ce/)
+//	  binaries: /var/lib/pocketbase         # cache: <binaries>/<version>/linux_amd64/pocketbase; PocketOne under p1/
 //	  manifest: /etc/pocketbase/versions.json  # releases it may download (optional)
-//	  data_root: /var/lib/instances         # default: pb_root
-//	  default_version: "pb:0.36.*"          # for instances without one (pb: upstream, ce: PocketOne)
+//	  root: /var/lib/instances              # one folder per instance: <root>/<id>
+//	  default_version: "p1:0.0.*"           # for instances without one (pb: upstream, p1: PocketOne)
 //	  idle_ttl: 10m
 //	  max_concurrent_starts: 4
 //	  memory: 512MiB
@@ -25,12 +28,12 @@ import (
 //	  cap_drop: [ALL]
 //	  no_new_privileges: true
 //	  adopt_image: ""                       # also adopt unlabeled containers of this image (migrations)
-type FileConfig struct {
+type SectionConfig struct {
 	Socket              string        `yaml:"socket"`
 	Image               string        `yaml:"image"`
 	Binaries            string        `yaml:"binaries"`
 	Manifest            string        `yaml:"manifest"`
-	DataRoot            string        `yaml:"data_root"`
+	Root                string        `yaml:"root"`
 	Home                string        `yaml:"home"`
 	DefaultVersion      string        `yaml:"default_version"`
 	IdleTTL             time.Duration `yaml:"idle_ttl"`
@@ -46,38 +49,70 @@ type FileConfig struct {
 	AdoptImage          string        `yaml:"adopt_image"`
 }
 
-// FromConfig returns the Config for a config document's `docker:` section (ok false when it has none). pbRoot is
-// the default data root.
-func FromConfig(doc *yaml.Node, pbRoot string, log *slog.Logger) (cfg Config, ok bool, err error) {
-	n := host.TopLevel(doc, "docker")
-	if n == nil {
-		return Config{}, false, nil
+// Section is the key of the `docker` section.
+var Section = ceplugin.NewSectionFunc("docker", func() SectionConfig { return SectionConfig{} },
+	"Runtime provider docker: each instance in its own container with the PocketBase (pb:) or PocketOne (p1:) binary of its version (image, binary cache and manifest, instance root, default version, idle stop, limits).")
+
+// ConfigFromSection builds a Config from a `docker` section. resolve makes relative paths absolute (nil = as is).
+func ConfigFromSection(sc SectionConfig, resolve func(string) string, log *slog.Logger) (Config, error) {
+	if resolve == nil {
+		resolve = func(s string) string { return s }
 	}
-	var fc FileConfig
-	if err := n.Decode(&fc); err != nil {
-		return Config{}, false, fmt.Errorf("docker: %w", err)
+	if sc.Image == "" || sc.Binaries == "" || sc.Root == "" {
+		return Config{}, errors.New("docker: image, binaries and root are required")
 	}
-	if fc.Image == "" || fc.Binaries == "" {
-		return Config{}, false, fmt.Errorf("docker: image and binaries are required")
-	}
-	b := &Binaries{Root: fc.Binaries}
-	if fc.Manifest != "" {
-		if b.Manifest, err = LoadManifest(fc.Manifest); err != nil {
-			return Config{}, false, fmt.Errorf("docker: %w", err)
+	b := &Binaries{Root: resolve(sc.Binaries)}
+	if sc.Manifest != "" {
+		m, err := LoadManifest(resolve(sc.Manifest))
+		if err != nil {
+			return Config{}, fmt.Errorf("docker: %w", err)
 		}
+		b.Manifest = m
 	}
-	if fc.DataRoot == "" {
-		fc.DataRoot = pbRoot
-	}
-	cfg = Config{
-		Socket: fc.Socket, Image: fc.Image, DataRoot: fc.DataRoot, Home: fc.Home, Binaries: b,
-		DefaultVersion: fc.DefaultVersion, IdleTTL: fc.IdleTTL, MaxConcurrentStarts: fc.MaxConcurrentStarts,
-		StartTimeout: fc.StartTimeout, Memory: int64(fc.Memory), NanoCPUs: fc.NanoCPUs, PidsLimit: fc.PidsLimit,
-		CapDrop: fc.CapDrop, NoNewPrivileges: fc.NoNewPrivileges, Network: fc.Network, AdoptImage: fc.AdoptImage,
+	cfg := Config{
+		Socket: sc.Socket, Image: sc.Image, DataRoot: resolve(sc.Root), Home: sc.Home, Binaries: b,
+		DefaultVersion: sc.DefaultVersion, IdleTTL: sc.IdleTTL, MaxConcurrentStarts: sc.MaxConcurrentStarts,
+		StartTimeout: sc.StartTimeout, Memory: int64(sc.Memory), NanoCPUs: sc.NanoCPUs, PidsLimit: sc.PidsLimit,
+		CapDrop: sc.CapDrop, NoNewPrivileges: sc.NoNewPrivileges, Network: sc.Network, AdoptImage: sc.AdoptImage,
 		Logger: log,
 	}
-	if len(fc.Nofile) > 0 {
-		cfg.NofileSoft, cfg.NofileHard = fc.Nofile[0], fc.Nofile[len(fc.Nofile)-1]
+	if len(sc.Nofile) > 0 {
+		cfg.NofileSoft, cfg.NofileHard = sc.Nofile[0], sc.Nofile[len(sc.Nofile)-1]
 	}
-	return cfg, true, nil
+	return cfg, nil
+}
+
+// Provider is docker as a runtime provider for ext/host (`provider: docker`). Its fields are the host
+// application's extensions.
+type Provider struct {
+	// Container adds host-specific mounts, environment and labels to each container (see [Config.Prepare]).
+	Container func(ctx context.Context, inst host.Instance, version string, spec *Spec) error
+	// Version, if set, rewrites an instance's version before the binary is picked (e.g. a host's rule for which
+	// release line its instances run).
+	Version func(inst host.Instance) string
+	// OnLog receives container output (see [Config.OnLog]).
+	OnLog func(instanceID string, stderr bool, line string)
+	// Resolve makes relative paths in the section absolute (e.g. ext/config's Config.ResolvePath).
+	Resolve func(string) string
+}
+
+var _ host.Provider = (*Provider)(nil)
+
+// Name implements host.Provider.
+func (p *Provider) Name() string { return "docker" }
+
+// Prepare implements host.Provider: it reads the `docker` section and makes h run each instance in a container.
+func (p *Provider) Prepare(h *host.Host) error {
+	sc, _ := Section.Get()
+	cfg, err := ConfigFromSection(sc, p.Resolve, h.Logger)
+	if err != nil {
+		return err
+	}
+	cfg.Prepare, cfg.OnLog, cfg.Version = p.Container, p.OnLog, p.Version
+	rt, err := New(cfg)
+	if err != nil {
+		return err
+	}
+	h.Runtime = rt
+	return nil
 }

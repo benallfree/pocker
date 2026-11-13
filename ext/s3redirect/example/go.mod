@@ -65,3 +65,5 @@ replace github.com/pockethost/pocketone/ext/host => ../../host
 replace github.com/pockethost/pocketone/ext/ceplugin => ../../ceplugin
 
 replace github.com/pockethost/pocketone/ext/jserrors => ../../jserrors
+
+replace github.com/pockethost/pocketone/ext/config => ../../config

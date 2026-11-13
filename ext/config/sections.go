@@ -6,17 +6,31 @@ import (
 	"github.com/pockethost/pocketone/ext/ceplugin"
 )
 
-// ServerConfig is the `server` section: how the binary listens. In single-app mode these are the serve command's
-// --http, --https and --origins defaults (flags still win).
+// ServerConfig is the `server` section: how the binary listens.
+//
+// Single-app mode: http, https and origins are the serve command's --http, --https and --origins defaults (flags
+// still win). Multi-instance mode (a provider): https is the main address (TLS from tls or a TLS plugin), http then
+// redirects plain HTTP to HTTPS (http alone serves plain HTTP), plain lists extra plain-HTTP addresses with no
+// redirect (e.g. a private network other edges forward on), and shutdown_timeout bounds in-flight requests at stop.
 //
 //	server:
-//	  http: 127.0.0.1:8090
-//	  https: ""
-//	  origins: ["*"]
+//	  https: ":443"
+//	  http: ":80"
+//	  plain: [":8080"]
+//	  tls: { cert: /etc/certs/cert.pem, key: /etc/certs/key.pem }
 type ServerConfig struct {
-	HTTP    string   `yaml:"http"`
-	HTTPS   string   `yaml:"https"`
-	Origins []string `yaml:"origins"`
+	HTTP            string        `yaml:"http"`
+	HTTPS           string        `yaml:"https"`
+	Origins         []string      `yaml:"origins"`
+	Plain           []string      `yaml:"plain"`
+	TLS             ServerTLS     `yaml:"tls"`
+	ShutdownTimeout time.Duration `yaml:"shutdown_timeout"`
+}
+
+// ServerTLS is a certificate pair, reloaded when the files change.
+type ServerTLS struct {
+	Cert string `yaml:"cert"`
+	Key  string `yaml:"key"`
 }
 
 // AppConfig is the `app` section: the one app of single-app mode (the root flags as config; flags still win). It

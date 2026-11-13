@@ -2,7 +2,7 @@
  "hosts": {
   "gani": "https://ganigeorgiev.com/meta/pocketbase/pocketbase/download/v{version}/{file}",
   "github": "https://github.com/pocketbase/pocketbase/releases/download/v{version}/{file}",
-  "pbce": "https://github.com/pockethost/pocketbase/releases/download/v{version}/{file}"
+  "pocketone": "https://github.com/pockethost/pocketone/releases/download/v{version}/{file}"
  },
  "versions": {
   "0.23.12": {
@@ -20,13 +20,13 @@
    }
   }
  },
- "ce": {
+ "pocketone": {
   "0.0.1": {
-   "host": "pbce",
+   "host": "pocketone",
    "base": "0.41.1",
    "sha256": {
-    "linux_amd64": "6569aeee2d84bd4114122bffafddce2fcadea2c844eb8417fff3ec7b4304df91",
-    "linux_arm64": "6bc5bc423e292f3c705a1c3bd564c76cfbc1d094f04d0ab2638f40b7a818cf5a"
+    "linux_amd64": "0392fd2cc98930b7e58a7aceba68aa6b8c557549c35af06c37fc44516a54b422",
+    "linux_arm64": "2a92d288e74db19109a2383142fa47c35824382f83297448629181b628090d04"
    }
   }
  }

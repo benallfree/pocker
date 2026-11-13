@@ -34,6 +34,9 @@ instances don't see it. In single-app mode, `app.env_allow` lists the `.env` nam
 config file). No file = stock behavior. Relative paths in the file are relative to the file's folder. Flags win over
 the file.
 
+`server` serves both modes: single app (`http`, `https`, `origins` = the serve flags) and many instances under a
+provider (`https` main, `http` redirect, `plain` extra addresses, `tls` cert files, `shutdown_timeout`).
+
 ```yaml
 server:
   http: 127.0.0.1:8090

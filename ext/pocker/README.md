@@ -12,6 +12,13 @@ register on it.
 > plugins of their own ([autotls](../autotls/README.md), [servertiming](../servertiming/README.md)); the `pocker`
 > command bundles them.
 
+## As a runtime provider
+
+`provider: pocker` in pocketbase.yaml: `pocker.Provider` reads the `pocker` section (`root`, `memory_limit`,
+`egress_allow`, `hooks_pool_size`, instance limit defaults) and runs every instance of an [ext/host](../host/README.md)
+in-process. Instance versions are ignored: every instance runs the PocketOne code in the binary. Plugins configured
+from a pocker.yaml document don't read pocketbase.yaml sections yet (they run with their defaults there).
+
 ## Untrusted instances
 
 Pocker runs every instance's JS hooks in the [sandbox](../sandbox/README.md). For why that's safe enough to host code

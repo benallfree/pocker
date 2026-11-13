@@ -13,11 +13,11 @@ PocketBase (or PocketOne) binary of the version it asks for, so one host serves 
 ## How it runs an instance
 
 - **Binary:** two release lines, picked by a prefix in the instance's `version`: `pb:` = upstream PocketBase
-  (0.23 and newer; 0.22 and older are sunset and refused), `ce:` = PocketOne releases (their own version numbers);
-  no prefix = `pb:`. Exact versions (`pb:0.36.9`) or ranges (`pb:0.36.*`, `ce:~0.0.1`, `^0.30`); the newest match
+  (0.23 and newer; 0.22 and older are sunset and refused), `p1:` = PocketOne releases (their own version numbers);
+  no prefix = `pb:`. Exact versions (`pb:0.36.9`) or ranges (`pb:0.36.*`, `p1:~0.0.1`, `^0.30`); the newest match
   wins. The cache is laid out as `<binaries>/<version>/<platform>/pocketbase` for upstream (PocketHost's existing
-  layout) and `<binaries>/ce/<version>/<platform>/pocketbase` for PocketOne; missing releases are downloaded from a
-  manifest (`versions.json`: hosts, `versions` for upstream, `ce` for PocketOne with each release's upstream base, sha256
+  layout) and `<binaries>/p1/<version>/<platform>/pocketone` for PocketOne; missing releases are downloaded from a
+  manifest (`versions.json`: hosts, `versions` for upstream, `pocketone` for PocketOne with each release's upstream base, sha256
   per platform) and checked.
 - **Container:** the instance folder at `/home/pockethost`, the binary read-only at `/home/pockethost/pocketbase`,
   `./pocketbase serve --http 0.0.0.0:8090` (plus `--dev`, and `--encryptionEnv=PB_ENCRYPTION_KEY` when the instance
@@ -32,7 +32,9 @@ PocketBase (or PocketOne) binary of the version it asks for, so one host serves 
 - **Limits and hardening** (optional): memory, CPUs, pids, nofile, dropped capabilities, no-new-privileges.
 - **Logs:** container output goes to `OnLog` (default: the edge's debug log).
 
-A host that runs docker sends every instance to it (one provider per process).
+A host that runs docker sends every instance to it (one provider per process): `provider: docker` with a `docker`
+section in pocketbase.yaml (`docker.Provider`; its `Container` hook adds host mounts/env, `Version` rewrites an
+instance's version before the binary is picked).
 
 ```yaml
 docker:

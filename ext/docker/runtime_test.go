@@ -85,7 +85,7 @@ func TestRuntime(t *testing.T) {
 
 	// instance a (upstream 0.23): a hook that reads env, as customers' hooks do; b runs a PocketOne release
 	a := host.Instance{ID: "cedockera", Version: "pb:0.23.*", Secrets: map[string]string{"FOO": "bar"}}
-	b := host.Instance{ID: "cedockerb", Version: "ce:0.0.*"}
+	b := host.Instance{ID: "cedockerb", Version: "p1:0.0.*"}
 	if err := os.MkdirAll(filepath.Join(data, a.ID, "pb_hooks"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -126,7 +126,7 @@ func TestRuntime(t *testing.T) {
 	for _, s := range list {
 		versions[s.Labels[LabelInstance]] = s.Labels[LabelVersion]
 	}
-	if versions["cedockera"] != "pb:0.23.12" || versions["cedockerb"] != "ce:0.0.1" {
+	if versions["cedockera"] != "pb:0.23.12" || versions["cedockerb"] != "p1:0.0.1" {
 		t.Fatalf("labels: %v", versions)
 	}
 	if _, err := os.Stat(filepath.Join(data, a.ID, "pb_data", "data.db")); err != nil {

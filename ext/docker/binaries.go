@@ -22,17 +22,17 @@ import (
 )
 
 // Manifest lists the releases an edge may download: where each is hosted and the sha256 of its zips. Two release
-// lines: "versions" are upstream PocketBase (PocketHost's versions.json is a valid manifest as is), "ce" are PocketOne
+// lines: "versions" are upstream PocketBase (PocketHost's versions.json is a valid manifest as is), "pocketone" are PocketOne
 // releases, which have their own version numbers and note the upstream version they are based on.
 //
 //	{"hosts": {"github": "https://github.com/pocketbase/pocketbase/releases/download/v{version}/{file}",
-//	           "pbce": "https://github.com/pockethost/pocketbase/releases/download/v{version}/{file}"},
+//	           "pocketone": "https://github.com/pockethost/pocketone/releases/download/v{version}/{file}"},
 //	 "versions": {"0.36.9": {"host": "github", "sha256": {"linux_amd64": "…", "linux_arm64": "…"}}},
-//	 "ce": {"0.0.1": {"host": "pbce", "base": "0.41.1", "sha256": {"linux_amd64": "…"}}}}
+//	 "pocketone": {"0.0.1": {"host": "pocketone", "base": "0.41.1", "sha256": {"linux_amd64": "…"}}}}
 type Manifest struct {
 	Hosts    map[string]string        `json:"hosts"`
 	Versions map[string]ManifestEntry `json:"versions"`
-	CE       map[string]ManifestEntry `json:"ce"`
+	PocketOne map[string]ManifestEntry `json:"pocketone"`
 }
 
 // ManifestEntry is one release in a [Manifest].
@@ -42,25 +42,25 @@ type ManifestEntry struct {
 	SHA256 map[string]string `json:"sha256"`         // by platform, e.g. "linux_amd64"
 }
 
-// Release lines, the prefix of an instance's version: "pb:0.36.*" (upstream PocketBase) or "ce:0.0.*" (PocketOne).
+// Release lines, the prefix of an instance's version: "pb:0.36.*" (upstream PocketBase) or "p1:0.0.*" (PocketOne).
 // A version without a prefix is upstream.
 const (
 	LinePB = "pb"
-	LineCE = "ce"
+	LineP1 = "p1"
 )
 
 // MinUpstream is the oldest upstream PocketBase version served: 0.22 and older are sunset.
 const MinUpstream = "0.23.0"
 
-// ParseVersion splits "ce:0.0.*" into its line and version (range); no prefix = upstream.
+// ParseVersion splits "p1:0.0.*" into its line and version (range); no prefix = upstream.
 func ParseVersion(v string) (line, want string, err error) {
 	v = strings.TrimSpace(v)
 	line, want = LinePB, v
 	if i := strings.Index(v, ":"); i >= 0 {
 		line, want = v[:i], v[i+1:]
 	}
-	if line != LinePB && line != LineCE {
-		return "", "", fmt.Errorf("pocketbase version %q: unknown release line %q (use pb: or ce:)", v, line)
+	if line != LinePB && line != LineP1 {
+		return "", "", fmt.Errorf("pocketbase version %q: unknown release line %q (use pb: or p1:)", v, line)
 	}
 	return line, strings.TrimPrefix(strings.TrimSpace(want), "v"), nil
 }
@@ -101,8 +101,8 @@ func (b *Binaries) platform() string {
 // Path is where a release's binary lives in the cache (whether or not it is there): upstream at
 // <Root>/<version>/<platform>/pocketbase (PocketHost's existing layout), PocketOne at <Root>/ce/<version>/<platform>/….
 func (b *Binaries) Path(line, version string) string {
-	if line == LineCE {
-		return filepath.Join(b.Root, "ce", version, b.platform(), "pocketbase")
+	if line == LineP1 {
+		return filepath.Join(b.Root, "p1", version, b.platform(), "pocketone")
 	}
 	return filepath.Join(b.Root, version, b.platform(), "pocketbase")
 }
@@ -111,8 +111,8 @@ func (b *Binaries) entries(line string) map[string]ManifestEntry {
 	if b.Manifest == nil {
 		return nil
 	}
-	if line == LineCE {
-		return b.Manifest.CE
+	if line == LineP1 {
+		return b.Manifest.PocketOne
 	}
 	return b.Manifest.Versions
 }
@@ -132,8 +132,8 @@ func (b *Binaries) Versions(line string) []string {
 		list = append(list, sv)
 	}
 	dir := b.Root
-	if line == LineCE {
-		dir = filepath.Join(b.Root, "ce")
+	if line == LineP1 {
+		dir = filepath.Join(b.Root, "p1")
 	}
 	if entries, err := os.ReadDir(dir); err == nil {
 		for _, e := range entries {
@@ -157,7 +157,7 @@ func (b *Binaries) Versions(line string) []string {
 	return out
 }
 
-// Match returns the line and newest available version satisfying want: "pb:0.36.*", "ce:0.0.1", or an upstream
+// Match returns the line and newest available version satisfying want: "pb:0.36.*", "p1:0.0.1", or an upstream
 // version without a prefix; exact versions and ranges ("0.36.*", "~0.36", "^0.30", ">=0.30 <0.40") both work.
 func (b *Binaries) Match(want string) (line, version string, err error) {
 	line, rng, err := ParseVersion(want)
@@ -228,7 +228,11 @@ func (b *Binaries) download(ctx context.Context, line, version string) error {
 	if sum == "" || tmpl == "" {
 		return fmt.Errorf("pocketbase %s has no %s build (or no host) in the manifest", version, b.platform())
 	}
-	file := fmt.Sprintf("pocketbase_%s_%s.zip", version, b.platform())
+	name := "pocketbase" // the release's binary, and its zip's prefix: pocketbase_<v>_<platform>.zip / pocketone_…
+	if line == LineP1 {
+		name = "pocketone"
+	}
+	file := fmt.Sprintf("%s_%s_%s.zip", name, version, b.platform())
 	u := strings.NewReplacer("{version}", version, "{file}", file).Replace(tmpl)
 
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
@@ -262,7 +266,7 @@ func (b *Binaries) download(ctx context.Context, line, version string) error {
 		return fmt.Errorf("pocketbase %s: %w", version, err)
 	}
 	for _, f := range zr.File {
-		if f.Name != "pocketbase" {
+		if f.Name != name {
 			continue
 		}
 		rc, err := f.Open()
@@ -289,5 +293,5 @@ func (b *Binaries) download(ctx context.Context, line, version string) error {
 		}
 		return os.Rename(tmp.Name(), path)
 	}
-	return fmt.Errorf("pocketbase %s: no pocketbase binary in %s", version, file)
+	return fmt.Errorf("pocketbase %s: no %s binary in %s", version, name, file)
 }

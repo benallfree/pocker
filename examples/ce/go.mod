@@ -10,12 +10,17 @@ require (
 	github.com/pockethost/pocketone/ext/ceplugin v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketone/ext/config v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketone/ext/deploy v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/docker v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/edge v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/firewall v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/host v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketone/ext/jserrors v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketone/ext/mailtrap v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketone/ext/mcp v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketone/ext/oauth-server v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketone/ext/pages v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketone/ext/pitr v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/pocker v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketone/ext/remotes v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketone/ext/s3redirect v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketone/ext/tokens v0.0.0-00010101000000-000000000000
@@ -25,6 +30,7 @@ require (
 	ganigeorgiev.com/fexpr v0.7.0 // indirect
 	ganigeorgiev.com/pocketbase/dbx v1.13.0 // indirect
 	ganigeorgiev.com/pocketbase/ozzo-validation/v4 v4.4.1 // indirect
+	github.com/Masterminds/semver/v3 v3.5.0 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/benbjohnson/litestream v0.5.18 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
@@ -63,8 +69,6 @@ require (
 	github.com/miekg/dns v1.1.73 // indirect
 	github.com/ncruces/go-strftime v1.1.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.23 // indirect
-	github.com/pockethost/pocketone/ext/host v0.0.0-00010101000000-000000000000 // indirect
-	github.com/pockethost/pocketone/ext/pocker v0.0.0-00010101000000-000000000000 // indirect
 	github.com/pockethost/pocketone/ext/sandbox v0.0.0-00010101000000-000000000000 // indirect
 	github.com/prometheus/client_golang v1.17.0 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
@@ -138,3 +142,7 @@ replace github.com/pockethost/pocketone/ext/mailtrap => ../../ext/mailtrap
 replace github.com/pockethost/pocketone/ext/ceplugin => ../../ext/ceplugin
 
 replace github.com/pockethost/pocketone/ext/jserrors => ../../ext/jserrors
+
+replace github.com/pockethost/pocketone/ext/docker => ../../ext/docker
+
+replace github.com/pockethost/pocketone/ext/firewall => ../../ext/firewall

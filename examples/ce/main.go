@@ -45,8 +45,14 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if p, _ := config.Provider.Get(); p != "" {
-		log.Fatalf("provider %q: %v (it serves a single app; omit provider:)", p, config.ErrNoProvider)
+	if p, _ := config.Provider.Get(); p != "" && firstArg(os.Args[1:]) == "serve" {
+		// a provider in pocketbase.yaml: serve many instances (pocker or docker) instead of a single app
+		if handled, err := serveMany(cfg); handled {
+			if err != nil {
+				log.Fatal(err)
+			}
+			return
+		}
 	}
 	appCfg, _ := config.App.Get()
 	if err := cfg.AllowEnv(appCfg.EnvAllow); err != nil { // only the .env names the app may read
@@ -311,6 +317,21 @@ func main() {
 	if err := app.Execute(); err != nil {
 		log.Fatal(err)
 	}
+}
+
+// firstArg is the first argument that isn't a flag (the command name), or "".
+func firstArg(args []string) string {
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		switch {
+		case a == "--config" || a == "--env-file":
+			i++ // its value
+		case len(a) > 0 && a[0] == '-':
+		default:
+			return a
+		}
+	}
+	return ""
 }
 
 func or(v *bool, def bool) bool {

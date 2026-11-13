@@ -69,6 +69,35 @@ func (s *Server) Run(ctx context.Context) error {
 	if err != nil {
 		return err // fail fast, e.g. missing instances file in production
 	}
+	h := &host.Host{
+		Source: source, First: first, Forward: s.Forward, Dev: s.Config.Dev, Logger: log,
+		Listeners: host.Listeners{Listen: s.Config.Listen, PlainListen: s.Config.PlainListen, TLS: s.Config.TLS, ShutdownTimeout: s.Config.ShutdownTimeout},
+	}
+	fws := host.ConfiguredGates(s.Config.Doc())
+	if s.Firewall != nil {
+		fws = []host.ConfigurableGate{s.Firewall}
+	}
+	for _, fw := range fws {
+		if err := fw.Configure(s.Config.Doc(), s.Config.Dev); err != nil {
+			return err
+		}
+		h.Gates = append(h.Gates, fw)
+	}
+	if err := s.prepare(h); err != nil {
+		return err
+	}
+	return h.Run(ctx)
+}
+
+// prepare makes h run its instances in-process: plugins, the egress policy, the Manager as h's runtime, wrappers,
+// background work (plugin starters, the memory watch). h's Source, Gates, Forward, Dev, Listeners and Logger are
+// already set; plugin gates are added after h's.
+func (s *Server) prepare(h *host.Host) error {
+	log := h.Logger
+	if log == nil {
+		log = slog.Default()
+		h.Logger = log
+	}
 	var allow []netip.Prefix
 	for _, c := range s.Config.EgressAllow {
 		pfx, err := netip.ParsePrefix(c)
@@ -87,23 +116,12 @@ func (s *Server) Run(ctx context.Context) error {
 		pool = *s.Config.HooksPoolSize
 	}
 	var (
-		gates     []Gate
 		tlsProv   TLSProvider
 		wrappers  []Wrapper
 		starters  []Starter
 		initers   []AppIniter
 		jsIniters []JSIniter
 	)
-	fws := host.ConfiguredGates(s.Config.Doc())
-	if s.Firewall != nil {
-		fws = []host.ConfigurableGate{s.Firewall}
-	}
-	for _, fw := range fws {
-		if err := fw.Configure(s.Config.Doc(), s.Config.Dev); err != nil {
-			return err
-		}
-		gates = append(gates, fw)
-	}
 	for _, p := range s.Plugins {
 		if c, ok := p.(Configurer); ok {
 			if err := c.Configure(s.Config.Doc(), s.Config); err != nil {
@@ -113,16 +131,16 @@ func (s *Server) Run(ctx context.Context) error {
 		if cp, ok := p.(ceplugin.Plugin); ok {
 			// a PocketOne plugin: register it on every instance, with that instance's settings
 			if _, own := p.(AppIniter); !own {
-				h, err := hostCEPlugin(cp, s.Config.Doc())
+				hp, err := hostCEPlugin(cp, s.Config.Doc())
 				if err != nil {
 					return fmt.Errorf("plugin %s: %w", p.Name(), err)
 				}
-				initers = append(initers, h)
-				jsIniters = append(jsIniters, h)
+				initers = append(initers, hp)
+				jsIniters = append(jsIniters, hp)
 			}
 		}
 		if g, ok := p.(Gate); ok {
-			gates = append(gates, g)
+			h.Gates = append(h.Gates, g)
 		}
 		if t, ok := p.(TLSProvider); ok {
 			if tlsProv != nil {
@@ -143,23 +161,29 @@ func (s *Server) Run(ctx context.Context) error {
 			jsIniters = append(jsIniters, js)
 		}
 	}
-	dir := host.NewDirectory(log)
-	s.Manager = NewManager(source, ManagerOptions{
+	if h.Directory == nil {
+		h.Directory = host.NewDirectory(log)
+	}
+	s.Manager = NewManager(h.Source, ManagerOptions{
 		PBRoot:        s.Config.PBRoot,
 		Dev:           s.Config.Dev,
 		HooksPoolSize: pool,
 		Logger:        log,
 		Defaults:      s.Config.Limits,
-		Gate:          host.ChainGates(gates...),
-		OnEvent:       s.onEvent(source, log),
+		Gate:          host.ChainGates(h.Gates...),
+		OnEvent:       s.onEvent(h.Source, log),
 		Init:          chainIniters(initers),
 		InitJS:        chainJSIniters(jsIniters),
 		Setup:         s.SetupApp,
-		Forward:       s.Forward,
-		Directory:     dir,
+		Forward:       h.Forward,
+		Directory:     h.Directory,
 	})
 	if s.OnStart != nil {
 		s.OnStart(s.Manager)
+	}
+	h.Runtime = s.Manager
+	if tlsProv != nil {
+		h.TLS = tlsProv
 	}
 
 	var wrap []func(http.Handler) http.Handler // outermost first: plugin wrappers, then the host application's
@@ -169,9 +193,10 @@ func (s *Server) Run(ctx context.Context) error {
 	if s.Wrap != nil {
 		wrap = append(wrap, s.Wrap)
 	}
-	background := append([]func(context.Context){}, s.Background...)
+	h.Wrappers = append(wrap, h.Wrappers...)
+	h.Background = append(h.Background, s.Background...)
 	for _, st := range starters {
-		background = append(background, func(ctx context.Context) { st.Start(ctx, s.Manager) })
+		h.Background = append(h.Background, func(ctx context.Context) { st.Start(ctx, s.Manager) })
 	}
 	if s.Config.MemoryLimit > 0 {
 		debug.SetMemoryLimit(s.Config.MemoryLimit)
@@ -185,19 +210,12 @@ func (s *Server) Run(ctx context.Context) error {
 	}
 	if soft > 0 {
 		watch := &sandbox.MemoryWatch{SoftLimit: uint64(soft), OnStrike: s.Manager.Strike, Logger: log}
-		background = append(background, func(ctx context.Context) { watch.Run(ctx) })
+		h.Background = append(h.Background, func(ctx context.Context) { watch.Run(ctx) })
 	}
-
-	h := &host.Host{
-		Source: source, Runtime: s.Manager, Directory: dir, First: first,
-		Gates: gates, Wrappers: wrap, TLS: tlsProv, Forward: s.Forward, Dev: s.Config.Dev,
-		Listeners:  host.Listeners{Listen: s.Config.Listen, PlainListen: s.Config.PlainListen, TLS: s.Config.TLS, ShutdownTimeout: s.Config.ShutdownTimeout},
-		Background: background, Logger: log,
-		OnListen: func(addr string) {
-			log.Info("pocker: listening", "addr", addr, "pb_root", s.Config.PBRoot, "dev", s.Config.Dev)
-		},
+	h.OnListen = func(addr string) {
+		log.Info("pocker: listening", "addr", addr, "pb_root", s.Config.PBRoot, "dev", s.Config.Dev)
 	}
-	return h.Run(ctx)
+	return nil
 }
 
 // EventSink is implemented by instance sources that want instance events (e.g. to notify the owner).
