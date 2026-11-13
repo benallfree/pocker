@@ -4,9 +4,9 @@ import (
 	"context"
 	"path/filepath"
 
-	"ganigeorgiev.com/pocketbase/pocketbase/ceplugin"
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/hook"
+	"github.com/pockethost/pocketbase/ext/ceplugin"
 )
 
 // AppStorageDirName is the folder in pb_data where a single app keeps its certificates, unless Config.Storage

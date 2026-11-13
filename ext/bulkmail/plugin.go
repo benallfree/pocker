@@ -1,9 +1,9 @@
 package bulkmail
 
 import (
-	"ganigeorgiev.com/pocketbase/pocketbase/ceplugin"
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"github.com/dop251/goja"
+	"github.com/pockethost/pocketbase/ext/ceplugin"
 )
 
 // Plugin is bulk mail as a PocketBase CE plugin ([ceplugin.Plugin]): the same value works on a single app and on

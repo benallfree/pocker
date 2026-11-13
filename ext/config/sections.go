@@ -3,7 +3,7 @@ package config
 import (
 	"time"
 
-	"ganigeorgiev.com/pocketbase/pocketbase/ceplugin"
+	"github.com/pockethost/pocketbase/ext/ceplugin"
 )
 
 // ServerConfig is the `server` section: how the binary listens. In single-app mode these are the serve command's

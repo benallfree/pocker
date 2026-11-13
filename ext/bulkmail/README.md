@@ -4,7 +4,7 @@ Bulk mail: campaigns to an app's own users with one-click unsubscribe, bounce an
 
 **Runs on:** every level. It's in the standard `pocketbase` binary, and the same plugin value runs on every
 instance under [pocker](../pocker/README.md) (so the mothership and multitenant levels get it too). It follows the
-PocketBase CE plugin contract ([`ceplugin`](../../ceplugin/ceplugin.go)).
+PocketBase CE plugin contract ([`ceplugin`](../ceplugin/ceplugin.go)).
 
 ## Use it
 

@@ -1,9 +1,9 @@
 package ceplugin
 
-// CE: typed config sections. A plugin owns one top-level section of the config file (pocketbase.yaml, read by
+// Typed config sections. A plugin owns one top-level section of the config file (pocketbase.yaml, read by
 // ext/config) and exports its key; reading a section requires that key, so a plugin can only read the sections it
-// was built against (it imports their owners). There is no lookup by name and no access to the raw file. Core only
-// defines the keys; a config loader (ext/config) decodes them.
+// was built against (it imports their owners). There is no lookup by name and no access to the raw file. This
+// package only defines the keys; a config loader (ext/config) decodes them.
 
 import (
 	"fmt"

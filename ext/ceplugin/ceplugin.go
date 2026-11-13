@@ -1,4 +1,4 @@
-// CE: Package ceplugin is PocketBase CE's plugin contract: one plugin value that works on a single app and,
+// Package ceplugin is PocketBase CE's plugin contract: one plugin value that works on a single app and,
 // unchanged, on every instance under pocker (ext/pocker hosts any [Plugin] in Server.Plugins).
 //
 // A plugin implements Name and Register, and optionally [JSBinder]:

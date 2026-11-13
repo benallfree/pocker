@@ -3,9 +3,9 @@ package pocker
 import (
 	"fmt"
 
-	"ganigeorgiev.com/pocketbase/pocketbase/ceplugin"
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"github.com/dop251/goja"
+	"github.com/pockethost/pocketbase/ext/ceplugin"
 	"gopkg.in/yaml.v3"
 )
 

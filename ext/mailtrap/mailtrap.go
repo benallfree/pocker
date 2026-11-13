@@ -14,9 +14,9 @@
 package mailtrap
 
 import (
-	"ganigeorgiev.com/pocketbase/pocketbase/ceplugin"
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/hook"
+	"github.com/pockethost/pocketbase/ext/ceplugin"
 )
 
 // Name is the plugin's name (ceplugin / pocker config key).

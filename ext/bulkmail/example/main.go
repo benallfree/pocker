@@ -13,10 +13,10 @@ import (
 	"log"
 
 	"ganigeorgiev.com/pocketbase/pocketbase"
-	"ganigeorgiev.com/pocketbase/pocketbase/ceplugin"
 	"ganigeorgiev.com/pocketbase/pocketbase/plugins/jsvm"
 	"github.com/dop251/goja"
 	"github.com/pockethost/pocketbase/ext/bulkmail"
+	"github.com/pockethost/pocketbase/ext/ceplugin"
 	"github.com/pockethost/pocketbase/ext/devusers"
 )
 

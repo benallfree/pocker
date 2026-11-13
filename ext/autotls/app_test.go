@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"ganigeorgiev.com/pocketbase/pocketbase/ceplugin"
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"ganigeorgiev.com/pocketbase/pocketbase/tests"
+	"github.com/pockethost/pocketbase/ext/ceplugin"
 	"golang.org/x/crypto/acme/autocert"
 )
 

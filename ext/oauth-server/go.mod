@@ -35,6 +35,7 @@ require (
 	github.com/mattn/go-colorable v0.1.16 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/ncruces/go-strftime v1.1.0 // indirect
+	github.com/pockethost/pocketbase/ext/ceplugin v0.0.0-00010101000000-000000000000 // indirect
 	github.com/pockethost/pocketbase/ext/host v0.0.0-00010101000000-000000000000 // indirect
 	github.com/pockethost/pocketbase/ext/pocker v0.0.0-00010101000000-000000000000 // indirect
 	github.com/pockethost/pocketbase/ext/sandbox v0.0.0-00010101000000-000000000000 // indirect
@@ -74,3 +75,5 @@ replace github.com/pockethost/pocketbase/ext/pages => ../pages
 replace github.com/pockethost/pocketbase/ext/edge => ../edge
 
 replace github.com/pockethost/pocketbase/ext/host => ../host
+
+replace github.com/pockethost/pocketbase/ext/ceplugin => ../ceplugin

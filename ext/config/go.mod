@@ -3,7 +3,7 @@ module github.com/pockethost/pocketbase/ext/config
 go 1.27
 
 require (
-	ganigeorgiev.com/pocketbase/pocketbase v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketbase/ext/ceplugin v0.0.0-00010101000000-000000000000
 	github.com/spf13/cobra v1.10.2
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -12,6 +12,7 @@ require (
 	ganigeorgiev.com/fexpr v0.7.0 // indirect
 	ganigeorgiev.com/pocketbase/dbx v1.13.0 // indirect
 	ganigeorgiev.com/pocketbase/ozzo-validation/v4 v4.4.1 // indirect
+	ganigeorgiev.com/pocketbase/pocketbase v0.0.0-00010101000000-000000000000 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/disintegration/imaging v1.6.2 // indirect
 	github.com/dlclark/regexp2/v2 v2.9.1 // indirect
@@ -46,3 +47,5 @@ require (
 )
 
 replace ganigeorgiev.com/pocketbase/pocketbase => ../..
+
+replace github.com/pockethost/pocketbase/ext/ceplugin => ../ceplugin

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"ganigeorgiev.com/pocketbase/pocketbase/ceplugin"
+	"github.com/pockethost/pocketbase/ext/ceplugin"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )

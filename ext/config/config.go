@@ -18,7 +18,7 @@ import (
 	"sort"
 	"strings"
 
-	"ganigeorgiev.com/pocketbase/pocketbase/ceplugin"
+	"github.com/pockethost/pocketbase/ext/ceplugin"
 	"gopkg.in/yaml.v3"
 )
 

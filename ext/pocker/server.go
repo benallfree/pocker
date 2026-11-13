@@ -12,8 +12,8 @@ import (
 	"github.com/pockethost/pocketbase/ext/host"
 	"github.com/pockethost/pocketbase/ext/sandbox"
 
-	"ganigeorgiev.com/pocketbase/pocketbase/ceplugin"
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
+	"github.com/pockethost/pocketbase/ext/ceplugin"
 )
 
 // Server wires a [Config], an [InstanceSource] and a [Manager] into one HTTP server.

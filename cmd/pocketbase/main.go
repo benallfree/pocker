@@ -14,7 +14,6 @@ import (
 
 	"ganigeorgiev.com/pocketbase/pocketbase"
 	"ganigeorgiev.com/pocketbase/pocketbase/apis"
-	"ganigeorgiev.com/pocketbase/pocketbase/ceplugin"
 	"ganigeorgiev.com/pocketbase/pocketbase/cmd"
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"ganigeorgiev.com/pocketbase/pocketbase/plugins/ghupdate"
@@ -25,6 +24,7 @@ import (
 	"github.com/dop251/goja"
 	"github.com/pockethost/pocketbase/ext/autotls"
 	"github.com/pockethost/pocketbase/ext/bulkmail"
+	"github.com/pockethost/pocketbase/ext/ceplugin"
 	"github.com/pockethost/pocketbase/ext/config"
 	"github.com/pockethost/pocketbase/ext/deploy"
 	"github.com/pockethost/pocketbase/ext/mailtrap"

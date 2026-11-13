@@ -6,6 +6,7 @@ require (
 	ganigeorgiev.com/pocketbase/pocketbase v0.0.0-00010101000000-000000000000
 	github.com/domodwyer/mailyak/v3 v3.6.2
 	github.com/gabriel-vasile/mimetype v1.4.15
+	github.com/pockethost/pocketbase/ext/ceplugin v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketbase/ext/devusers v0.0.0-00010101000000-000000000000
 )
 
@@ -48,3 +49,5 @@ require (
 replace ganigeorgiev.com/pocketbase/pocketbase => ../..
 
 replace github.com/pockethost/pocketbase/ext/devusers => ../devusers
+
+replace github.com/pockethost/pocketbase/ext/ceplugin => ../ceplugin

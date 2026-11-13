@@ -10,7 +10,7 @@ It can also run process-wide jobs and middleware.
 
 ## The plugin contract: `ceplugin`
 
-Write a plugin once, against [`ceplugin`](../ceplugin/ceplugin.go) in core, and the same value runs on a single app
+Write a plugin once, against [`ceplugin`](../ext/ceplugin/ceplugin.go) (its own module, `github.com/pockethost/pocketbase/ext/ceplugin`; core has no part in it), and the same value runs on a single app
 and on every instance under pocker:
 
 ```go
