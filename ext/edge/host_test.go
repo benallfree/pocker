@@ -58,7 +58,10 @@ func TestHostEdgesFromYAML(t *testing.T) {
 		req, _ := http.NewRequest(http.MethodGet, "http://"+addr+"/x", nil)
 		req.Host = "away.test"
 		if res, err = client.Do(req); err == nil {
-			break
+			if res.StatusCode != http.StatusServiceUnavailable {
+				break
+			}
+			res.Body.Close() // the host answers 503 "starting" until the instance list has loaded
 		}
 	}
 	if err != nil {
