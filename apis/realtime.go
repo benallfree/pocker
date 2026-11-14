@@ -883,7 +883,8 @@ func realtimeCanAccessRecord(
 		From(record.Collection().Name).
 		AndWhere(dbx.HashExp{record.Collection().Name + ".id": record.Id})
 
-	resolver := core.NewRecordFieldResolver(app, record.Collection(), requestInfo, false)
+	// superusers may filter on hidden fields and superuser-only collections, as in the list API
+	resolver := core.NewRecordFieldResolver(app, record.Collection(), requestInfo, requestInfo.HasSuperuserAuth())
 	expr, err := search.FilterData(filter).BuildExpr(resolver)
 	if err != nil {
 		return false
