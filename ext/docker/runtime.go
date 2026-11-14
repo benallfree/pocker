@@ -339,8 +339,8 @@ func (rt *Runtime) folder(inst host.Instance) string {
 	return filepath.Join(rt.cfg.DataRoot, inst.ID)
 }
 
-// watchScripts makes sure the instance's pb_hooks exists and watches it; a change restarts the container.
-// (pb_migrations isn't watched: stock binaries write a migration there on every dashboard schema change.)
+// watchScripts makes sure the instance's pb_hooks exists and watches it; a change restarts the container (PocketBase's
+// HooksWatch, done from the host). Migrations aren't watched: they run when the container boots.
 func (rt *Runtime) watchScripts(id, dir string) {
 	hooks := filepath.Join(dir, "pb_hooks")
 	_ = os.MkdirAll(hooks, 0o755)

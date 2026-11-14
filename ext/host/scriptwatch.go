@@ -15,10 +15,10 @@ import (
 // scriptDebounce groups the burst of events one save or upload makes into a single restart.
 const scriptDebounce = 200 * time.Millisecond
 
-// ScriptWatcher watches the script folders (pb_hooks, pb_migrations) of every running instance with one inotify
-// instance (PocketBase's own HooksWatch opens one per app, and Linux allows only 128 per user by default) and calls
-// restart for just the instance whose scripts changed. Runtime providers (pocker, docker) use it so a deploy or an
-// edit takes effect without restarting anything else. A nil *ScriptWatcher does nothing.
+// ScriptWatcher is PocketBase's HooksWatch for many instances: it watches the pb_hooks folder of every running
+// instance with one inotify instance (PocketBase's own watcher opens one per app, and Linux allows only 128 per user
+// by default) and calls restart for just the instance whose hooks changed. Runtime providers (pocker, docker) use it.
+// Migrations aren't watched: like PocketBase, they run when an instance boots. A nil *ScriptWatcher does nothing.
 type ScriptWatcher struct {
 	w       *fsnotify.Watcher
 	log     *slog.Logger
@@ -34,7 +34,7 @@ type ScriptWatcher struct {
 func NewScriptWatcher(log *slog.Logger, restart func(id string)) *ScriptWatcher {
 	w, err := fsnotify.NewWatcher()
 	if err != nil {
-		log.Warn("host: script changes won't restart instances", "error", err)
+		log.Warn("host: pb_hooks changes won't restart instances", "error", err)
 		return nil
 	}
 	h := &ScriptWatcher{w: w, log: log, restart: restart, dirs: map[string]string{}, byID: map[string][]string{}, timers: map[string]*time.Timer{}}
@@ -42,8 +42,8 @@ func NewScriptWatcher(log *slog.Logger, restart func(id string)) *ScriptWatcher 
 	return h
 }
 
-// Add watches one of id's script folders and its subfolders (not hidden ones or node_modules, like PocketBase's
-// watcher); call it once per folder (pb_hooks, pb_migrations). A folder that doesn't exist is skipped.
+// Add watches id's pb_hooks folder and its subfolders (not hidden ones or node_modules, like PocketBase's watcher). A
+// folder that doesn't exist is skipped.
 func (h *ScriptWatcher) Add(id, hooksDir string) {
 	if h == nil {
 		return
@@ -69,7 +69,7 @@ func (h *ScriptWatcher) addDir(id, dir string) {
 		return
 	}
 	if err := h.w.Add(dir); err != nil {
-		h.log.Warn("host: can't watch scripts", "id", id, "dir", dir, "error", err)
+		h.log.Warn("host: can't watch pb_hooks", "id", id, "dir", dir, "error", err)
 		return
 	}
 	h.dirs[dir] = id
@@ -113,7 +113,7 @@ func (h *ScriptWatcher) run() {
 			if !ok {
 				return
 			}
-			h.log.Warn("host: script watch error", "error", err)
+			h.log.Warn("host: pb_hooks watch error", "error", err)
 		}
 	}
 }

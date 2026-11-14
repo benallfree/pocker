@@ -41,7 +41,7 @@ type Manager struct {
 
 	defaults Limits
 	onEvent  func(Event)
-	hooks    *host.ScriptWatcher // restarts an app when its pb_hooks or pb_migrations change
+	hooks    *host.ScriptWatcher // restarts an app when its pb_hooks change
 	gate     Gate
 
 	held map[string]chan struct{} // by ID: instances under maintenance; requests wait for the channel to close
@@ -291,15 +291,14 @@ func (m *Manager) RunningCount() int {
 	return running
 }
 
-// watchHooks restarts the app when its pb_hooks or pb_migrations change (like PocketBase's HooksWatch, but only this
-// app, migrations too, and one shared watcher). The watch ends with this app, unless a newer app for the instance
-// already took over.
+// watchHooks restarts the app when its pb_hooks change (PocketBase's HooksWatch, but only this app and with one
+// shared watcher). Migrations are not watched: like PocketBase, they run when the app boots. The watch ends with this
+// app, unless a newer app for the instance already took over.
 func (m *Manager) watchHooks(inst Instance, slot *appSlot) {
 	if m.hooks == nil {
 		return
 	}
 	m.hooks.Add(inst.ID, filepath.Join(instanceDir(m.opts, inst), "pb_hooks"))
-	m.hooks.Add(inst.ID, filepath.Join(instanceDir(m.opts, inst), "pb_migrations"))
 	slot.app.app.OnTerminate().BindFunc(func(e *core.TerminateEvent) error {
 		m.mu.RLock()
 		cur := m.apps[inst.ID]
@@ -311,7 +310,7 @@ func (m *Manager) watchHooks(inst Instance, slot *appSlot) {
 	})
 }
 
-// hooksChanged (pb_hooks or pb_migrations changed) restarts the instance's running app (app.Restart, caught by catchRestart: only this app restarts).
+// hooksChanged restarts the instance's running app (app.Restart, caught by catchRestart: only this app restarts).
 func (m *Manager) hooksChanged(id string) {
 	m.mu.RLock()
 	slot := m.apps[id]
@@ -327,9 +326,9 @@ func (m *Manager) hooksChanged(id string) {
 	if slot.app == nil {
 		return
 	}
-	m.log.Info("pocker: scripts changed, restarting", "id", id)
+	m.log.Info("pocker: pb_hooks changed, restarting", "id", id)
 	if inst, ok := m.dir.Get(id); ok {
-		openInstanceLog(instanceDir(m.opts, inst)).Write("stdout", "pb_hooks or pb_migrations changed, restarting")
+		openInstanceLog(instanceDir(m.opts, inst)).Write("stdout", "pb_hooks changed, restarting")
 	}
 	go func() {
 		if err := slot.app.app.Restart(); err != nil {
