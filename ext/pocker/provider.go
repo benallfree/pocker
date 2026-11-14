@@ -54,6 +54,7 @@ func (p *Provider) Prepare(h *host.Host) error {
 		root = p.Resolve(root)
 	}
 	cfg.PBRoot, cfg.Dev, cfg.Limits, cfg.EgressAllow = root, h.Dev, sc.Limits, sc.EgressAllow
+	cfg.TLS = h.Listeners.TLS // the server section's certificate files (autotls checks them)
 	if sc.HooksPoolSize != nil {
 		cfg.HooksPoolSize = sc.HooksPoolSize
 	}

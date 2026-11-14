@@ -2,35 +2,42 @@
 
 Pocker hosts many PocketBase instances in one process. It is PocketBase itself (this repo tracks
 [upstream PocketBase](https://ganigeorgiev.com/git/pocketbase/pocketbase) and shares its history) plus a small engine in
-this folder and a CLI in [`cmd/pocker/`](cmd/pocker).
+this folder, run by the stock `pocketone` binary as a runtime provider (`provider: pocker` in pocketbase.yaml).
 
 - One port, many instances. Each request's hostname maps to a canonical instance id.
-- Each instance is a normal PocketBase folder, `<pbRoot>/<id>` (`pb_data`, `pb_hooks`, `pb_migrations`, `pb_public`),
+- Each instance is a normal PocketBase folder, `<root>/<id>` (`pb_data`, `pb_hooks`, `pb_migrations`, `pb_public`),
   with its own environment for JS hooks (`$os.getenv`, `process.env`), its own JS migrations and its own settings
   encryption key.
 - An instance's app starts on its first request (tens of milliseconds) and keeps running.
 
 ## Dev mode: any hostname
 
+```yaml
+# pocketbase.yaml
+server: { http: "127.0.0.1:8090" }
+provider: pocker
+instances: { dev: true }
+pocker: { root: ./pb_root }
+```
+
 ```sh
-go build -o pocker ./cmd/pocker
-./pocker serve --dev --pbRoot ./pb_root
+pocketone serve
 curl -H 'Host: blog.localhost' http://127.0.0.1:8090/api/health   # creates and serves ./pb_root/blog.localhost
 ```
 
 A hostname the instance source doesn't map uses the hostname itself as its id (lowercase, no port, no trailing dot;
-anything that isn't a safe folder name gets 400), its folder is created on first use, and apps run in PocketBase dev mode. The instances file
-(or another provider) is optional in dev mode; hosts it maps keep their own ids.
+anything that isn't a safe folder name gets 400), its folder is created on first use, and apps run in PocketBase dev
+mode. The instances file (or another source) is optional in dev mode; hosts it maps keep their own ids.
 
 ## Production: mapped hostnames only
 
-Without `--dev`, Pocker serves only what an instance source maps. The built-in source is a YAML file (reloaded when it
-changes; Pocker refuses to start without it):
+Without dev mode, Pocker serves only what an instance source maps. The built-in source is the `instances` section's
+YAML file (reloaded when it changes; the host refuses to start without it):
 
 ```yaml
 # instances.yaml
 instances:
-  - id: blog                      # folder <pbRoot>/blog
+  - id: blog                      # folder <root>/blog
     hosts: [blog.example.com, www.blog.example.com]
   - id: shop
     hosts: [shop.example.com]
@@ -43,77 +50,74 @@ instances:
     blocked: { status: 402, message: "Payment required" }
 ```
 
-```sh
-./pocker serve --pbRoot ./pb_root --instances ./instances.yaml
-```
-
 Unknown hosts get 404 and no folder is ever created from a request. Ids are lowercase letters, digits, dots and dashes.
 Hosting platforms plug in their own [`InstanceSource`](instance.go) (for example a control plane streaming the
-hostname -> id map over SSE) instead of the file.
+hostname -> id map over SSE) instead of the file; a community mothership is one (the `mothership` section,
+[ext/mothership](../mothership/README.md)).
 
-Optional `pocker.yaml` (every field has a default):
+pocketbase.yaml for a production host (each plugin owns its section; every field has a default):
 
 ```yaml
-listen: ":8090"
-plain_listen: []          # extra plain-HTTP listeners (no TLS, no redirect), e.g. a private network other servers forward on
-pb_root: "./pb_root"
-dev: false
-instances_file: "./instances.yaml"
-hooks_pool_size: 2
-shutdown_timeout: 10s
-egress_allow: []          # private networks apps may still reach (default none)
+server:
+  https: ":443"
+  http: ":80"               # redirects to HTTPS (and answers ACME HTTP-01 challenges)
+  plain: []                 # extra plain-HTTP listeners (no TLS, no redirect), e.g. a private network other servers forward on
+  tls: { cert: /path/fullchain.pem, key: /path/privkey.pem }   # re-read when they change; or the autotls section
 
-# default limits for every instance (each instance can override them, see below)
-max_js_execution: 30s     # any single JS call (hook, route, cron, migration)
-max_js_allocation: 64MiB  # one-shot JS allocations
-max_call_stack_size: 2000
-max_sleep: 10s
-max_query_duration: 30s   # any SQL statement without its own deadline
-http_send_max_timeout: 60s
-http_send_max_body: 10MiB
-max_concurrent_js: 16     # JS calls an instance runs at once; more wait up to max_js_execution, then fail
-# the keys below are read by plugins: rate_limits/firewall by ext/firewall, edges by ext/edge, tls.auto... by ext/autotls
-rate_limits:              # per client IP and per instance; trusted clients get the trusted set
+provider: pocker
+instances: { file: ./instances.yaml }
+
+pocker:
+  root: ./pb_root
+  hooks_pool_size: 2
+  egress_allow: []          # private networks apps may still reach (default none)
+  # default limits for every instance (each instance can override them, see below)
+  max_js_execution: 30s     # any single JS call (hook, route, cron, migration)
+  max_js_allocation: 64MiB  # one-shot JS allocations
+  max_call_stack_size: 2000
+  max_sleep: 10s
+  max_query_duration: 30s   # any SQL statement without its own deadline
+  http_send_max_timeout: 60s
+  http_send_max_body: 10MiB
+  max_concurrent_js: 16     # JS calls an instance runs at once; more wait up to max_js_execution, then fail
+
+rate_limits:                # per client IP and per instance; trusted clients get the trusted set
   ip_hourly: 1000
   instance_hourly: 10000
   ip_concurrent: 15
   instance_concurrent: 250
-  file_weight: 0.1        # a /api/files request costs a tenth
+  file_weight: 0.1          # a /api/files request costs a tenth
   trusted: { ip_hourly: 5000, instance_hourly: 20000, ip_concurrent: 50, instance_concurrent: 250 }
-  # off: true             # no rate limiting (the default in --dev unless rate_limits is set)
+  # off: true               # no rate limiting (the default in dev mode unless rate_limits is set)
 
 firewall:
   allow_cidrs: []               # peers allowed to connect (empty = everyone); others get 403
   trusted_proxies: []           # peers whose client-IP headers are believed
   client_ip_headers: [CF-Connecting-IP, True-Client-IP, X-Forwarded-For, X-Real-IP]
   trusted_clients: []           # client IPs with the trusted limits on every instance
+  trusted_client_headers: [X-Client-IP]   # a trusted client names its end user (own buckets)
   rate_limit_header_prefix: X-RateLimit
 
-tls:
-  # either certificate files (re-read when they change; no restart for renewals) ...
-  cert: /path/fullchain.pem
-  key: /path/privkey.pem
-  # ... or automatic certificates (ACME, via CertMagic, Caddy's certificate engine):
-  # auto: true
-  # email: ops@example.com
-  # ca: letsencrypt             # letsencrypt (default), letsencrypt-staging, zerossl, or an ACME directory URL
-  # storage: ./pb_root/.pocker-certs
-  # domains: ["*.example.com", "example.com"]   # obtained up front; wildcards need dns
-  # dns: { provider: cloudflare, api_token_env: CF_API_TOKEN }   # only needed for wildcards
-  http_listen: ":80"            # optional: plain HTTP redirects to HTTPS (and answers ACME HTTP-01 challenges)
+# autotls:                      # automatic certificates (ACME, via CertMagic, Caddy's certificate engine)
+#   auto: true
+#   email: ops@example.com
+#   ca: letsencrypt             # letsencrypt (default), letsencrypt-staging, zerossl, or an ACME directory URL
+#   storage: ./pb_root/.pocker-certs
+#   domains: ["*.example.com", "example.com"]   # obtained up front; wildcards need dns
+#   dns: { provider: cloudflare, api_token_env: CF_API_TOKEN }   # only needed for wildcards
 ```
 
-**Firewall** ([ext/firewall](../firewall/README.md); `Server.Firewall`, on in the `pocker` command and whenever the config has `firewall:` or `rate_limits:`). Peers outside `allow_cidrs` get 403. The client IP comes from `client_ip_headers` only when the peer is
-a trusted proxy, otherwise it is the peer. Rate-limited requests get 429 with `Retry-After` and a message naming the
-limit; every routed response carries `<prefix>-{Ip,Instance}-{Hourly,Concurrent}-{Limit,Remaining}` and
-`<prefix>-{Ip,Instance}-Hourly-Reset`, listed in `Access-Control-Expose-Headers`. Long-lived responses (realtime) hold
-their concurrency slot until they end.
+**Firewall** ([ext/firewall](../firewall/README.md); on whenever the config has `firewall` or `rate_limits`). Peers
+outside `allow_cidrs` get 403. The client IP comes from `client_ip_headers` only when the peer is a trusted proxy,
+otherwise it is the peer. Rate-limited requests get 429 with `Retry-After` and a message naming the limit; every routed
+response carries `<prefix>-{Ip,Instance}-{Hourly,Concurrent}-{Limit,Remaining}` and `<prefix>-{Ip,Instance}-Hourly-Reset`,
+listed in `Access-Control-Expose-Headers`. Long-lived responses (realtime) hold their concurrency slot until they end.
 
-**TLS.** Certificate files are core. Automatic certificates are [ext/autotls](../autotls/README.md) (included in the
-`pocker` command): with `auto: true` and no `dns`, every hostname the instance source maps gets its own certificate on its first
-TLS handshake (HTTP-01 / TLS-ALPN-01), with any DNS host and no API token; hostnames no instance serves never trigger
-issuance. A DNS provider (Cloudflare for now) is only needed for wildcard `domains`, proved through DNS-01; a wildcard
-without one is a config error.
+**TLS.** Certificate files are core (`server.tls`). Automatic certificates are [ext/autotls](../autotls/README.md) (its
+`autotls` section): with `auto: true` and no `dns`, every hostname the instance source maps gets its own certificate on
+its first TLS handshake (HTTP-01 / TLS-ALPN-01), with any DNS host and no API token; hostnames no instance serves never
+trigger issuance. A DNS provider (Cloudflare for now) is only needed for wildcard `domains`, proved through DNS-01; a
+wildcard without one is a config error.
 
 Each instance can override any of those limits (zero or missing fields keep the default):
 
@@ -134,11 +138,12 @@ instances:
 
 ## Plugins
 
-`pocker.Server.Plugins` takes plugins (see `plugin.go`). Each implements `Name()` and any of:
+`pocker.Provider.Plugins` (or `pocker.Server.Plugins` in Go) takes plugins (see `plugin.go`). Each implements `Name()` and
+any of:
 
 | Interface | Used for |
 |---|---|
-| `Configurer` | reading its own keys from pocker.yaml (`Configure(doc, cfg)`) |
+| `Configurer` | reading its own pocketbase.yaml section before the server starts (`Configure(cfg)`) |
 | `Gate` | a peer check before routing, and admission (e.g. rate limits) before an instance is served or forwarded |
 | `TLSProvider` | the main listener's TLS (e.g. automatic certificates) |
 | `Wrapper` | wrapping the server's handler (the first listed is outermost) |
@@ -147,9 +152,9 @@ instances:
 
 Per-instance settings for a plugin go under the instance's `plugins.<name>` (read them with `pocker.DecodePluginConfig`).
 `app.Restart()` (PocketBase's backup restore, pitr) restarts only that instance, not the process.
-Timings for the Server-Timing header are registered with `pocker.Timing(ctx, fn)`. The `pocker` command
-([`cmd/pocker`](cmd/pocker)) bundles [servertiming](../servertiming/README.md), the [firewall](../firewall/README.md) and
-[autotls](../autotls/README.md).
+Timings for the Server-Timing header are registered with `pocker.Timing(ctx, fn)`. The stock `pocketone` binary runs
+pocker with [servertiming](../servertiming/README.md), [autotls](../autotls/README.md) and
+[mailtrap](../mailtrap/README.md); the [firewall](../firewall/README.md) turns on from its sections.
 
 ## Platform values and logs
 

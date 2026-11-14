@@ -39,7 +39,7 @@ security boundary while edges log in as superusers.
 ```yaml
 mothership:
   url: http://10.88.0.10:8090
-  email: $MOTHERSHIP_EMAIL          # $VARS expand from the environment (.env)
+  email: $MOTHERSHIP_EMAIL          # $VARS come from the private .env
   password: $MOTHERSHIP_PASSWORD
   self: lax-1                       # or edges.self
   internal_url: http://10.88.0.5:8080
@@ -47,7 +47,8 @@ mothership:
   apex: example.com                 # <name>.example.com routes to each instance
 ```
 
-The `pocker` command follows a mothership when its config has this section.
+The stock `pocketone` binary follows a mothership (instances and the other edges) when pocketbase.yaml has this
+section and names a provider.
 
 ## License
 

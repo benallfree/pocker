@@ -2,6 +2,7 @@ package mirror
 
 import (
 	"context"
+	"github.com/pockethost/pocketone/ext/host"
 	"io"
 	"log/slog"
 	"net/http/httptest"
@@ -11,7 +12,6 @@ import (
 	"ganigeorgiev.com/pocketbase/pocketbase/apis"
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"ganigeorgiev.com/pocketbase/pocketbase/tests"
-	"github.com/pockethost/pocketone/ext/edge"
 	"github.com/pockethost/pocketone/ext/mothership"
 )
 
@@ -98,9 +98,9 @@ func (ownerExt) Views() []View {
 	return []View{{Name: "owners", Collection: "owners", Filter: "instances_via_owner.edge ?= {edge}"}}
 }
 
-func (ownerExt) Instance(m *Mirror, local Record, inst *edge.Instance) {
+func (ownerExt) Instance(m *Mirror, local Record, inst *host.Instance) {
 	if o := m.Get("owners", local.String("owner")); o != nil && o.Bool("suspended") {
-		inst.Blocked = &edge.Blocked{Status: 403, Message: "account suspended"}
+		inst.Blocked = &host.Blocked{Status: 403, Message: "account suspended"}
 	}
 }
 
@@ -153,7 +153,7 @@ func TestMirror(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	byID := map[string]edge.Instance{}
+	byID := map[string]host.Instance{}
 	for _, i := range first {
 		byID[i.ID] = i
 	}
@@ -183,7 +183,7 @@ func TestMirror(t *testing.T) {
 	}
 
 	changes, _ := m2.Watch(ctx)
-	next := func(what string) edge.Change {
+	next := func(what string) host.Change {
 		t.Helper()
 		select {
 		case c := <-changes:
@@ -191,7 +191,7 @@ func TestMirror(t *testing.T) {
 		case <-time.After(5 * time.Second):
 			t.Fatalf("%s: no change within 5s", what)
 		}
-		return edge.Change{}
+		return host.Change{}
 	}
 
 	// another edge's instance changes something only it sees: nothing arrives here
@@ -203,7 +203,7 @@ func TestMirror(t *testing.T) {
 	for c.Instance.ID == b.Id && c.Instance.Remote != "" { // the routes event may land before the local one
 		c = next("b full record")
 	}
-	if c.Kind != edge.Upsert || c.Instance.ID != b.Id || c.Instance.Secrets["B"] != "rotated" {
+	if c.Kind != host.Upsert || c.Instance.ID != b.Id || c.Instance.Secrets["B"] != "rotated" {
 		t.Fatalf("b moved here: %+v", c)
 	}
 
@@ -231,7 +231,7 @@ func TestMirror(t *testing.T) {
 	if err := app.Delete(d); err != nil {
 		t.Fatal(err)
 	}
-	if c := next("d deleted"); c.Kind != edge.Delete || c.Instance.ID != d.Id {
+	if c := next("d deleted"); c.Kind != host.Delete || c.Instance.ID != d.Id {
 		t.Fatalf("d deleted: %+v", c)
 	}
 

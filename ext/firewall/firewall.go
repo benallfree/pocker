@@ -17,8 +17,6 @@ import (
 	"github.com/pockethost/pocketone/ext/ceplugin"
 
 	"github.com/pockethost/pocketone/ext/host"
-
-	"gopkg.in/yaml.v3"
 )
 
 // Config is the process-wide part of the firewall (the config file `firewall:`). Rate limits are `rate_limits:` (the
@@ -99,26 +97,6 @@ func NewFirewall(cfg Config) (*Firewall, error) {
 
 // Name is the firewall's key under an instance's `plugins:`.
 func (f *Firewall) Name() string { return "firewall" }
-
-// Configure reads `firewall:` and `rate_limits:` from the config file. List fields add to what was set before;
-// other fields fill in what wasn't. In dev mode, rate limiting is off unless rate_limits is set somewhere.
-func (f *Firewall) Configure(doc *yaml.Node, dev bool) error {
-	var c Config
-	n := host.TopLevel(doc, "firewall")
-	if n != nil {
-		if err := n.Decode(&c); err != nil {
-			return fmt.Errorf("firewall: %w", err)
-		}
-	}
-	var rl RateLimits
-	m := host.TopLevel(doc, "rate_limits")
-	if m != nil {
-		if err := m.Decode(&rl); err != nil {
-			return fmt.Errorf("rate_limits: %w", err)
-		}
-	}
-	return f.apply(c, n != nil, rl, m != nil, dev)
-}
 
 // apply adds the config file's sections to what was set before (lists add, other fields fill in), runs Adjust and
 // builds the firewall.
@@ -538,10 +516,9 @@ func FromSections(dev bool) (fw *Firewall, enabled bool, err error) {
 	return fw, true, fw.apply(c, haveConfig, rl, haveLimits, dev)
 }
 
-// Linking this package makes the firewall available to every host (ext/host): it turns on when the config has a
-// `firewall` or `rate_limits` section (pocketbase.yaml through ext/config, or a pocker.yaml document).
+// Linking this package makes the firewall available to every host (ext/host): it turns on when pocketbase.yaml has
+// a `firewall` or `rate_limits` section.
 func init() {
-	host.RegisterGate("firewall", []string{"firewall", "rate_limits"}, func() host.ConfigurableGate { return &Firewall{} })
 	host.RegisterSectionGate(host.SectionGate{Name: "firewall", New: func(dev bool) (host.Gate, bool, error) {
 		fw, enabled, err := FromSections(dev)
 		if fw == nil {
@@ -551,4 +528,4 @@ func init() {
 	}})
 }
 
-var _ host.ConfigurableGate = (*Firewall)(nil)
+var _ host.Gate = (*Firewall)(nil)

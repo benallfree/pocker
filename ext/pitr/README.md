@@ -50,11 +50,10 @@ srv := &pocker.Server{Config: cfg, Plugins: []pocker.Plugin{pitr.New(pitr.Config
 ```
 
 ```yaml
-# pocker.yaml (fields set in Go win)
+# pocketbase.yaml (fields set in Go win)
 pitr:
   retention: 72h          # on by default; enabled: false turns it off for every instance
   snapshot_interval: 24h
-  bucket: { endpoint: ..., bucket: ..., region: auto, access_key: ..., secret: ..., label: EU }
 
 # instances.yaml (or a provider): only enabled and retention per instance (e.g. enabled: false for a plan without PITR)
 instances:

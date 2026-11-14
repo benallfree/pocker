@@ -23,10 +23,7 @@ import (
 var uiFiles embed.FS
 
 func main() {
-	cfg, err := pocker.LoadConfig("pocker.yaml") // defaults apply when the file is missing
-	if err != nil {
-		log.Fatal(err)
-	}
+	cfg := pocker.DefaultConfig()
 	cfg.Dev = true // any hostname; drop this for production (instances.yaml required)
 
 	ui, _ := fs.Sub(uiFiles, "ui")

@@ -91,7 +91,7 @@ curl -X POST http://beta.localhost:8090/api/collections/users/request-password-r
 - Each instance's dashboard shows the relay on Settings → Mail. The example's logins are the shared test accounts
   ([`ext/devusers`](../devusers)): `admin@example.com` / `password`, and the user `user@example.com` / `password`.
 - `--listen` changes the instances' port. `PB_MAILTRAP_HTTP` and `PB_MAILTRAP_SMTP` change the trap's.
-- Without mailrelay, `pocker serve --dev` (which includes `mailtrap`) already sends every instance's SMTP-less mail to
-  the same trap, as is, with no relay rules.
+- Without mailrelay, the stock `pocketone` binary in host dev mode (which includes `mailtrap`) already sends every
+  instance's SMTP-less mail to the same trap, as is, with no relay rules.
 
 The trap only runs in dev mode. It accepts mail from anyone who can reach its port, so never expose it.

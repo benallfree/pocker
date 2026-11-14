@@ -6,36 +6,26 @@ import (
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"github.com/dop251/goja"
 	"github.com/pockethost/pocketone/ext/ceplugin"
-	"gopkg.in/yaml.v3"
 )
 
 // hostedPlugin runs a PocketOne plugin ([ceplugin.Plugin], e.g. bulkmail.New(...)) on every instance: put the
 // plugin itself in [Server.Plugins], no pocker-specific wrapper needed.
 //
-// Settings: the config file's top-level `<name>:` key, then the instance's `plugins.<name>`, over the defaults the
-// plugin was built with. `enabled: false` in either turns it off (the instance wins); off means Register and
-// BindJS are never called for that instance.
+// Settings: the instance's `plugins.<name>` over the defaults the plugin was built with (process-wide settings are
+// the plugin's own, set in Go). `enabled: false` turns it off for that instance: Register and BindJS are never
+// called.
 type hostedPlugin struct {
-	p       ceplugin.Plugin
-	process map[string]any
+	p ceplugin.Plugin
 }
 
-func hostCEPlugin(p ceplugin.Plugin, doc *yaml.Node) (*hostedPlugin, error) {
-	h := &hostedPlugin{p: p}
-	if n := TopLevel(doc, p.Name()); n != nil {
-		if err := n.Decode(&h.process); err != nil {
-			return nil, fmt.Errorf("top-level %q: %w", p.Name(), err)
-		}
-	}
-	return h, nil
-}
+func hostCEPlugin(p ceplugin.Plugin) *hostedPlugin { return &hostedPlugin{p: p} }
 
 func (h *hostedPlugin) config(inst Instance) (ceplugin.Config, error) {
 	own, err := ceplugin.Layer(inst.PluginConfig(h.p.Name()))
 	if err != nil {
 		return nil, fmt.Errorf("instance %s: plugins.%s: %w", inst.ID, h.p.Name(), err)
 	}
-	return ceplugin.Config{h.process, own}, nil
+	return ceplugin.Config{own}, nil
 }
 
 // InitApp implements [AppIniter].

@@ -11,8 +11,7 @@ package pockerplugin
 
 import (
 	"fmt"
-
-	"gopkg.in/yaml.v3"
+	"github.com/pockethost/pocketone/ext/ceplugin"
 
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"github.com/pockethost/pocketone/ext/pocker"
@@ -40,15 +39,11 @@ func New(cfg s3redirect.Config) *Plugin { return &Plugin{cfg: cfg, p: s3redirect
 // Name implements [pocker.Plugin].
 func (pp *Plugin) Name() string { return Name }
 
-// Configure reads the config file's top-level `s3redirect:` key. Fields already set in Go are kept.
-func (pp *Plugin) Configure(doc *yaml.Node, _ pocker.Config) error {
-	n := pocker.TopLevel(doc, Name)
-	if n == nil {
+// Configure reads pocketbase.yaml's `s3redirect` section. Fields already set in Go are kept.
+func (pp *Plugin) Configure(pocker.Config) error {
+	c, found := Section.Get()
+	if !found {
 		return nil
-	}
-	var c s3redirect.Config
-	if err := n.Decode(&c); err != nil {
-		return fmt.Errorf("s3redirect: %w", err)
 	}
 	if pp.cfg.Enabled == nil {
 		pp.cfg.Enabled = c.Enabled
@@ -98,3 +93,7 @@ func instanceConfig(inst pocker.Instance) (s3redirect.AppConfig, error) {
 	}
 	return ac, nil
 }
+
+// Section is the key of the `s3redirect` section (pocketbase.yaml): signed S3 redirects for file downloads on a
+// pocker host.
+var Section = ceplugin.NewSection(Name, s3redirect.Config{}, "Signed S3 redirects for file downloads on a pocker host: enabled, URL lifetime.")

@@ -27,11 +27,10 @@ package storage
 
 import (
 	"fmt"
+	"github.com/pockethost/pocketone/ext/ceplugin"
 	"log/slog"
 	"sort"
 	"strings"
-
-	"gopkg.in/yaml.v3"
 
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/filesystem"
@@ -106,15 +105,11 @@ func (p *Plugin) Name() string { return Name }
 // Config returns the effective configuration.
 func (p *Plugin) Config() Config { return p.cfg }
 
-// Configure reads the config file's top-level `storage:` key; fields set in Go are kept.
-func (p *Plugin) Configure(doc *yaml.Node, _ pocker.Config) error {
-	n := pocker.TopLevel(doc, Name)
-	if n == nil {
+// Configure reads pocketbase.yaml's `storage` section; fields set in Go are kept.
+func (p *Plugin) Configure(pocker.Config) error {
+	c, found := Section.Get()
+	if !found {
 		return nil
-	}
-	var c Config
-	if err := n.Decode(&c); err != nil {
-		return fmt.Errorf("storage: %w", err)
 	}
 	if p.cfg.Enabled == nil {
 		p.cfg.Enabled = c.Enabled
@@ -274,3 +269,6 @@ func open(b *Bucket, prefix string) (*filesystem.System, error) {
 		SecretKey: b.Secret, PathStyle: b.ForcePathStyle}
 	return filesystem.New(prefixDriver{Driver: s3.Driver(), prefix: prefix, sign: sign}), nil
 }
+
+// Section is the key of the `storage` section (pocketbase.yaml): storage backends and mounts for a pocker host.
+var Section = ceplugin.NewSection(Name, Config{}, "Storage backends and mounts (S3, local) for a pocker host's instances: uploads, backups, PITR history.")

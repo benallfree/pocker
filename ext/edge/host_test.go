@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/pockethost/pocketone/ext/host"
-	"gopkg.in/yaml.v3"
 )
 
 type noRuntime struct{}
@@ -40,11 +39,7 @@ func TestHostEdgesFromYAML(t *testing.T) {
 	if err := os.WriteFile(instances, []byte("instances:\n  - id: away\n    hosts: [away.test]\n    remote: \"edge:@sgp-1\"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	var doc yaml.Node
-	if err := yaml.Unmarshal([]byte("edges:\n  self: lax-1\n  list:\n    - { id: sgp-1, internal_url: \""+owner.URL+"\" }\n"), &doc); err != nil {
-		t.Fatal(err)
-	}
-	edges, err := EdgesFromConfig(host.TopLevel(&doc, "edges"), quietLog)
+	edges, err := EdgesConfig{Self: "lax-1", List: []StaticEdge{{ID: "sgp-1", InternalURL: owner.URL}}}.Build(quietLog)
 	if err != nil || edges == nil {
 		t.Fatal(err)
 	}

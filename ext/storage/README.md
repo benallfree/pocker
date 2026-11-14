@@ -17,7 +17,7 @@ srv := &pocker.Server{Config: cfg, Plugins: []pocker.Plugin{storage.New(storage.
 ```
 
 ```yaml
-# pocker.yaml (fields set in Go win)
+# pocketbase.yaml (fields set in Go win)
 storage:
   backends:                        # named S3-compatible destinations
     r2-eu:   { endpoint: https://<account>.eu.r2.cloudflarestorage.com, bucket: pocketbase-eu, region: auto, access_key: ..., secret: ..., prefix: "" }

@@ -2,16 +2,15 @@ package mirror
 
 import (
 	"fmt"
+	"github.com/pockethost/pocketone/ext/ceplugin"
 	"log/slog"
-	"os"
 	"time"
 
 	"github.com/pockethost/pocketone/ext/edge"
-	"gopkg.in/yaml.v3"
 )
 
-// FileConfig is a config file's `mothership:` section. Values expand $VARS from the environment, so the login can
-// live in .env. self falls back to `edges.self`.
+// FileConfig is pocketbase.yaml's `mothership` section (`$VAR` values come from the private .env through ext/config).
+// self falls back to the `edges` section's self.
 //
 //	mothership:
 //	  url: http://10.88.0.10:8090
@@ -35,30 +34,24 @@ type FileConfig struct {
 	Resync      time.Duration `yaml:"resync"`
 }
 
-// FromConfig returns a mirror for a config document's `mothership:` section, or nil when it has none.
-// Extensions are added to the mirror's.
-func FromConfig(doc *yaml.Node, log *slog.Logger, exts ...Extension) (*Mirror, error) {
-	n := edge.TopLevel(doc, "mothership")
-	if n == nil {
+// Section is the key of the `mothership` section (pocketbase.yaml): a community mothership this host mirrors its
+// instances and the other edges from.
+var Section = ceplugin.NewSection("mothership", FileConfig{}, "A community mothership to mirror instances and edges from: url, login, this edge's id, internal URL, region, apex.")
+
+// FromSection returns a mirror for the `mothership` section, or nil when the config has none. Extensions are added to
+// the mirror's.
+func FromSection(log *slog.Logger, exts ...Extension) (*Mirror, error) {
+	fc, found := Section.Get()
+	if !found {
 		return nil, nil
 	}
-	var fc FileConfig
-	if err := n.Decode(&fc); err != nil {
-		return nil, fmt.Errorf("mothership: %w", err)
-	}
 	if fc.Self == "" {
-		if e := edge.TopLevel(doc, "edges"); e != nil {
-			var s struct {
-				Self string `yaml:"self"`
-			}
-			_ = e.Decode(&s)
-			fc.Self = s.Self
-		}
+		e, _ := edge.Section.Get()
+		fc.Self = e.Self
 	}
 	cfg := Config{
-		URL: os.ExpandEnv(fc.URL), Email: os.ExpandEnv(fc.Email), Password: os.ExpandEnv(fc.Password),
-		Self: os.ExpandEnv(fc.Self), InternalURL: os.ExpandEnv(fc.InternalURL), Region: os.ExpandEnv(fc.Region),
-		Apex: os.ExpandEnv(fc.Apex), Heartbeat: fc.Heartbeat, Resync: fc.Resync, Extensions: exts, Logger: log,
+		URL: fc.URL, Email: fc.Email, Password: fc.Password, Self: fc.Self, InternalURL: fc.InternalURL,
+		Region: fc.Region, Apex: fc.Apex, Heartbeat: fc.Heartbeat, Resync: fc.Resync, Extensions: exts, Logger: log,
 	}
 	if cfg.URL == "" || cfg.Self == "" {
 		return nil, fmt.Errorf("mothership: url and self are required")

@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/pockethost/pocketone/ext/host"
-	"gopkg.in/yaml.v3"
 )
 
 // okRuntime answers every request 200: the firewall's headers and 429s are what's under test.
@@ -27,8 +26,8 @@ func (okRuntime) ServeInstance(w http.ResponseWriter, r *http.Request, _ host.In
 	_, _ = io.WriteString(w, "ok")
 }
 
-// The whole path on a host: config sections turn the registered firewall on, per-instance plugins.firewall from the
-// instances file, header names, 429.
+// The whole path on a host: the firewall as a gate, per-instance plugins.firewall from the instances file, header
+// names, 429.
 func TestHostWithFirewall(t *testing.T) {
 	root := t.TempDir()
 	instances := filepath.Join(root, "instances.yaml")
@@ -42,15 +41,8 @@ instances:
 `), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	var doc yaml.Node
-	if err := yaml.Unmarshal([]byte("firewall: { rate_limit_header_prefix: X-PocketHost-RateLimit }\n"), &doc); err != nil {
-		t.Fatal(err)
-	}
-	gates := host.ConfiguredGates(&doc)
-	if len(gates) != 1 {
-		t.Fatalf("registered gates turned on by the config: %d", len(gates))
-	}
-	if err := gates[0].Configure(&doc, false); err != nil {
+	fw, err := NewFirewall(Config{RateLimitHeaderPrefix: "X-PocketHost-RateLimit"})
+	if err != nil {
 		t.Fatal(err)
 	}
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
@@ -60,7 +52,7 @@ instances:
 	addr := ln.Addr().String()
 	_ = ln.Close()
 	h := &host.Host{Source: &host.YAMLSource{Path: instances, Required: true}, Runtime: okRuntime{},
-		Gates: []host.Gate{gates[0]}, Listeners: host.Listeners{Listen: addr}, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))}
+		Gates: []host.Gate{fw}, Listeners: host.Listeners{Listen: addr}, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))}
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
 	go func() { done <- h.Run(ctx) }()

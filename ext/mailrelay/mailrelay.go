@@ -15,6 +15,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/pockethost/pocketone/ext/ceplugin"
 	"html"
 	"net/mail"
 	"regexp"
@@ -30,7 +31,6 @@ import (
 	"github.com/domodwyer/mailyak/v3"
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/pockethost/pocketone/ext/pocker"
-	"gopkg.in/yaml.v3"
 )
 
 // Name is the plugin's key in a pocker config file and under an instance's `plugins:`.
@@ -150,8 +150,8 @@ func New(cfg Config) *Plugin {
 // Name implements [pocker.Plugin].
 func (p *Plugin) Name() string { return Name }
 
-// yamlConfig is the shape of the top-level `mailrelay:` key and of an instance's `plugins.mailrelay`.
-type yamlConfig struct {
+// SectionConfig is the shape of the `mailrelay` section and of an instance's `plugins.mailrelay`.
+type SectionConfig struct {
 	Enabled   *bool `yaml:"enabled"`
 	PerMinute *int  `yaml:"per_minute"`
 	Daily     *int  `yaml:"daily"`
@@ -164,7 +164,7 @@ type limits struct {
 	daily     int
 }
 
-func (y yamlConfig) apply(l *limits) {
+func (y SectionConfig) apply(l *limits) {
 	if y.Enabled != nil {
 		l.enabled = *y.Enabled
 	}
@@ -176,18 +176,14 @@ func (y yamlConfig) apply(l *limits) {
 	}
 }
 
-// Configure implements [pocker.Configurer]: the config file's top-level `mailrelay:` key. Limits set in Go win.
-func (p *Plugin) Configure(doc *yaml.Node, _ pocker.Config) error {
+// Configure implements [pocker.Configurer]: pocketbase.yaml's `mailrelay` section. Limits set in Go win.
+func (p *Plugin) Configure(pocker.Config) error {
 	if p.cfg.Domain == "" || p.cfg.Upstream == nil {
 		return errNotConfigured
 	}
-	n := pocker.TopLevel(doc, Name)
-	if n == nil {
+	y, found := Section.Get()
+	if !found {
 		return nil
-	}
-	var y yamlConfig
-	if err := n.Decode(&y); err != nil {
-		return fmt.Errorf("mailrelay: %w", err)
 	}
 	p.enabled = y.Enabled
 	if y.PerMinute != nil && *y.PerMinute > 0 && p.cfg.PerMinute == DefaultPerMinute {
@@ -206,7 +202,7 @@ func (p *Plugin) Start(_ context.Context, m *pocker.Manager) { p.mgr.Store(m) }
 func (p *Plugin) limitsFor(inst pocker.Instance) (limits, error) {
 	l := limits{enabled: p.enabled == nil || *p.enabled, perMinute: p.cfg.PerMinute, daily: p.cfg.Daily}
 	if raw := inst.PluginConfig(Name); raw != nil {
-		var y yamlConfig
+		var y SectionConfig
 		if err := pocker.DecodePluginConfig(raw, &y); err != nil {
 			return l, fmt.Errorf("mailrelay: instance %s: %w", inst.ID, err)
 		}
@@ -491,3 +487,6 @@ func maskList(list []string) string {
 	}
 	return strings.Join(out, ", ")
 }
+
+// Section is the key of the `mailrelay` section (pocketbase.yaml): the shared mail relay on a pocker host.
+var Section = ceplugin.NewSection(Name, SectionConfig{}, "Shared mail relay on a pocker host: enabled, per-minute and daily limits per instance.")

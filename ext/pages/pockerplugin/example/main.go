@@ -30,10 +30,7 @@ func main() {
 	listen := flag.String("listen", "127.0.0.1:8791", "listen address")
 	flag.Parse()
 
-	cfg, err := pocker.LoadConfig("pocker.yaml") // defaults apply when the file is missing
-	if err != nil {
-		log.Fatal(err)
-	}
+	cfg := pocker.DefaultConfig()
 	cfg.Dev = true // any hostname is an instance; drop this for production (instances.yaml required)
 	cfg.PBRoot = *pbRoot
 	cfg.Listen = *listen

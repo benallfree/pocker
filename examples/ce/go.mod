@@ -17,12 +17,14 @@ require (
 	github.com/pockethost/pocketone/ext/jserrors v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketone/ext/mailtrap v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketone/ext/mcp v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/mothership v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketone/ext/oauth-server v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketone/ext/pages v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketone/ext/pitr v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketone/ext/pocker v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketone/ext/remotes v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketone/ext/s3redirect v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/servertiming v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketone/ext/tokens v0.0.0-00010101000000-000000000000
 )
 
@@ -146,3 +148,7 @@ replace github.com/pockethost/pocketone/ext/jserrors => ../../ext/jserrors
 replace github.com/pockethost/pocketone/ext/docker => ../../ext/docker
 
 replace github.com/pockethost/pocketone/ext/firewall => ../../ext/firewall
+
+replace github.com/pockethost/pocketone/ext/mothership => ../../ext/mothership
+
+replace github.com/pockethost/pocketone/ext/servertiming => ../../ext/servertiming

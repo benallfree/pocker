@@ -2,6 +2,7 @@ package edge
 
 import (
 	"context"
+	"github.com/pockethost/pocketone/ext/host"
 	"io"
 	"log/slog"
 	"net"
@@ -19,7 +20,7 @@ var quietLog = slog.New(slog.NewTextHandler(io.Discard, nil))
 func owner(t *testing.T) *httptest.Server {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == DefaultHealthPath {
+		if r.URL.Path == host.DefaultHealthPath {
 			_, _ = io.WriteString(w, `{"status":"ok"}`)
 			return
 		}
@@ -33,7 +34,7 @@ func owner(t *testing.T) *httptest.Server {
 	return srv
 }
 
-func serveRT(rt *Router, inst Instance, method, path string, hdr map[string]string) *httptest.ResponseRecorder {
+func serveRT(rt *Router, inst host.Instance, method, path string, hdr map[string]string) *httptest.ResponseRecorder {
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(method, "http://"+inst.Hosts[0]+path, nil)
 	for k, v := range hdr {
@@ -50,7 +51,7 @@ func TestForwardViaYAMLProvider(t *testing.T) {
 	edges := &YAMLProvider{SelfID: "lax-1", List: []StaticEdge{{ID: "sgp-1", InternalURL: o.URL}}}
 	rt := NewRouter(RouterConfig{Edges: edges, Logger: quietLog})
 	for _, remote := range []string{"edge:@sgp-1", "sgp-1"} {
-		inst := Instance{ID: "x", Hosts: []string{"x.example.com"}, Remote: remote}
+		inst := host.Instance{ID: "x", Hosts: []string{"x.example.com"}, Remote: remote}
 		w := serveRT(rt, inst, http.MethodGet, "/api/health", nil)
 		if w.Code != 200 || w.Body.String() != "owner x.example.com/api/health from lax-1" {
 			t.Fatalf("%s: %d %q", remote, w.Code, w.Body.String())
@@ -75,7 +76,7 @@ func TestUnavailableOwners(t *testing.T) {
 	}
 	rt := NewRouter(RouterConfig{Edges: edges, Logger: quietLog, UnavailableMessage: "down"})
 	for _, remote := range []string{"nope", "sgp-1", "ams-1"} {
-		w := serveRT(rt, Instance{ID: "x", Hosts: []string{"x.example.com"}, Remote: remote}, http.MethodGet, "/", nil)
+		w := serveRT(rt, host.Instance{ID: "x", Hosts: []string{"x.example.com"}, Remote: remote}, http.MethodGet, "/", nil)
 		if w.Code != http.StatusServiceUnavailable || w.Body.String() != "down" || w.Header().Get("Retry-After") == "" {
 			t.Fatalf("%s: %d %q", remote, w.Code, w.Body.String())
 		}
@@ -86,7 +87,7 @@ func TestUnavailableOwners(t *testing.T) {
 func TestNoBounce(t *testing.T) {
 	o := owner(t)
 	rt := NewRouter(RouterConfig{Edges: &YAMLProvider{List: []StaticEdge{{ID: "sgp-1", InternalURL: o.URL}}}, Logger: quietLog})
-	w := serveRT(rt, Instance{ID: "x", Hosts: []string{"x.example.com"}, Remote: "sgp-1"}, http.MethodGet, "/", map[string]string{"X-Edge-Forwarded-By": "ams-1"})
+	w := serveRT(rt, host.Instance{ID: "x", Hosts: []string{"x.example.com"}, Remote: "sgp-1"}, http.MethodGet, "/", map[string]string{"X-Edge-Forwarded-By": "ams-1"})
 	if w.Code != http.StatusMisdirectedRequest {
 		t.Fatalf("bounce: %d", w.Code)
 	}
@@ -112,7 +113,7 @@ func TestHoldAndReplay(t *testing.T) {
 			return
 		}
 		srv := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.URL.Path == DefaultHealthPath {
+			if r.URL.Path == host.DefaultHealthPath {
 				_, _ = io.WriteString(w, `{"status":"ok"}`)
 				return
 			}
@@ -125,7 +126,7 @@ func TestHoldAndReplay(t *testing.T) {
 	defer cancel()
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "http://x.example.com/", nil).WithContext(ctx)
-	rt.Forward(w, req, Instance{ID: "x", Hosts: []string{"x.example.com"}, Remote: "sgp-1"})
+	rt.Forward(w, req, host.Instance{ID: "x", Hosts: []string{"x.example.com"}, Remote: "sgp-1"})
 	if w.Code != 200 || w.Body.String() != "back" || probes.Load() == 0 {
 		t.Fatalf("held: %d %q (probes %d)", w.Code, w.Body.String(), probes.Load())
 	}
@@ -133,7 +134,7 @@ func TestHoldAndReplay(t *testing.T) {
 	edges["sgp-1"] = Edge{ID: "sgp-1", InternalURL: "http://" + freeAddrRT(t), Status: "online", LastSeen: time.Now()}
 	w = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodPost, "http://x.example.com/", strings.NewReader("body")).WithContext(ctx)
-	rt.Forward(w, req, Instance{ID: "x", Hosts: []string{"x.example.com"}, Remote: "sgp-1"})
+	rt.Forward(w, req, host.Instance{ID: "x", Hosts: []string{"x.example.com"}, Remote: "sgp-1"})
 	if w.Code != http.StatusServiceUnavailable {
 		t.Fatalf("POST to a refusing owner: %d", w.Code)
 	}
@@ -143,7 +144,7 @@ func TestHoldAndReplay(t *testing.T) {
 func TestCORSAtTheEntryEdge(t *testing.T) {
 	o := owner(t)
 	rt := NewRouter(RouterConfig{Edges: &YAMLProvider{List: []StaticEdge{{ID: "sgp-1", InternalURL: o.URL}}}, Logger: quietLog})
-	inst := Instance{ID: "x", Hosts: []string{"x.example.com"}, Remote: "sgp-1", Access: Access{CORSOrigins: []string{"https://app.example"}}}
+	inst := host.Instance{ID: "x", Hosts: []string{"x.example.com"}, Remote: "sgp-1", Access: host.Access{CORSOrigins: []string{"https://app.example"}}}
 	w := serveRT(rt, inst, http.MethodOptions, "/api/x", map[string]string{"Origin": "https://app.example", "Access-Control-Request-Method": "POST"})
 	if w.Code != http.StatusNoContent || w.Header().Get("Access-Control-Allow-Origin") != "https://app.example" {
 		t.Fatalf("preflight: %d %v", w.Code, w.Header())
@@ -161,7 +162,7 @@ func TestMultiProvider(t *testing.T) {
 		sourceFunc{"sgp-1": {ID: "sgp-1", InternalURL: o.URL, Status: "online", LastSeen: time.Now()}}}
 	rt := NewRouter(RouterConfig{Edges: m, Logger: quietLog})
 	for _, remote := range []string{"lab-1", "sgp-1"} {
-		if w := serveRT(rt, Instance{ID: "x", Hosts: []string{"x.example.com"}, Remote: remote}, http.MethodGet, "/", nil); w.Code != 200 {
+		if w := serveRT(rt, host.Instance{ID: "x", Hosts: []string{"x.example.com"}, Remote: remote}, http.MethodGet, "/", nil); w.Code != 200 {
 			t.Fatalf("%s: %d", remote, w.Code)
 		}
 	}

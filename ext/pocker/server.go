@@ -35,16 +35,13 @@ type Server struct {
 	// Forward, if set, serves requests for instances another server runs (see [ManagerOptions.Forward]).
 	Forward func(w http.ResponseWriter, r *http.Request, inst Instance)
 
-	// Firewall is the first gate every request passes (e.g. ext/firewall: allowed peers, client IPs, rate limits). It is
-	// configured from the config file. When nil, every gate registered with the host whose section the config file
-	// has is turned on (linking ext/firewall registers it for `firewall:` / `rate_limits:`).
-	Firewall host.ConfigurableGate
+	// Gates every request passes first, in order (e.g. ext/firewall: allowed peers, client IPs, rate limits).
+	Gates []host.Gate
 
 	// Background work run until shutdown (e.g. an edge provider's refresh).
 	Background []func(ctx context.Context)
 
-	// Plugins extend the server (see [Plugin]): settings from the config file, a request gate (e.g. the firewall
-	// plugin), TLS (e.g. the autotls plugin), handler wrappers and background work. Order matters for wrappers: the
+	// Plugins extend the server (see [Plugin]): their own settings, a request gate, TLS (e.g. the autotls plugin), handler wrappers and background work. Order matters for wrappers: the
 	// first listed is the outermost.
 	Plugins []Plugin
 
@@ -72,16 +69,7 @@ func (s *Server) Run(ctx context.Context) error {
 		Source: source, First: first, Forward: s.Forward, Dev: s.Config.Dev, Logger: log,
 		Listeners: host.Listeners{Listen: s.Config.Listen, PlainListen: s.Config.PlainListen, TLS: s.Config.TLS, ShutdownTimeout: s.Config.ShutdownTimeout},
 	}
-	fws := host.ConfiguredGates(s.Config.Doc())
-	if s.Firewall != nil {
-		fws = []host.ConfigurableGate{s.Firewall}
-	}
-	for _, fw := range fws {
-		if err := fw.Configure(s.Config.Doc(), s.Config.Dev); err != nil {
-			return err
-		}
-		h.Gates = append(h.Gates, fw)
-	}
+	h.Gates = append(h.Gates, s.Gates...)
 	if err := s.prepare(h); err != nil {
 		return err
 	}
@@ -123,17 +111,14 @@ func (s *Server) prepare(h *host.Host) error {
 	)
 	for _, p := range s.Plugins {
 		if c, ok := p.(Configurer); ok {
-			if err := c.Configure(s.Config.Doc(), s.Config); err != nil {
+			if err := c.Configure(s.Config); err != nil {
 				return fmt.Errorf("plugin %s: %w", p.Name(), err)
 			}
 		}
 		if cp, ok := p.(ceplugin.Plugin); ok {
 			// a PocketOne plugin: register it on every instance, with that instance's settings
 			if _, own := p.(AppIniter); !own {
-				hp, err := hostCEPlugin(cp, s.Config.Doc())
-				if err != nil {
-					return fmt.Errorf("plugin %s: %w", p.Name(), err)
-				}
+				hp := hostCEPlugin(cp)
 				initers = append(initers, hp)
 				jsIniters = append(jsIniters, hp)
 			}

@@ -7,7 +7,6 @@ import (
 
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"github.com/dop251/goja"
-	"gopkg.in/yaml.v3"
 )
 
 // Plugin extends a Pocker server (see [Server.Plugins]). A plugin implements Name and any of the optional
@@ -17,10 +16,10 @@ type Plugin interface {
 	Name() string
 }
 
-// Configurer reads a plugin's settings. doc is the whole config file (nil when there is none), so a plugin can own
-// its own top-level keys; cfg is the parsed core config. Configure runs once, before the server starts.
+// Configurer prepares a plugin before the server starts, once: a plugin reads its own pocketbase.yaml section here
+// (a [ceplugin.Section] it owns); cfg is the server's config.
 type Configurer interface {
-	Configure(doc *yaml.Node, cfg Config) error
+	Configure(cfg Config) error
 }
 
 // AppIniter sets up each instance's app right after it is created, before its JS hooks load and before it
@@ -69,6 +68,3 @@ type Starter interface {
 
 // DecodePluginConfig is [host.DecodePluginConfig].
 func DecodePluginConfig[T any](v any, out *T) error { return host.DecodePluginConfig(v, out) }
-
-// TopLevel is [host.TopLevel].
-func TopLevel(doc *yaml.Node, key string) *yaml.Node { return host.TopLevel(doc, key) }

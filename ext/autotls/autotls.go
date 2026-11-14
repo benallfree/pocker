@@ -1,8 +1,8 @@
 // Package autotls is a PocketOne plugin: automatic HTTPS certificates through ACME, with CertMagic (Caddy's
 // certificate engine). Two entry points:
 //
-//   - Under pocker, [New] is a server plugin that reads pocker.yaml's `tls:` block; certificate files
-//     (`tls.cert`/`tls.key`) stay a core feature.
+//   - Under pocker, [New] is a server plugin that reads pocketbase.yaml's `autotls` section; certificate files
+//     (`server.tls.cert`/`key`) stay a core feature.
 //
 //     srv := &pocker.Server{Config: cfg, Plugins: []pocker.Plugin{autotls.New()}}
 //
@@ -17,6 +17,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"github.com/pockethost/pocketone/ext/ceplugin"
 	"net"
 	"net/http"
 	"os"
@@ -26,10 +27,9 @@ import (
 	"github.com/caddyserver/certmagic"
 	"github.com/libdns/cloudflare"
 	"github.com/pockethost/pocketone/ext/pocker"
-	"gopkg.in/yaml.v3"
 )
 
-// Config is the plugin's part of pocker.yaml's `tls:` block.
+// Config is the `autotls` section (pocketbase.yaml), or the settings given in Go.
 type Config struct {
 	Auto    bool       `yaml:"auto" json:"auto"`
 	Email   string     `yaml:"email" json:"email"`
@@ -39,7 +39,7 @@ type Config struct {
 	DNS     *DNSConfig `yaml:"dns" json:"dns"`
 }
 
-// AutoTLS is the plugin ([pocker.Configurer], [pocker.TLSProvider]). It does nothing unless `tls.auto` is true.
+// AutoTLS is the plugin ([pocker.Configurer], [pocker.TLSProvider]). It does nothing unless `autotls.auto` is true.
 type AutoTLS struct {
 	// Config may be set before the server starts; the config file's `tls:` block is used when Auto is false here.
 	Config Config
@@ -54,13 +54,12 @@ func New() *AutoTLS { return &AutoTLS{} }
 // Name is the plugin's name.
 func (a *AutoTLS) Name() string { return "autotls" }
 
-// Configure reads `tls:` from the config file and checks it without touching the network.
-func (a *AutoTLS) Configure(doc *yaml.Node, cfg pocker.Config) error {
+// Configure reads pocketbase.yaml's `autotls` section (unless enabled in Go) and checks it without touching the
+// network.
+func (a *AutoTLS) Configure(cfg pocker.Config) error {
 	if !a.Config.Auto {
-		if n := pocker.TopLevel(doc, "tls"); n != nil {
-			if err := n.Decode(&a.Config); err != nil {
-				return fmt.Errorf("tls: %w", err)
-			}
+		if c, found := Section.Get(); found {
+			a.Config = c
 		}
 	}
 	a.certFiles = cfg.TLS.Cert != "" || cfg.TLS.Key != ""
@@ -251,3 +250,6 @@ func normalizeHost(h string) string {
 	}
 	return strings.TrimSuffix(h, ".")
 }
+
+// Section is the key of the `autotls` section (pocketbase.yaml): automatic certificates for a pocker host.
+var Section = ceplugin.NewSection("autotls", Config{}, "Automatic HTTPS certificates (ACME) for a pocker host: auto, email, CA, domains, DNS-01.")

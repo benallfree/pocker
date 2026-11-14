@@ -4,12 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/pockethost/pocketone/ext/ceplugin"
-	"gopkg.in/yaml.v3"
 )
 
 // Edge is one server in a fleet: another edge requests can be forwarded to.
@@ -50,18 +48,6 @@ type EdgesConfig struct {
 	List []StaticEdge `yaml:"list"`
 }
 
-// EdgesFromConfig builds the [YAMLProvider] for an `edges:` section (node may be nil: no section, nil result).
-func EdgesFromConfig(node *yaml.Node, log *slog.Logger) (EdgeSource, error) {
-	if node == nil {
-		return nil, nil
-	}
-	var c EdgesConfig
-	if err := node.Decode(&c); err != nil {
-		return nil, fmt.Errorf("edges: %w", err)
-	}
-	return c.Build(log)
-}
-
 // Build returns the [YAMLProvider] c describes.
 func (c EdgesConfig) Build(log *slog.Logger) (EdgeSource, error) {
 	for i, e := range c.List {
@@ -70,23 +56,6 @@ func (c EdgesConfig) Build(log *slog.Logger) (EdgeSource, error) {
 		}
 	}
 	return &YAMLProvider{SelfID: c.Self, List: c.List}, nil
-}
-
-// LoadEdges reads the `edges:` section of a YAML config file (nil, nil when the file has none).
-func LoadEdges(path string, log *slog.Logger) (EdgeSource, error) {
-	b, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	var doc yaml.Node
-	if err := yaml.Unmarshal(b, &doc); err != nil {
-		return nil, fmt.Errorf("%s: %w", path, err)
-	}
-	src, err := EdgesFromConfig(TopLevel(&doc, "edges"), log)
-	if err != nil {
-		return nil, fmt.Errorf("%s: %w", path, err)
-	}
-	return src, nil
 }
 
 // YAMLProvider is a fixed list of edges, e.g. a config file's `edges.list`. An instance's Remote names its owner as

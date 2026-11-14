@@ -11,6 +11,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/pockethost/pocketone/ext/host"
 	"io"
 	"log/slog"
 	"net"
@@ -32,7 +33,7 @@ type RouterConfig struct {
 	// (default "X-Edge-Forwarded-By").
 	ForwardedByHeader string
 	// HealthPath is probed on the owner (GET <internal_url><HealthPath>, 200 {"status":"ok"}); default
-	// [DefaultHealthPath].
+	// [host.DefaultHealthPath].
 	HealthPath string
 	// HealthyWindow: an edge heard from more recently than this is healthy without a probe (default 30s).
 	HealthyWindow time.Duration
@@ -78,7 +79,7 @@ func NewRouter(cfg RouterConfig) *Router {
 		cfg.ForwardedByHeader = "X-Edge-Forwarded-By"
 	}
 	if cfg.HealthPath == "" {
-		cfg.HealthPath = DefaultHealthPath
+		cfg.HealthPath = host.DefaultHealthPath
 	}
 	if cfg.HealthyWindow <= 0 {
 		cfg.HealthyWindow = 30 * time.Second
@@ -235,8 +236,8 @@ func isUnreachable(err error) bool {
 var idempotent = map[string]bool{http.MethodGet: true, http.MethodHead: true, http.MethodOptions: true}
 
 // Forward serves a request for an instance another edge runs (plug into [Handler.Forward]).
-func (rt *Router) Forward(w http.ResponseWriter, r *http.Request, inst Instance) {
-	host := NormalizeHost(r.Host)
+func (rt *Router) Forward(w http.ResponseWriter, r *http.Request, inst host.Instance) {
+	host := host.NormalizeHost(r.Host)
 	if r.Header.Get(rt.cfg.ForwardedByHeader) != "" {
 		// the forwarding edge says it's ours, we say it isn't: answer, don't bounce it back
 		http.Error(w, host+" "+rt.cfg.MisdirectedSuffix, http.StatusMisdirectedRequest)

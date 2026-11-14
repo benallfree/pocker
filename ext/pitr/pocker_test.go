@@ -2,6 +2,7 @@ package pitr
 
 import (
 	"context"
+	"github.com/pockethost/pocketone/ext/ceplugin"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -147,13 +148,22 @@ func TestPockerRestoreRestartsOnlyThatInstance(t *testing.T) {
 	}
 }
 
-func TestConfigureAndInstanceConfig(t *testing.T) {
-	var doc yaml.Node
-	if err := yaml.Unmarshal([]byte("pitr:\n  enabled: false\n  retention: 48h\n  bucket:\n    bucket: x\n    label: EU\n"), &doc); err != nil {
-		t.Fatal(err)
+// sectionSource serves sections from YAML text (what ext/config does for pocketbase.yaml).
+type sectionSource map[string]string
+
+func (s sectionSource) DecodeSection(name string, out any) (bool, error) {
+	v, ok := s[name]
+	if !ok {
+		return false, nil
 	}
+	return true, yaml.Unmarshal([]byte(v), out)
+}
+
+func TestConfigureAndInstanceConfig(t *testing.T) {
+	ceplugin.SetSectionSource(sectionSource{"pitr": "enabled: false\nretention: 48h\n"})
+	t.Cleanup(func() { ceplugin.SetSectionSource(nil) })
 	p := New(Config{SnapshotInterval: time.Hour, Logger: quiet})
-	if err := p.Configure(&doc, pocker.Config{}); err != nil {
+	if err := p.Configure(pocker.Config{}); err != nil {
 		t.Fatal(err)
 	}
 	c := p.Config()
@@ -162,7 +172,7 @@ func TestConfigureAndInstanceConfig(t *testing.T) {
 	}
 	// Go-set values win over the file
 	p2 := New(Config{Retention: 24 * time.Hour, Logger: quiet})
-	_ = p2.Configure(&doc, pocker.Config{})
+	_ = p2.Configure(pocker.Config{})
 	if p2.Config().Retention != 24*time.Hour {
 		t.Fatalf("file overrode a Go-set retention: %v", p2.Config().Retention)
 	}

@@ -4,9 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/pockethost/pocketone/ext/ceplugin"
 	"time"
-
-	"gopkg.in/yaml.v3"
 
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"github.com/pockethost/pocketone/ext/pocker"
@@ -25,16 +24,11 @@ var (
 	_ pocker.Starter    = (*Plugin)(nil)
 )
 
-// Configure reads the config file's top-level `pitr:` key. Fields already set in Go are kept; the file fills the
-// rest.
-func (p *Plugin) Configure(doc *yaml.Node, _ pocker.Config) error {
-	n := pocker.TopLevel(doc, Name)
-	if n == nil {
+// Configure reads pocketbase.yaml's `pitr` section. Fields already set in Go are kept; the section fills the rest.
+func (p *Plugin) Configure(pocker.Config) error {
+	c, found := Section.Get()
+	if !found {
 		return nil
-	}
-	var c Config
-	if err := n.Decode(&c); err != nil {
-		return fmt.Errorf("pitr: %w", err)
 	}
 	if p.cfg.Enabled == nil {
 		p.cfg.Enabled = c.Enabled
@@ -44,12 +38,6 @@ func (p *Plugin) Configure(doc *yaml.Node, _ pocker.Config) error {
 	}
 	if !p.intervalSet && c.SnapshotInterval > 0 {
 		p.cfg.SnapshotInterval = c.SnapshotInterval
-	}
-	var probe map[string]any
-	if n.Decode(&probe) == nil {
-		if _, ok := probe["bucket"]; ok {
-			p.log.Warn("pitr: `pitr.bucket` is no longer read; history goes to the app's own PITR S3 setting, else the storage plugin's `litestream` mount, else pb_data/litestream/")
-		}
 	}
 	return nil
 }
@@ -112,3 +100,6 @@ func (p *Plugin) Start(ctx context.Context, _ *pocker.Manager) {
 		p.log.Warn("pitr: close", "error", err)
 	}
 }
+
+// Section is the key of the `pitr` section (pocketbase.yaml): point-in-time restore defaults on a pocker host.
+var Section = ceplugin.NewSection(Name, Config{}, "Point-in-time restore on a pocker host: on by default, retention, snapshot interval (instances may override).")

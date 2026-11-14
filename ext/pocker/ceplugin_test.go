@@ -6,7 +6,6 @@ import (
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"github.com/dop251/goja"
 	"github.com/pockethost/pocketone/ext/ceplugin"
-	"gopkg.in/yaml.v3"
 )
 
 type fakeCEPlugin struct {
@@ -34,15 +33,8 @@ func (f *fakeCEPlugin) BindJS(app core.App, _ *goja.Runtime) {
 }
 
 func TestHostedCEPlugin(t *testing.T) {
-	var doc yaml.Node
-	if err := yaml.Unmarshal([]byte("fake:\n  daily: 100\n"), &doc); err != nil {
-		t.Fatal(err)
-	}
 	f := &fakeCEPlugin{got: map[string]int{}, bound: map[string]bool{}}
-	h, err := hostCEPlugin(f, &doc)
-	if err != nil {
-		t.Fatal(err)
-	}
+	h := hostCEPlugin(f)
 
 	run := func(inst Instance) {
 		t.Helper()
@@ -54,12 +46,12 @@ func TestHostedCEPlugin(t *testing.T) {
 		h.InitJS(inst, app, goja.New())
 	}
 
-	run(Instance{ID: "process"})                                                                // config file only
+	run(Instance{ID: "plain"})                                                                  // the plugin's own defaults
 	run(Instance{ID: "own", Plugins: map[string]any{"fake": map[string]any{"daily": 7}}})       // instance wins
 	run(Instance{ID: "typed", Plugins: map[string]any{"fake": &fakeSettings{Daily: 3}}})        // a host's typed value
 	run(Instance{ID: "off", Plugins: map[string]any{"fake": map[string]any{"enabled": false}}}) // turned off
 
-	want := map[string]int{"process": 100, "own": 7, "typed": 3}
+	want := map[string]int{"plain": 1, "own": 7, "typed": 3}
 	for id, d := range want {
 		if f.got[id] != d || !f.bound[id] {
 			t.Fatalf("%s: daily %d bound %v, want %d", id, f.got[id], f.bound[id], d)

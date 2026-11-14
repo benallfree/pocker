@@ -1,5 +1,5 @@
 // Package mirror is the edge side of ext/mothership: it follows a mothership over PocketBase's realtime stream and
-// serves what it learns to ext/edge as an [edge.InstanceSource] (which instances exist, and which this edge runs) and
+// serves what it learns to ext/edge as an [host.InstanceSource] (which instances exist, and which this edge runs) and
 // an [edge.EdgeSource] (where the other edges are).
 //
 // Each edge only receives what is relevant to it. The stream is a set of filtered views:
@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/pockethost/pocketone/ext/host"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -100,7 +101,7 @@ type Extension interface {
 	// Views are the extra views to follow.
 	Views() []View
 	// Instance adjusts inst, just built from local (this edge's full instance record).
-	Instance(m *Mirror, local Record, inst *edge.Instance)
+	Instance(m *Mirror, local Record, inst *host.Instance)
 	// Changed reports the instances to rebuild after rec changed in one of its views.
 	Changed(m *Mirror, view string, rec Record, deleted bool) (instanceIDs []string)
 }
@@ -138,15 +139,15 @@ type Mirror struct {
 	topicView map[string]string
 	recs      map[string]map[string]Record // view -> record id -> record
 
-	cur     map[string]edge.Instance // built instances, by id (mirror goroutine only)
+	cur     map[string]host.Instance // built instances, by id (mirror goroutine only)
 	events  <-chan event
 	started atomic.Bool
 	done    <-chan struct{} // the Watch context's
-	out     chan edge.Change
+	out     chan host.Change
 }
 
 var (
-	_ edge.InstanceSource = (*Mirror)(nil)
+	_ host.InstanceSource = (*Mirror)(nil)
 	_ edge.EdgeSource     = (*Mirror)(nil)
 )
 
@@ -157,12 +158,12 @@ func New(cfg Config) *Mirror {
 		log = slog.Default()
 	}
 	return &Mirror{cfg: cfg, c: newClient(cfg.URL, cfg.Email, cfg.Password, cfg.HTTPClient), log: log,
-		recs: map[string]map[string]Record{}, cur: map[string]edge.Instance{}, out: make(chan edge.Change, 256)}
+		recs: map[string]map[string]Record{}, cur: map[string]host.Instance{}, out: make(chan host.Change, 256)}
 }
 
-// Snapshot implements [edge.InstanceSource]: it finds (or registers) this edge's record, opens the stream with every
+// Snapshot implements [host.InstanceSource]: it finds (or registers) this edge's record, opens the stream with every
 // view subscribed, loads the views and returns the instances.
-func (m *Mirror) Snapshot(ctx context.Context) ([]edge.Instance, error) {
+func (m *Mirror) Snapshot(ctx context.Context) ([]host.Instance, error) {
 	if m.cfg.Self == "" {
 		return nil, errors.New("mothership: this edge's id (self) is required")
 	}
@@ -175,7 +176,7 @@ func (m *Mirror) Snapshot(ctx context.Context) ([]edge.Instance, error) {
 		return nil, err
 	}
 	m.rebuildAll()
-	out := make([]edge.Instance, 0, len(m.cur))
+	out := make([]host.Instance, 0, len(m.cur))
 	for _, inst := range m.cur {
 		out = append(out, inst)
 	}
@@ -185,8 +186,8 @@ func (m *Mirror) Snapshot(ctx context.Context) ([]edge.Instance, error) {
 	return out, nil
 }
 
-// Watch implements [edge.InstanceSource]: changes stream until ctx is done. The stream reconnects on its own.
-func (m *Mirror) Watch(ctx context.Context) (<-chan edge.Change, error) {
+// Watch implements [host.InstanceSource]: changes stream until ctx is done. The stream reconnects on its own.
+func (m *Mirror) Watch(ctx context.Context) (<-chan host.Change, error) {
 	if m.started.CompareAndSwap(false, true) {
 		m.done = ctx.Done()
 		go m.loop(ctx)
@@ -565,15 +566,15 @@ func (m *Mirror) rebuild(ids []string) {
 		switch {
 		case ok && (!had || !reflect.DeepEqual(prev, next)):
 			m.cur[id] = next
-			m.emit(edge.Change{Kind: edge.Upsert, Instance: next})
+			m.emit(host.Change{Kind: host.Upsert, Instance: next})
 		case !ok && had:
 			delete(m.cur, id)
-			m.emit(edge.Change{Kind: edge.Delete, Instance: edge.Instance{ID: id}})
+			m.emit(host.Change{Kind: host.Delete, Instance: host.Instance{ID: id}})
 		}
 	}
 }
 
-func (m *Mirror) emit(c edge.Change) {
+func (m *Mirror) emit(c host.Change) {
 	if !m.started.Load() {
 		return // before Watch: Snapshot returns m.cur instead
 	}
@@ -585,23 +586,23 @@ func (m *Mirror) emit(c edge.Change) {
 
 // build returns the instance for a record id: remote (routing only) when another edge owns it, full when this edge
 // does and its local record has arrived; ok is false when it isn't served anywhere (no edge) or isn't known.
-func (m *Mirror) build(id string) (edge.Instance, bool) {
+func (m *Mirror) build(id string) (host.Instance, bool) {
 	route := m.Get(ViewRoutes, id)
 	if route == nil {
-		return edge.Instance{}, false
+		return host.Instance{}, false
 	}
 	owner := route.String("edge")
 	if owner == "" {
-		return edge.Instance{}, false // not placed
+		return host.Instance{}, false // not placed
 	}
 	if owner != m.SelfRecord() {
-		return edge.Instance{ID: id, Hosts: m.hosts(route), Remote: "edge:" + owner}, true
+		return host.Instance{ID: id, Hosts: m.hosts(route), Remote: "edge:" + owner}, true
 	}
 	local := m.Get(ViewLocal, id)
 	if local == nil {
-		return edge.Instance{}, false // its full record is on the way
+		return host.Instance{}, false // its full record is on the way
 	}
-	inst := edge.Instance{
+	inst := host.Instance{
 		ID:            id,
 		Hosts:         m.hosts(local),
 		Version:       local.String("version"),
@@ -614,9 +615,9 @@ func (m *Mirror) build(id string) (edge.Instance, bool) {
 	_ = local.Decode("plugins", &inst.Plugins)
 	switch {
 	case local.String("suspension") != "":
-		inst.Blocked = &edge.Blocked{Status: http.StatusForbidden, Message: local.String("suspension")}
+		inst.Blocked = &host.Blocked{Status: http.StatusForbidden, Message: local.String("suspension")}
 	case !local.Bool("power"):
-		inst.Blocked = &edge.Blocked{Status: http.StatusConflict, Message: "instance is powered off"}
+		inst.Blocked = &host.Blocked{Status: http.StatusConflict, Message: "instance is powered off"}
 	}
 	for _, x := range m.cfg.Extensions {
 		x.Instance(m, local, &inst)

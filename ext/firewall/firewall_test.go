@@ -128,7 +128,7 @@ func TestRateLimitsTrustedWeightsConcurrency(t *testing.T) {
 	}
 }
 
-// The whole path: pocker.yaml keys, per-instance plugins.firewall from instances.yaml, header names, 429.
+// The whole path: per-instance plugins.firewall from instances.yaml, header names, 429.
 
 // A trusted client (an SSR proxy) names its end user in a trusted_client_headers header: each user gets their own
 // per-IP bucket with the trusted limits. The same header from an untrusted client is ignored (no spoofing).
@@ -154,7 +154,7 @@ func TestTrustedClientNamesEndUser(t *testing.T) {
 
 	for _, c := range []struct {
 		name, proxy, header string
-		in                 host.Instance
+		in                  host.Instance
 	}{
 		{"process trusted_clients, PocketHost's header", "198.51.100.1:1", "X-PocketHost-Client-IP", inst("a")},
 		{"instance trusted_ips, default header", "203.0.113.50:1", "X-Client-IP", inst("b", "203.0.113.50")},

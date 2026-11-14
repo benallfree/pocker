@@ -30,13 +30,10 @@ import (
 
 func main() {
 	dev := flag.Bool("dev", false, "serve any hostname (alpha.localhost, beta.localhost, ...); otherwise instances.yaml is required")
-	listen := flag.String("listen", "", "HTTP address for the instances (default from pocker.yaml, else :8090)")
+	listen := flag.String("listen", "", "HTTP address for the instances (default :8090)")
 	flag.Parse()
 
-	cfg, err := pocker.LoadConfig("pocker.yaml") // defaults apply when the file is missing
-	if err != nil {
-		log.Fatal(err)
-	}
+	cfg := pocker.DefaultConfig()
 	cfg.Dev = cfg.Dev || *dev
 	if *listen != "" {
 		cfg.Listen = *listen

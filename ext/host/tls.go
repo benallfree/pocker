@@ -9,8 +9,8 @@ import (
 	"time"
 )
 
-// TLSConfig enables HTTPS on Listen (pocker.yaml `tls:`), either from certificate files (re-read when they change, so
-// a renewal needs no restart). Automatic certificates (ACME) are the autotls plugin, which also reads `tls:`.
+// TLSConfig enables HTTPS on Listen (pocketbase.yaml `server.tls`), from certificate files (re-read when they change,
+// so a renewal needs no restart). Automatic certificates (ACME) are the autotls plugin (its `autotls` section).
 //
 //	tls:
 //	  cert: /etc/letsencrypt/live/example.com/fullchain.pem
