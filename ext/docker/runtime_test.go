@@ -1,8 +1,8 @@
 package docker
 
 import (
-	"encoding/json"
 	"context"
+	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
@@ -65,6 +65,14 @@ func testVersions(t *testing.T, b *Binaries) staticVersions {
 		t.Fatal(err)
 	}
 	return rs
+}
+
+func TestPoweredBy(t *testing.T) {
+	for in, want := range map[string]string{"pb:0.23.8": "PocketBase 0.23.8", "p1:0.0.1": "PocketOne 0.0.1", "": "", "0.36.9": ""} {
+		if got := PoweredBy(in); got != want {
+			t.Errorf("PoweredBy(%q) = %q, want %q", in, got, want)
+		}
+	}
 }
 
 func get(t *testing.T, rt *Runtime, inst host.Instance, path string) (int, string) {
@@ -138,6 +146,12 @@ func TestRuntime(t *testing.T) {
 	}
 	if code, body := get(t, rt, a, "/env"); code != 200 || body != "bar|cedockera|pb:0.23.12" {
 		t.Fatalf("a /env: %d %q", code, body)
+	}
+	// upstream PocketBase sends no X-Powered-By: the runtime names the release
+	hw := httptest.NewRecorder()
+	rt.ServeInstance(hw, httptest.NewRequest(http.MethodGet, "http://"+a.ID+".test/api/health", nil), a)
+	if got := hw.Header().Values("X-Powered-By"); len(got) != 1 || got[0] != "PocketBase 0.23.12" {
+		t.Fatalf("a X-Powered-By: %v", got)
 	}
 	if rt.RunningCount() != 2 {
 		t.Fatalf("running: %d", rt.RunningCount())

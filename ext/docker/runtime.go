@@ -125,6 +125,8 @@ type ctr struct {
 	hash      string // its LabelSpec ("" = adopted from another manager: kept until the instance changes)
 	dirty     bool   // the instance changed since the container started
 
+	poweredBy atomic.Value // string: the X-Powered-By for responses that carry none ("PocketBase 0.36.9")
+
 	running  atomic.Bool // container != "" (readable without mu, which a start holds for seconds)
 	inflight atomic.Int64
 	lastUsed atomic.Int64 // unix nanos
@@ -315,6 +317,7 @@ func (rt *Runtime) adopt(ctx context.Context) error {
 		}
 		c := rt.get(id)
 		c.container, c.port, c.hash = s.ID, info.hostPort(), hash
+		c.poweredBy.Store(PoweredBy(s.Labels[LabelVersion]))
 		c.running.Store(true)
 		c.lastUsed.Store(time.Now().UnixNano())
 		go rt.follow(c.inst, s.ID, time.Now())
@@ -362,6 +365,15 @@ func (rt *Runtime) ServeInstance(w http.ResponseWriter, r *http.Request, inst ho
 		},
 		Transport:     rt.tr,
 		FlushInterval: -1, // realtime (SSE) streams flush at once
+		ModifyResponse: func(res *http.Response) error {
+			// the instance's server names itself; a release that doesn't (upstream PocketBase) gets named here
+			if res.Header.Get("X-Powered-By") == "" {
+				if v, _ := c.poweredBy.Load().(string); v != "" {
+					res.Header.Set("X-Powered-By", v)
+				}
+			}
+			return nil
+		},
 		ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
 			if errors.Is(r.Context().Err(), context.Canceled) {
 				return
@@ -375,6 +387,22 @@ func (rt *Runtime) ServeInstance(w http.ResponseWriter, r *http.Request, inst ho
 		},
 	}
 	p.ServeHTTP(w, r)
+}
+
+// PoweredBy names a release for X-Powered-By: "pb:0.23.8" → "PocketBase 0.23.8", "p1:0.0.1" → "PocketOne 0.0.1"
+// ("" for anything else, e.g. an adopted container without a version label).
+func PoweredBy(key string) string {
+	line, v, ok := strings.Cut(key, ":")
+	if !ok || v == "" {
+		return ""
+	}
+	switch line {
+	case LinePB:
+		return "PocketBase " + v
+	case LineP1:
+		return "PocketOne " + v
+	}
+	return ""
 }
 
 // forget drops a container that no longer answers on port.
@@ -587,6 +615,7 @@ func (rt *Runtime) startLocked(ctx context.Context, c *ctr, inst host.Instance, 
 		return 0, err
 	}
 	c.container, c.port, c.hash, c.dirty = id, port, cfg.Labels[LabelSpec], false
+	c.poweredBy.Store(PoweredBy(version))
 	c.running.Store(true)
 	started := inst
 	c.last = &started

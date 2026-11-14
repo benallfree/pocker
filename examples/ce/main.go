@@ -26,21 +26,22 @@ import (
 	"github.com/pockethost/pocketone/ext/bulkmail"
 	"github.com/pockethost/pocketone/ext/ceplugin"
 	"github.com/pockethost/pocketone/ext/config"
-	"github.com/pockethost/pocketone/ext/docker"
 	"github.com/pockethost/pocketone/ext/deploy"
+	"github.com/pockethost/pocketone/ext/docker"
 	"github.com/pockethost/pocketone/ext/jserrors"
 	"github.com/pockethost/pocketone/ext/mailtrap"
 	"github.com/pockethost/pocketone/ext/mcp"
 	oauthserver "github.com/pockethost/pocketone/ext/oauth-server"
 	"github.com/pockethost/pocketone/ext/pages"
 	"github.com/pockethost/pocketone/ext/pitr"
+	"github.com/pockethost/pocketone/ext/pocker"
 	"github.com/pockethost/pocketone/ext/remotes"
 	"github.com/pockethost/pocketone/ext/s3redirect"
 	"github.com/pockethost/pocketone/ext/tokens"
 )
 
-// PoweredBy is the X-Powered-By this binary sends on every response.
-const PoweredBy = "PocketOne"
+// PoweredBy is the X-Powered-By this binary sends on every response: "PocketOne 0.0.2" (see pocker.Version).
+var PoweredBy = "PocketOne " + pocker.Version()
 
 func main() {
 	// pocketbase.yaml (and the .env beside it): each plugin's section, defaults for the flags below (flags win)
