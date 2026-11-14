@@ -43,7 +43,7 @@ func keys(rs []Release) string {
 
 // The one place that culls: newest patch per minor and line, upstream from 0.23 on.
 func TestLatestPatches(t *testing.T) {
-	in := []Release{rel("pb", "0.22.30"), rel("pb", "0.23.1"), rel("pb", "0.23.12"), rel("pb", "0.36.9"), rel("pb", "0.36.10"),
+	in := []Release{rel("pb", "0.43.0-rc1"), rel("p1", "0.0.3-beta.1"), rel("pb", "0.22.30"), rel("pb", "0.23.1"), rel("pb", "0.23.12"), rel("pb", "0.36.9"), rel("pb", "0.36.10"),
 		rel("pb", "0.42.0"), rel("pb", "0.42.2"), rel("p1", "0.0.1"), rel("p1", "0.0.2"), rel("p1", "0.1.0"), rel("pb", "bogus")}
 	if got := keys(LatestPatches(in)); got != "p1:0.0.2,p1:0.1.0,pb:0.23.12,pb:0.36.10,pb:0.42.2" {
 		t.Fatalf("got %s", got)
@@ -52,7 +52,8 @@ func TestLatestPatches(t *testing.T) {
 
 // The one place that matches an instance's version to a release.
 func TestPick(t *testing.T) {
-	rs := []Release{rel("pb", "0.23.12"), rel("pb", "0.36.9"), rel("pb", "0.36.10"), rel("p1", "0.0.1"), rel("p1", "0.0.2")}
+	rs := []Release{rel("pb", "0.23.12"), rel("pb", "0.36.9"), rel("pb", "0.36.10"), rel("p1", "0.0.1"), rel("p1", "0.0.2"),
+		rel("pb", "0.36.11-rc1"), rel("p1", "0.0.3-beta.1")} // pre-releases in a list are never picked
 	for want, exp := range map[string]string{
 		"0.36.*": "pb:0.36.10", "pb:0.36.*": "pb:0.36.10", "pb:0.36.9": "pb:0.36.9", "~0.23.1": "pb:0.23.12",
 		"p1:0.0.*": "p1:0.0.2", "p1:0.0.1": "p1:0.0.1", "v0.23.12": "pb:0.23.12",
@@ -130,7 +131,7 @@ func TestDiscoveryAndUpdate(t *testing.T) {
 	zipP1, sumP1 := fakeRelease(t, "p1 0.0.2", "pocketone")
 	mux := http.NewServeMux()
 	mux.HandleFunc("/upstream/refs", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, "001e# service=git-upload-pack\n0000 refs/tags/v0.22.30 refs/tags/v0.36.8 refs/tags/v0.36.9 refs/tags/v0.36.9^{} refs/tags/v0.42.1 refs/tags/v0.42.2 refs/tags/v0.43.0-rc1\n")
+		fmt.Fprint(w, "001e# service=git-upload-pack\n0000 refs/tags/v0.22.30 refs/tags/v0.36.8 refs/tags/v0.36.9 refs/tags/v0.36.9^{} refs/tags/v0.42.1 refs/tags/v0.42.2 refs/tags/v0.43.0-rc1 refs/tags/v0.42.3-beta.2\n")
 	})
 	mux.HandleFunc("/p1/refs", func(w http.ResponseWriter, r *http.Request) { fmt.Fprint(w, "refs/tags/v0.0.1 refs/tags/v0.0.2\n") })
 	// the new host has 0.42.x only; the archive has the older ones

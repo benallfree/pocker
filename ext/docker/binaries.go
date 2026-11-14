@@ -88,8 +88,8 @@ func Pick(rs []Release, want string) (Release, error) {
 			continue
 		}
 		v, err := semver.StrictNewVersion(r.Version)
-		if err != nil || !c.Check(v) || (line == LinePB && v.LessThan(semver.MustParse(MinUpstream))) {
-			continue
+		if err != nil || v.Prerelease() != "" || !c.Check(v) || (line == LinePB && v.LessThan(semver.MustParse(MinUpstream))) {
+			continue // pre-releases are never served
 		}
 		if best == nil || v.GreaterThan(best) {
 			best, pick = v, r
