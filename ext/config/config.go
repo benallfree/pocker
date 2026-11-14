@@ -300,11 +300,16 @@ func dedupe(s []string) []string {
 // ErrNoProvider is returned when the config names a runtime provider this binary doesn't link.
 var ErrNoProvider = errors.New("this binary links no runtime provider")
 
-// ResolvePath makes a relative path from the config file relative to the file's folder (so a config file works
-// from any working directory). Absolute and empty paths, and paths without a config file, are returned unchanged.
+// ResolvePath makes a relative path from the config file absolute, relative to the file's folder (so a config file
+// works from any working directory, and paths handed to other processes, such as docker bind mounts, are absolute).
+// Absolute and empty paths, and paths without a config file, are returned unchanged.
 func (c *Config) ResolvePath(p string) string {
 	if p == "" || filepath.IsAbs(p) || c.Path == "" {
 		return p
 	}
-	return filepath.Join(filepath.Dir(c.Path), p)
+	joined := filepath.Join(filepath.Dir(c.Path), p)
+	if abs, err := filepath.Abs(joined); err == nil {
+		return abs
+	}
+	return joined
 }

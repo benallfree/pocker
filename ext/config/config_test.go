@@ -153,3 +153,14 @@ func TestCommand(t *testing.T) {
 		t.Fatalf("list: %v %q", err, out.String())
 	}
 }
+
+func TestResolvePathIsAbsolute(t *testing.T) {
+	c := &Config{Path: "pocketbase.yaml"} // a relative --config
+	got := c.ResolvePath("./instances")
+	if !filepath.IsAbs(got) || filepath.Base(got) != "instances" {
+		t.Fatalf("ResolvePath = %q, want an absolute path ending in instances", got)
+	}
+	if got := c.ResolvePath("/abs/x"); got != "/abs/x" {
+		t.Fatalf("absolute path changed: %q", got)
+	}
+}
