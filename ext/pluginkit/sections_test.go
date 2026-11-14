@@ -1,4 +1,4 @@
-package ceplugin
+package pluginkit
 
 import (
 	"encoding/json"

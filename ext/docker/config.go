@@ -6,8 +6,8 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/pockethost/pocketone/ext/ceplugin"
 	"github.com/pockethost/pocketone/ext/host"
+	"github.com/pockethost/pocketone/ext/pluginkit"
 )
 
 // SectionConfig is the `docker` section (pocketbase.yaml, ext/config): settings for running each instance in its
@@ -47,7 +47,7 @@ type SectionConfig struct {
 }
 
 // Section is the key of the `docker` section.
-var Section = ceplugin.NewSectionFunc("docker", func() SectionConfig { return SectionConfig{} },
+var Section = pluginkit.NewSectionFunc("docker", func() SectionConfig { return SectionConfig{} },
 	"Runtime provider docker: each instance in its own container with the PocketBase (pb:) or PocketOne (p1:) binary of its version (image, binary cache and manifest, instance root, default version, idle stop, limits).")
 
 // ConfigFromSection builds a Config from a `docker` section. resolve makes relative paths absolute (nil = as is).

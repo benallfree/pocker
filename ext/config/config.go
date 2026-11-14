@@ -1,9 +1,9 @@
 // Package config is PocketOne's config file: pocketbase.yaml, with secrets in a .env beside it.
 //
-// Each plugin owns one top-level section, declared with ceplugin.NewSection (a typed key the owner exports); a
+// Each plugin owns one top-level section, declared with pluginkit.NewSection (a typed key the owner exports); a
 // plugin reads a section only through its owner's key. This package finds and parses the files, expands $VARS,
 // checks that every top-level key belongs to a linked plugin and that every section decodes, and hands sections to
-// their keys (ceplugin.SetSectionSource).
+// their keys (pluginkit.SetSectionSource).
 //
 // The .env stays private to the process: it is used only to expand $VAR references in pocketbase.yaml. It is never
 // written to the process environment, so JS hooks ($os.getenv) and instances don't see it, except names an operator
@@ -18,7 +18,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/pockethost/pocketone/ext/ceplugin"
+	"github.com/pockethost/pocketone/ext/pluginkit"
 	"gopkg.in/yaml.v3"
 )
 
@@ -41,7 +41,7 @@ type Config struct {
 	env      map[string]string
 }
 
-var _ ceplugin.SectionSource = (*Config)(nil)
+var _ pluginkit.SectionSource = (*Config)(nil)
 
 // FromArgs reads --config and --env-file from command line arguments (before the full flag parse, which needs the
 // config's values as defaults).
@@ -74,7 +74,7 @@ func Load(o Options) (*Config, error) {
 	if err := c.Check(); err != nil {
 		return nil, err
 	}
-	ceplugin.SetSectionSource(c)
+	pluginkit.SetSectionSource(c)
 	return c, nil
 }
 
@@ -145,25 +145,25 @@ func Read(o Options) (*Config, error) {
 func (c *Config) Check() error {
 	var unknown []string
 	for k := range c.sections {
-		if !ceplugin.IsSection(k) {
+		if !pluginkit.IsSection(k) {
 			unknown = append(unknown, k)
 		}
 	}
 	if len(unknown) > 0 {
 		sort.Strings(unknown)
 		var known []string
-		for _, s := range ceplugin.Sections() {
+		for _, s := range pluginkit.Sections() {
 			known = append(known, s.Name)
 		}
 		return fmt.Errorf("%s: unknown section(s) %s (sections in this binary: %s)", c.Path, strings.Join(unknown, ", "), strings.Join(known, ", "))
 	}
-	if err := ceplugin.CheckSections(c); err != nil {
+	if err := pluginkit.CheckSections(c); err != nil {
 		return fmt.Errorf("%s: %w", c.Path, err)
 	}
 	return nil
 }
 
-// DecodeSection implements ceplugin.SectionSource.
+// DecodeSection implements pluginkit.SectionSource.
 func (c *Config) DecodeSection(name string, out any) (bool, error) {
 	n, ok := c.sections[name]
 	if !ok {

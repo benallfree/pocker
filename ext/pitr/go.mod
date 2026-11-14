@@ -46,7 +46,7 @@ require (
 	github.com/matttproud/golang_protobuf_extensions/v2 v2.0.0 // indirect
 	github.com/ncruces/go-strftime v1.1.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.23 // indirect
-	github.com/pockethost/pocketone/ext/ceplugin v0.0.0-00010101000000-000000000000 // indirect
+	github.com/pockethost/pocketone/ext/pluginkit v0.0.0-00010101000000-000000000000 // indirect
 	github.com/pockethost/pocketone/ext/config v0.0.0-00010101000000-000000000000 // indirect
 	github.com/pockethost/pocketone/ext/host v0.0.0-00010101000000-000000000000 // indirect
 	github.com/pockethost/pocketone/ext/jserrors v0.0.0-00010101000000-000000000000 // indirect
@@ -88,7 +88,7 @@ replace github.com/pockethost/pocketone/ext/edge => ../edge
 
 replace github.com/pockethost/pocketone/ext/host => ../host
 
-replace github.com/pockethost/pocketone/ext/ceplugin => ../ceplugin
+replace github.com/pockethost/pocketone/ext/pluginkit => ../pluginkit
 
 replace github.com/pockethost/pocketone/ext/jserrors => ../jserrors
 

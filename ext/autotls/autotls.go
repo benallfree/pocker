@@ -6,10 +6,10 @@
 //
 //     srv := &pocker.Server{Config: cfg, Plugins: []pocker.Plugin{autotls.New()}}
 //
-//   - On a single app, [NewApp] is a [ceplugin.Plugin] that replaces PocketBase's built-in autocert on
+//   - On a single app, [NewApp] is a [pluginkit.Plugin] that replaces PocketBase's built-in autocert on
 //     `pocketbase serve example.com` (or `--https`) with CertMagic: wildcards through DNS-01, other CAs, extra domains.
 //
-//     ceplugin.MustRegister(app, autotls.NewApp(autotls.Config{Auto: true, Email: "ops@example.com"}))
+//     pluginkit.MustRegister(app, autotls.NewApp(autotls.Config{Auto: true, Email: "ops@example.com"}))
 package autotls
 
 import (

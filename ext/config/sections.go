@@ -3,7 +3,7 @@ package config
 import (
 	"time"
 
-	"github.com/pockethost/pocketone/ext/ceplugin"
+	"github.com/pockethost/pocketone/ext/pluginkit"
 )
 
 // ServerConfig is the `server` section: how the binary listens.
@@ -61,7 +61,7 @@ type AppConfig struct {
 
 // Server, App and Provider are the sections this package owns.
 var (
-	Server   = ceplugin.NewSectionFunc("server", func() ServerConfig { return ServerConfig{} }, "How the binary listens: http, https and CORS origins (single-app mode: the serve command's defaults).")
-	App      = ceplugin.NewSectionFunc("app", func() AppConfig { return AppConfig{} }, "The single app: data dir, dev mode, encryption, hooks, migrations, public dir, and the .env names it may read (env_allow). Not used when a provider runs many instances.")
-	Provider = ceplugin.NewSection("provider", "", "The runtime provider that runs many instances (pocker or docker). Omit for a single stock app.")
+	Server   = pluginkit.NewSectionFunc("server", func() ServerConfig { return ServerConfig{} }, "How the binary listens: http, https and CORS origins (single-app mode: the serve command's defaults).")
+	App      = pluginkit.NewSectionFunc("app", func() AppConfig { return AppConfig{} }, "The single app: data dir, dev mode, encryption, hooks, migrations, public dir, and the .env names it may read (env_allow). Not used when a provider runs many instances.")
+	Provider = pluginkit.NewSection("provider", "", "The runtime provider that runs many instances (pocker or docker). Omit for a single stock app.")
 )

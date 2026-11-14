@@ -11,7 +11,7 @@ import (
 	"github.com/pockethost/pocketone/ext/sandbox"
 
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
-	"github.com/pockethost/pocketone/ext/ceplugin"
+	"github.com/pockethost/pocketone/ext/pluginkit"
 )
 
 // Server wires a [Config], an [InstanceSource] and a [Manager] into one HTTP server.
@@ -127,10 +127,10 @@ func (s *Server) prepare(h *host.Host) error {
 				return fmt.Errorf("plugin %s: %w", p.Name(), err)
 			}
 		}
-		if cp, ok := p.(ceplugin.Plugin); ok {
+		if cp, ok := p.(pluginkit.Plugin); ok {
 			// a PocketOne plugin: register it on every instance, with that instance's settings
 			if _, own := p.(AppIniter); !own {
-				hp, err := hostCEPlugin(cp, s.Config.Doc())
+				hp, err := hostPlugin(cp, s.Config.Doc())
 				if err != nil {
 					return fmt.Errorf("plugin %s: %w", p.Name(), err)
 				}

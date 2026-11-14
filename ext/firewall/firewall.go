@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pockethost/pocketone/ext/ceplugin"
+	"github.com/pockethost/pocketone/ext/pluginkit"
 
 	"github.com/pockethost/pocketone/ext/host"
 
@@ -518,8 +518,8 @@ func (r RateLimits) merged(def RateLimits) RateLimits {
 
 // Section and RateLimitsSection are the firewall's pocketbase.yaml sections (ext/config).
 var (
-	Section           = ceplugin.NewSection("firewall", Config{}, "Peers allowed to connect, trusted proxies and client-IP headers, trusted clients, the rate-limit header prefix. Turns the firewall on.")
-	RateLimitsSection = ceplugin.NewSection("rate_limits", RateLimits{}, "Default rate limits for every instance (per instance: plugins.firewall.rate_limits). Turns the firewall on.")
+	Section           = pluginkit.NewSection("firewall", Config{}, "Peers allowed to connect, trusted proxies and client-IP headers, trusted clients, the rate-limit header prefix. Turns the firewall on.")
+	RateLimitsSection = pluginkit.NewSection("rate_limits", RateLimits{}, "Default rate limits for every instance (per instance: plugins.firewall.rate_limits). Turns the firewall on.")
 )
 
 // SectionAdjust, if set, runs on a firewall built from config sections, like [Firewall.Adjust] (e.g. a host

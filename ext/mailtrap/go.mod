@@ -6,7 +6,7 @@ require (
 	ganigeorgiev.com/pocketbase/pocketbase v0.0.0-00010101000000-000000000000
 	github.com/domodwyer/mailyak/v3 v3.6.2
 	github.com/gabriel-vasile/mimetype v1.4.15
-	github.com/pockethost/pocketone/ext/ceplugin v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/pluginkit v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketone/ext/devusers v0.0.0-00010101000000-000000000000
 )
 
@@ -50,4 +50,4 @@ replace ganigeorgiev.com/pocketbase/pocketbase => ../..
 
 replace github.com/pockethost/pocketone/ext/devusers => ../devusers
 
-replace github.com/pockethost/pocketone/ext/ceplugin => ../ceplugin
+replace github.com/pockethost/pocketone/ext/pluginkit => ../pluginkit

@@ -5,22 +5,22 @@ import (
 
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"github.com/dop251/goja"
-	"github.com/pockethost/pocketone/ext/ceplugin"
+	"github.com/pockethost/pocketone/ext/pluginkit"
 	"gopkg.in/yaml.v3"
 )
 
-// hostedPlugin runs a PocketOne plugin ([ceplugin.Plugin], e.g. bulkmail.New(...)) on every instance: put the
+// hostedPlugin runs a PocketOne plugin ([pluginkit.Plugin], e.g. bulkmail.New(...)) on every instance: put the
 // plugin itself in [Server.Plugins], no pocker-specific wrapper needed.
 //
 // Settings: the config file's top-level `<name>:` key, then the instance's `plugins.<name>`, over the defaults the
 // plugin was built with. `enabled: false` in either turns it off (the instance wins); off means Register and
 // BindJS are never called for that instance.
 type hostedPlugin struct {
-	p       ceplugin.Plugin
+	p       pluginkit.Plugin
 	process map[string]any
 }
 
-func hostCEPlugin(p ceplugin.Plugin, doc *yaml.Node) (*hostedPlugin, error) {
+func hostPlugin(p pluginkit.Plugin, doc *yaml.Node) (*hostedPlugin, error) {
 	h := &hostedPlugin{p: p}
 	if n := TopLevel(doc, p.Name()); n != nil {
 		if err := n.Decode(&h.process); err != nil {
@@ -30,12 +30,12 @@ func hostCEPlugin(p ceplugin.Plugin, doc *yaml.Node) (*hostedPlugin, error) {
 	return h, nil
 }
 
-func (h *hostedPlugin) config(inst Instance) (ceplugin.Config, error) {
-	own, err := ceplugin.Layer(inst.PluginConfig(h.p.Name()))
+func (h *hostedPlugin) config(inst Instance) (pluginkit.Config, error) {
+	own, err := pluginkit.Layer(inst.PluginConfig(h.p.Name()))
 	if err != nil {
 		return nil, fmt.Errorf("instance %s: plugins.%s: %w", inst.ID, h.p.Name(), err)
 	}
-	return ceplugin.Config{h.process, own}, nil
+	return pluginkit.Config{h.process, own}, nil
 }
 
 // InitApp implements [AppIniter].
@@ -55,7 +55,7 @@ func (h *hostedPlugin) InitApp(inst Instance, app core.App) error {
 
 // InitJS implements [JSIniter].
 func (h *hostedPlugin) InitJS(inst Instance, app core.App, vm *goja.Runtime) {
-	b, ok := h.p.(ceplugin.JSBinder)
+	b, ok := h.p.(pluginkit.JSBinder)
 	if !ok {
 		return
 	}

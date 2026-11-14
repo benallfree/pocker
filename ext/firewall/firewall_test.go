@@ -154,7 +154,7 @@ func TestTrustedClientNamesEndUser(t *testing.T) {
 
 	for _, c := range []struct {
 		name, proxy, header string
-		in                 host.Instance
+		in                  host.Instance
 	}{
 		{"process trusted_clients, PocketHost's header", "198.51.100.1:1", "X-PocketHost-Client-IP", inst("a")},
 		{"instance trusted_ips, default header", "203.0.113.50:1", "X-Client-IP", inst("b", "203.0.113.50")},

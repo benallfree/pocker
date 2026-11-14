@@ -7,7 +7,7 @@ require (
 	github.com/dop251/goja v0.0.0-20261023121931-6ace4dde0b29
 	github.com/pockethost/pocketone/ext/autotls v0.0.0-20261112000927-b078fd50496e
 	github.com/pockethost/pocketone/ext/bulkmail v0.0.0-00010101000000-000000000000
-	github.com/pockethost/pocketone/ext/ceplugin v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/pluginkit v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketone/ext/config v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketone/ext/deploy v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketone/ext/docker v0.0.0-00010101000000-000000000000
@@ -139,7 +139,7 @@ replace github.com/pockethost/pocketone/ext/host => ../../ext/host
 
 replace github.com/pockethost/pocketone/ext/mailtrap => ../../ext/mailtrap
 
-replace github.com/pockethost/pocketone/ext/ceplugin => ../../ext/ceplugin
+replace github.com/pockethost/pocketone/ext/pluginkit => ../../ext/pluginkit
 
 replace github.com/pockethost/pocketone/ext/jserrors => ../../ext/jserrors
 

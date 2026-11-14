@@ -8,8 +8,8 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/pockethost/pocketone/ext/ceplugin"
 	"github.com/pockethost/pocketone/ext/config"
+	"github.com/pockethost/pocketone/ext/pluginkit"
 )
 
 // Provider is a runtime provider: it turns a host into a multi-instance server by supplying its one runtime
@@ -78,15 +78,15 @@ type InstancesConfig struct {
 }
 
 // Instances is the section key of InstancesConfig.
-var Instances = ceplugin.NewSection("instances", InstancesConfig{File: "instances.yaml"}, "Where a multi-instance host's instances come from (a YAML file), and dev mode (serve unknown hostnames).")
+var Instances = pluginkit.NewSection("instances", InstancesConfig{File: "instances.yaml"}, "Where a multi-instance host's instances come from (a YAML file), and dev mode (serve unknown hostnames).")
 
 // Options are what the binary adds to a host built from config.
 type Options struct {
-	Source     InstanceSource                                        // nil = the `instances` section's file
-	Forward    func(w http.ResponseWriter, r *http.Request, inst Instance) // the fleet hook (ext/edge)
-	Gates      []Gate                                                // after the section gates
-	Wrappers   []func(http.Handler) http.Handler                     // outermost first
-	Logger     *slog.Logger
+	Source   InstanceSource                                              // nil = the `instances` section's file
+	Forward  func(w http.ResponseWriter, r *http.Request, inst Instance) // the fleet hook (ext/edge)
+	Gates    []Gate                                                      // after the section gates
+	Wrappers []func(http.Handler) http.Handler                           // outermost first
+	Logger   *slog.Logger
 	// Resolve makes a relative path from the config file relative to the file's folder (ext/config's
 	// Config.ResolvePath); nil = paths as written.
 	Resolve func(string) string

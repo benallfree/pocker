@@ -1,4 +1,4 @@
-// Package ceplugin is PocketOne's plugin contract: one plugin value that works on a single app and,
+// Package pluginkit is PocketOne's plugin contract: one plugin value that works on a single app and,
 // unchanged, on every instance under pocker (ext/pocker hosts any [Plugin] in Server.Plugins).
 //
 // A plugin implements Name and Register, and optionally [JSBinder]:
@@ -7,7 +7,7 @@
 //
 //	func New(cfg Config) *Plugin { return &Plugin{cfg: cfg} }
 //	func (p *Plugin) Name() string { return "hello" }
-//	func (p *Plugin) Register(app core.App, cfg ceplugin.Config) error {
+//	func (p *Plugin) Register(app core.App, cfg pluginkit.Config) error {
 //		c := p.cfg
 //		if err := cfg.Decode(&c); err != nil { // settings for this app, over the defaults given to New
 //			return err
@@ -18,7 +18,7 @@
 //
 // A single app registers it with [MustRegister] (and [BindJS] from jsvm's OnInit). Pocker calls Register for every
 // instance with that instance's settings.
-package ceplugin
+package pluginkit
 
 import (
 	"encoding/json"

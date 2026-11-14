@@ -4,7 +4,7 @@ Bulk mail: campaigns to an app's own users with one-click unsubscribe, bounce an
 
 **Runs on:** every level. It's in the standard `pocketone` binary, and the same plugin value runs on every
 instance under [pocker](../pocker/README.md) (so the mothership and multitenant levels get it too). It follows the
-PocketOne plugin contract ([`ceplugin`](../ceplugin/ceplugin.go)).
+PocketOne plugin contract ([`pluginkit`](../pluginkit/pluginkit.go)).
 
 ## Use it
 
@@ -13,8 +13,8 @@ mail := bulkmail.New(bulkmail.Config{Rate: 5, Daily: 5000})
 
 // a single app
 app := pocketbase.New()
-ceplugin.MustRegister(app, mail)
-jsvm.MustRegister(app, jsvm.Config{OnInit: func(vm *goja.Runtime) { ceplugin.BindJS(app, vm, mail) }}) // $bulkmail
+pluginkit.MustRegister(app, mail)
+jsvm.MustRegister(app, jsvm.Config{OnInit: func(vm *goja.Runtime) { pluginkit.BindJS(app, vm, mail) }}) // $bulkmail
 
 // or every pocker instance
 srv.Plugins = append(srv.Plugins, mail)

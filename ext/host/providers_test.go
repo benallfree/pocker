@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/pockethost/pocketone/ext/ceplugin"
 	"github.com/pockethost/pocketone/ext/config"
+	"github.com/pockethost/pocketone/ext/pluginkit"
 )
 
 type fakeProvider struct{ prepared *Host }
@@ -23,9 +23,9 @@ func (p *fakeProvider) Prepare(h *Host) error {
 
 type echoRT struct{}
 
-func (echoRT) Name() string                                            { return "echo" }
-func (echoRT) Serves(Instance) bool                                    { return true }
-func (echoRT) Ready() bool                                             { return true }
+func (echoRT) Name() string                                                     { return "echo" }
+func (echoRT) Serves(Instance) bool                                             { return true }
+func (echoRT) Ready() bool                                                      { return true }
 func (echoRT) ServeInstance(w http.ResponseWriter, _ *http.Request, _ Instance) {}
 
 type allowAll struct{}
@@ -46,7 +46,7 @@ func loadConfig(t *testing.T, yaml string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { ceplugin.SetSectionSource(nil) })
+	t.Cleanup(func() { pluginkit.SetSectionSource(nil) })
 	_ = c
 }
 

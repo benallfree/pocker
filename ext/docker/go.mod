@@ -6,7 +6,7 @@ replace github.com/pockethost/pocketone/ext/host => ../host
 
 require (
 	github.com/Masterminds/semver/v3 v3.5.0
-	github.com/pockethost/pocketone/ext/ceplugin v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/pluginkit v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketone/ext/host v0.0.0-00010101000000-000000000000
 	github.com/spf13/cobra v1.10.2
 )
@@ -53,6 +53,6 @@ require (
 
 replace (
 	ganigeorgiev.com/pocketbase/pocketbase => ../..
-	github.com/pockethost/pocketone/ext/ceplugin => ../ceplugin
+	github.com/pockethost/pocketone/ext/pluginkit => ../pluginkit
 	github.com/pockethost/pocketone/ext/config => ../config
 )

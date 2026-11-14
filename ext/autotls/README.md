@@ -33,7 +33,7 @@ HTTP-01 isn't used, because port 80 is PocketBase's redirect server. Certificate
 In Go, register it like any PocketOne plugin:
 
 ```go
-ceplugin.MustRegister(app, autotls.NewApp(autotls.Config{Auto: true, Email: "ops@example.com"}))
+pluginkit.MustRegister(app, autotls.NewApp(autotls.Config{Auto: true, Email: "ops@example.com"}))
 ```
 
 ## Under pocker

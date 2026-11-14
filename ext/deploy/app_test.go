@@ -95,7 +95,7 @@ func (r *p1Remote) client(t *testing.T, token string) *Client {
 	return c
 }
 
-func TestCEToCE(t *testing.T) {
+func TestP1ToP1(t *testing.T) {
 	r := newP1Remote(t)
 	ctx := context.Background()
 	c := r.client(t, r.token(t, "_superusers", "test@example.com", ScopeDeploy))
@@ -194,7 +194,7 @@ func TestCEToCE(t *testing.T) {
 	}
 }
 
-func TestCEToCEWithImpersonateLogin(t *testing.T) {
+func TestP1ToP1WithImpersonateLogin(t *testing.T) {
 	r := newP1Remote(t)
 	rc := &remotes.Client{Remote: &remotes.Remote{Name: "ce", URL: r.url}, HTTP: remotes.NewHTTPClient()}
 	su, _ := r.app.FindAuthRecordByEmail(core.CollectionNameSuperusers, "test@example.com")

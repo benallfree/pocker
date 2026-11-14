@@ -4,8 +4,8 @@ import (
 	"log/slog"
 
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
-	"github.com/pockethost/pocketone/ext/ceplugin"
 	"github.com/pockethost/pocketone/ext/host"
+	"github.com/pockethost/pocketone/ext/pluginkit"
 )
 
 // SectionConfig is the `pocker` section (pocketbase.yaml, ext/config): settings for running instances in-process.
@@ -23,7 +23,7 @@ type SectionConfig struct {
 }
 
 // Section is the key of the `pocker` section.
-var Section = ceplugin.NewSectionFunc("pocker", func() SectionConfig {
+var Section = pluginkit.NewSectionFunc("pocker", func() SectionConfig {
 	d := DefaultConfig()
 	return SectionConfig{Root: d.PBRoot, HooksPoolSize: d.HooksPoolSize, Limits: d.Limits}
 }, "Runtime provider pocker: instances run in-process (root folder, hooks pool, egress allow list, instance limit defaults).")

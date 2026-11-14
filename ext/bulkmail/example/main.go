@@ -16,8 +16,8 @@ import (
 	"ganigeorgiev.com/pocketbase/pocketbase/plugins/jsvm"
 	"github.com/dop251/goja"
 	"github.com/pockethost/pocketone/ext/bulkmail"
-	"github.com/pockethost/pocketone/ext/ceplugin"
 	"github.com/pockethost/pocketone/ext/devusers"
+	"github.com/pockethost/pocketone/ext/pluginkit"
 )
 
 func main() {
@@ -31,10 +31,10 @@ func main() {
 		Rate:  5,    // messages per second
 		Daily: 5000, // messages per day; bulkmail.NoBulkMail forbids sending
 	})
-	ceplugin.MustRegister(app, mail)
+	pluginkit.MustRegister(app, mail)
 
 	jsvm.MustRegister(app, jsvm.Config{
-		OnInit: func(vm *goja.Runtime) { ceplugin.BindJS(app, vm, mail) }, // $bulkmail in JS hooks
+		OnInit: func(vm *goja.Runtime) { pluginkit.BindJS(app, vm, mail) }, // $bulkmail in JS hooks
 	})
 
 	if err := app.Start(); err != nil {

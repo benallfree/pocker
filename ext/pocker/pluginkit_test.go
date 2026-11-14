@@ -5,11 +5,11 @@ import (
 
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"github.com/dop251/goja"
-	"github.com/pockethost/pocketone/ext/ceplugin"
+	"github.com/pockethost/pocketone/ext/pluginkit"
 	"gopkg.in/yaml.v3"
 )
 
-type fakeCEPlugin struct {
+type fakePlugin struct {
 	got   map[string]int // instance id -> decoded daily
 	bound map[string]bool
 }
@@ -18,9 +18,9 @@ type fakeSettings struct {
 	Daily int `json:"daily"`
 }
 
-func (f *fakeCEPlugin) Name() string { return "fake" }
+func (f *fakePlugin) Name() string { return "fake" }
 
-func (f *fakeCEPlugin) Register(app core.App, cfg ceplugin.Config) error {
+func (f *fakePlugin) Register(app core.App, cfg pluginkit.Config) error {
 	s := fakeSettings{Daily: 1} // the plugin's own default
 	if err := cfg.Decode(&s); err != nil {
 		return err
@@ -29,17 +29,17 @@ func (f *fakeCEPlugin) Register(app core.App, cfg ceplugin.Config) error {
 	return nil
 }
 
-func (f *fakeCEPlugin) BindJS(app core.App, _ *goja.Runtime) {
+func (f *fakePlugin) BindJS(app core.App, _ *goja.Runtime) {
 	f.bound[app.Settings().Meta.AppName] = true
 }
 
-func TestHostedCEPlugin(t *testing.T) {
+func TestHostedPlugin(t *testing.T) {
 	var doc yaml.Node
 	if err := yaml.Unmarshal([]byte("fake:\n  daily: 100\n"), &doc); err != nil {
 		t.Fatal(err)
 	}
-	f := &fakeCEPlugin{got: map[string]int{}, bound: map[string]bool{}}
-	h, err := hostCEPlugin(f, &doc)
+	f := &fakePlugin{got: map[string]int{}, bound: map[string]bool{}}
+	h, err := hostPlugin(f, &doc)
 	if err != nil {
 		t.Fatal(err)
 	}
