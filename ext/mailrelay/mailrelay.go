@@ -176,7 +176,7 @@ func (y SectionConfig) apply(l *limits) {
 	}
 }
 
-// Configure implements [pocker.Configurer]: pocketbase.yaml's `mailrelay` section. Limits set in Go win.
+// Configure implements [pocker.Configurer]: pocketone.yaml's `mailrelay` section. Limits set in Go win.
 func (p *Plugin) Configure(pocker.Config) error {
 	if p.cfg.Domain == "" || p.cfg.Upstream == nil {
 		return errNotConfigured
@@ -488,5 +488,5 @@ func maskList(list []string) string {
 	return strings.Join(out, ", ")
 }
 
-// Section is the key of the `mailrelay` section (pocketbase.yaml): the shared mail relay on a pocker host.
+// Section is the key of the `mailrelay` section (pocketone.yaml): the shared mail relay on a pocker host.
 var Section = ceplugin.NewSection(Name, SectionConfig{}, "Shared mail relay on a pocker host: enabled, per-minute and daily limits per instance.")

@@ -148,7 +148,7 @@ func TestPockerRestoreRestartsOnlyThatInstance(t *testing.T) {
 	}
 }
 
-// sectionSource serves sections from YAML text (what ext/config does for pocketbase.yaml).
+// sectionSource serves sections from YAML text (what ext/config does for pocketone.yaml).
 type sectionSource map[string]string
 
 func (s sectionSource) DecodeSection(name string, out any) (bool, error) {

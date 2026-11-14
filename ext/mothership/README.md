@@ -47,7 +47,7 @@ mothership:
   apex: example.com                 # <name>.example.com routes to each instance
 ```
 
-The stock `pocketone` binary follows a mothership (instances and the other edges) when pocketbase.yaml has this
+The stock `pocketone` binary follows a mothership (instances and the other edges) when pocketone.yaml has this
 section and names a provider.
 
 ## License

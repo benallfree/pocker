@@ -7,7 +7,7 @@
 //	app := pocketbase.New()
 //	pitr.MustRegister(app, pitr.Config{})
 //
-// Many apps in one process: add it to a pocker server's plugins; settings come from pocketbase.yaml's `pitr`
+// Many apps in one process: add it to a pocker server's plugins; settings come from pocketone.yaml's `pitr`
 // section and each instance's `plugins.pitr`:
 //
 //	srv.Plugins = append(srv.Plugins, pitr.New(pitr.Config{}))

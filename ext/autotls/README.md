@@ -38,7 +38,7 @@ ceplugin.MustRegister(app, autotls.NewApp(autotls.Config{Auto: true, Email: "ops
 
 ## Under pocker
 
-`autotls.New()` is a pocker plugin, configured by pocketbase.yaml's `autotls` section
+`autotls.New()` is a pocker plugin, configured by pocketone.yaml's `autotls` section
 (`autotls: {auto, email, ca, storage, domains, dns}`); the stock `pocketone` binary runs it under `provider: pocker`.
 Certificate files (`server.tls.cert`/`key`) stay a core feature.
 

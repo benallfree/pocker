@@ -55,7 +55,7 @@ func report(w io.Writer, rs []Release, added []string, b *Binaries) {
 // NewCommand returns `docker` with `seed` and `update` for a binary built on cobra (the stock pocketone binary). section
 // returns the loaded `docker` section and the path resolver of the config file.
 func NewCommand(section func() (SectionConfig, func(string) string)) *cobra.Command {
-	cmd := &cobra.Command{Use: "docker", Short: "Release binaries for the docker runtime provider (docker.versions in pocketbase.yaml)"}
+	cmd := &cobra.Command{Use: "docker", Short: "Release binaries for the docker runtime provider (docker.versions in pocketone.yaml)"}
 	binaries := func() (SectionConfig, *Binaries, error) {
 		sc, resolve := section()
 		if resolve == nil {

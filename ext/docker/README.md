@@ -13,7 +13,7 @@ PocketBase (or PocketOne) binary of the version it asks for, so one host serves 
 ## How it runs an instance
 
 - **Releases:** a host serves an explicit list of releases, each pinned to its download and sha256, from a
-  `VersionsSource`. Built in: `docker.versions` in pocketbase.yaml, the minors to serve (`["pb:0.36", "p1:0.0"]`).
+  `VersionsSource`. Built in: `docker.versions` in pocketone.yaml, the minors to serve (`["pb:0.36", "p1:0.0"]`).
   `docker update` finds the latest patch of each (upstream PocketBase from ganigeorgiev.com, then the archived GitHub;
   PocketOne from GitHub; checksums from each release's checksums.txt), records them in the cache's `releases.json`
   and downloads them; `docker seed` downloads whatever is listed but not cached. One function (`LatestPatches`) culls
@@ -40,7 +40,7 @@ PocketBase (or PocketOne) binary of the version it asks for, so one host serves 
 - **Logs:** container output goes to `OnLog` (default: the edge's debug log).
 
 A host that runs docker sends every instance to it (one provider per process): `provider: docker` with a `docker`
-section in pocketbase.yaml (`docker.Provider`; its `Container` hook adds host mounts/env, `Version` rewrites an
+section in pocketone.yaml (`docker.Provider`; its `Container` hook adds host mounts/env, `Version` rewrites an
 instance's version before the binary is picked).
 
 ```yaml

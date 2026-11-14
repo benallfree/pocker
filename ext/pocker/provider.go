@@ -8,7 +8,7 @@ import (
 	"github.com/pockethost/pocketone/ext/host"
 )
 
-// SectionConfig is the `pocker` section (pocketbase.yaml, ext/config): settings for running instances in-process.
+// SectionConfig is the `pocker` section (pocketone.yaml, ext/config): settings for running instances in-process.
 // Listeners, instances and the firewall are the host's sections (server, instances, firewall).
 //
 //	pocker:

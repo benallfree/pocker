@@ -4,7 +4,7 @@ PocketOne's multi-instance host: many PocketBase instances behind one listener, 
 runtime provider ([pocker](../pocker/README.md) in-process, or docker in containers).
 
 > **Status.** Working: Go module `github.com/pockethost/pocketone/ext/host`. pocker runs on it (`pocker.Server` is a
-> thin layer over `host.Host`). Next: the stock `pocketone` binary hands `serve` to it when `pocketbase.yaml` names a
+> thin layer over `host.Host`). Next: the stock `pocketone` binary hands `serve` to it when `pocketone.yaml` names a
 > provider.
 
 ## Pieces
@@ -22,7 +22,7 @@ runtime provider ([pocker](../pocker/README.md) in-process, or docker in contain
 The fleet (forwarding to other edges, edge lists, a mothership) is [ext/edge](../edge/README.md), on top; it fills
 `Forward`.
 
-## From pocketbase.yaml
+## From pocketone.yaml
 
 `host.FromConfig` builds a host from [ext/config](../config/README.md) sections: the provider named in `provider`
 (registered with `RegisterProvider`: pocker, docker), listeners from `server` (`https` main, `http` redirects to it,

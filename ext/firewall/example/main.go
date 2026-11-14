@@ -1,5 +1,5 @@
 // The firewall in front of a host: every request is checked (allowed peers, rate limits) before a toy runtime
-// answers. In a PocketOne binary the firewall turns on from pocketbase.yaml's firewall / rate_limits sections; here
+// answers. In a PocketOne binary the firewall turns on from pocketone.yaml's firewall / rate_limits sections; here
 // it is built in Go.
 //
 //	go run ./example --instances instances.yaml

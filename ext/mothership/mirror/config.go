@@ -9,7 +9,7 @@ import (
 	"github.com/pockethost/pocketone/ext/edge"
 )
 
-// FileConfig is pocketbase.yaml's `mothership` section (`$VAR` values come from the private .env through ext/config).
+// FileConfig is pocketone.yaml's `mothership` section (`$VAR` values come from the private .env through ext/config).
 // self falls back to the `edges` section's self.
 //
 //	mothership:
@@ -34,7 +34,7 @@ type FileConfig struct {
 	Resync      time.Duration `yaml:"resync"`
 }
 
-// Section is the key of the `mothership` section (pocketbase.yaml): a community mothership this host mirrors its
+// Section is the key of the `mothership` section (pocketone.yaml): a community mothership this host mirrors its
 // instances and the other edges from.
 var Section = ceplugin.NewSection("mothership", FileConfig{}, "A community mothership to mirror instances and edges from: url, login, this edge's id, internal URL, region, apex.")
 

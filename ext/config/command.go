@@ -14,7 +14,7 @@ import (
 func NewCommand(opts func() Options) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "config",
-		Short: "Lists the pocketbase.yaml sections this binary understands, with their defaults",
+		Short: "Lists the pocketone.yaml sections this binary understands, with their defaults",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			out := cmd.OutOrStdout()
 			for _, s := range ceplugin.Sections() {

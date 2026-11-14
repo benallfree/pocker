@@ -17,7 +17,7 @@ type VersionsSource interface {
 	Releases(ctx context.Context) ([]Release, error)
 }
 
-// YAMLVersions serves the `docker.versions` minors of pocketbase.yaml: for each tracked minor ("pb:0.36", "p1:0.0"),
+// YAMLVersions serves the `docker.versions` minors of pocketone.yaml: for each tracked minor ("pb:0.36", "p1:0.0"),
 // the latest patch recorded in the cache's index by [Update]. It reads only local files, never the network.
 type YAMLVersions struct {
 	Tracked []string // e.g. ["pb:0.36", "p1:0.0"]; "pb:0.36.*" works too

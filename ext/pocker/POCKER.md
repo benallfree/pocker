@@ -2,7 +2,7 @@
 
 Pocker hosts many PocketBase instances in one process. It is PocketBase itself (this repo tracks
 [upstream PocketBase](https://ganigeorgiev.com/git/pocketbase/pocketbase) and shares its history) plus a small engine in
-this folder, run by the stock `pocketone` binary as a runtime provider (`provider: pocker` in pocketbase.yaml).
+this folder, run by the stock `pocketone` binary as a runtime provider (`provider: pocker` in pocketone.yaml).
 
 - One port, many instances. Each request's hostname maps to a canonical instance id.
 - Each instance is a normal PocketBase folder, `<root>/<id>` (`pb_data`, `pb_hooks`, `pb_migrations`, `pb_public`),
@@ -13,7 +13,7 @@ this folder, run by the stock `pocketone` binary as a runtime provider (`provide
 ## Dev mode: any hostname
 
 ```yaml
-# pocketbase.yaml
+# pocketone.yaml
 server: { http: "127.0.0.1:8090" }
 provider: pocker
 instances: { dev: true }
@@ -55,7 +55,7 @@ Hosting platforms plug in their own [`InstanceSource`](instance.go) (for example
 hostname -> id map over SSE) instead of the file; a community mothership is one (the `mothership` section,
 [ext/mothership](../mothership/README.md)).
 
-pocketbase.yaml for a production host (each plugin owns its section; every field has a default):
+pocketone.yaml for a production host (each plugin owns its section; every field has a default):
 
 ```yaml
 server:
@@ -143,7 +143,7 @@ any of:
 
 | Interface | Used for |
 |---|---|
-| `Configurer` | reading its own pocketbase.yaml section before the server starts (`Configure(cfg)`) |
+| `Configurer` | reading its own pocketone.yaml section before the server starts (`Configure(cfg)`) |
 | `Gate` | a peer check before routing, and admission (e.g. rate limits) before an instance is served or forwarded |
 | `TLSProvider` | the main listener's TLS (e.g. automatic certificates) |
 | `Wrapper` | wrapping the server's handler (the first listed is outermost) |

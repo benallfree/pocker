@@ -494,7 +494,7 @@ func (r RateLimits) merged(def RateLimits) RateLimits {
 	return out
 }
 
-// Section and RateLimitsSection are the firewall's pocketbase.yaml sections (ext/config).
+// Section and RateLimitsSection are the firewall's pocketone.yaml sections (ext/config).
 var (
 	Section           = ceplugin.NewSection("firewall", Config{}, "Peers allowed to connect, trusted proxies and client-IP headers, trusted clients, the rate-limit header prefix. Turns the firewall on.")
 	RateLimitsSection = ceplugin.NewSection("rate_limits", RateLimits{}, "Default rate limits for every instance (per instance: plugins.firewall.rate_limits). Turns the firewall on.")
@@ -516,7 +516,7 @@ func FromSections(dev bool) (fw *Firewall, enabled bool, err error) {
 	return fw, true, fw.apply(c, haveConfig, rl, haveLimits, dev)
 }
 
-// Linking this package makes the firewall available to every host (ext/host): it turns on when pocketbase.yaml has
+// Linking this package makes the firewall available to every host (ext/host): it turns on when pocketone.yaml has
 // a `firewall` or `rate_limits` section.
 func init() {
 	host.RegisterSectionGate(host.SectionGate{Name: "firewall", New: func(dev bool) (host.Gate, bool, error) {

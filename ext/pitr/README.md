@@ -50,7 +50,7 @@ srv := &pocker.Server{Config: cfg, Plugins: []pocker.Plugin{pitr.New(pitr.Config
 ```
 
 ```yaml
-# pocketbase.yaml (fields set in Go win)
+# pocketone.yaml (fields set in Go win)
 pitr:
   retention: 72h          # on by default; enabled: false turns it off for every instance
   snapshot_interval: 24h

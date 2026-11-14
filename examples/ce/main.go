@@ -44,14 +44,14 @@ import (
 var PoweredBy = "PocketOne " + pocker.Version()
 
 func main() {
-	// pocketbase.yaml (and the .env beside it): each plugin's section, defaults for the flags below (flags win)
+	// pocketone.yaml (and the .env beside it): each plugin's section, defaults for the flags below (flags win)
 	cfgOpts := config.FromArgs(os.Args[1:])
 	cfg, err := config.Load(cfgOpts)
 	if err != nil {
 		log.Fatal(err)
 	}
 	if p, _ := config.Provider.Get(); p != "" && firstArg(os.Args[1:]) == "serve" {
-		// a provider in pocketbase.yaml: serve many instances (pocker or docker) instead of a single app
+		// a provider in pocketone.yaml: serve many instances (pocker or docker) instead of a single app
 		if handled, err := serveMany(cfg); handled {
 			if err != nil {
 				log.Fatal(err)
@@ -71,7 +71,7 @@ func main() {
 		DefaultQueryTimeout:  appCfg.QueryTimeout,
 	})
 	var cfgPath, envPath string
-	app.RootCmd.PersistentFlags().StringVar(&cfgPath, "config", "", "the config file (default ./pocketbase.yaml, else next to the executable)")
+	app.RootCmd.PersistentFlags().StringVar(&cfgPath, "config", "", "the config file (default ./pocketone.yaml, else next to the executable)")
 	app.RootCmd.PersistentFlags().StringVar(&envPath, "env-file", "", "secrets for $VAR references in the config file (default .env beside it); never passed to the app")
 	app.RootCmd.AddCommand(config.NewCommand(func() config.Options { return cfgOpts }))
 	app.RootCmd.AddCommand(docker.NewCommand(func() (docker.SectionConfig, func(string) string) {

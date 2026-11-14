@@ -166,7 +166,7 @@ func ParsePBTime(v string) (time.Time, error) {
 	return time.Time{}, fmt.Errorf("bad time %q", v)
 }
 
-// Section is the key of the `edges` section (pocketbase.yaml, ext/config).
+// Section is the key of the `edges` section (pocketone.yaml, ext/config).
 var Section = ceplugin.NewSection("edges", EdgesConfig{}, "The fleet: this edge's id and a fixed list of the other edges (id, internal_url, region).")
 
 // FromSection builds the edge provider for the `edges` section (nil, nil when the config file has none).

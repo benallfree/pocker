@@ -24,7 +24,7 @@ var (
 	_ pocker.Starter    = (*Plugin)(nil)
 )
 
-// Configure reads pocketbase.yaml's `pitr` section. Fields already set in Go are kept; the section fills the rest.
+// Configure reads pocketone.yaml's `pitr` section. Fields already set in Go are kept; the section fills the rest.
 func (p *Plugin) Configure(pocker.Config) error {
 	c, found := Section.Get()
 	if !found {
@@ -101,5 +101,5 @@ func (p *Plugin) Start(ctx context.Context, _ *pocker.Manager) {
 	}
 }
 
-// Section is the key of the `pitr` section (pocketbase.yaml): point-in-time restore defaults on a pocker host.
+// Section is the key of the `pitr` section (pocketone.yaml): point-in-time restore defaults on a pocker host.
 var Section = ceplugin.NewSection(Name, Config{}, "Point-in-time restore on a pocker host: on by default, retention, snapshot interval (instances may override).")

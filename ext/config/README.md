@@ -1,6 +1,6 @@
 # config
 
-PocketOne's config file: `pocketbase.yaml`, with secrets in a `.env` beside it. Linked by default in the `pocketone`
+PocketOne's config file: `pocketone.yaml`, with secrets in a `.env` beside it. Linked by default in the `pocketone`
 binary.
 
 > **Status.** Working: Go module `github.com/pockethost/pocketone/ext/config`. Sections today: `server`, `app`,
@@ -30,7 +30,7 @@ instances don't see it. In single-app mode, `app.env_allow` lists the `.env` nam
 
 ## Files
 
-`--config` (default `./pocketbase.yaml`, else next to the executable) and `--env-file` (default `.env` beside the
+`--config` (default `./pocketone.yaml`, else next to the executable) and `--env-file` (default `.env` beside the
 config file). No file = stock behavior. Relative paths in the file are relative to the file's folder. Flags win over
 the file.
 

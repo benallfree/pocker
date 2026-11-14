@@ -21,7 +21,7 @@ import (
 	"github.com/pockethost/pocketone/ext/servertiming"
 )
 
-// serveMany runs the binary as a multi-instance host when pocketbase.yaml names a provider: instances from the
+// serveMany runs the binary as a multi-instance host when pocketone.yaml names a provider: instances from the
 // `instances` section, or mirrored from a community mothership (`mothership` section), routed by hostname, run by
 // pocker (in-process) or docker (containers); other edges from the `edges` section and the mothership. It reports
 // false when no provider is configured, so main serves a single app as stock PocketBase does.

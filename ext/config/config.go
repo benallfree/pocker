@@ -1,11 +1,11 @@
-// Package config is PocketOne's config file: pocketbase.yaml, with secrets in a .env beside it.
+// Package config is PocketOne's config file: pocketone.yaml, with secrets in a .env beside it.
 //
 // Each plugin owns one top-level section, declared with ceplugin.NewSection (a typed key the owner exports); a
 // plugin reads a section only through its owner's key. This package finds and parses the files, expands $VARS,
 // checks that every top-level key belongs to a linked plugin and that every section decodes, and hands sections to
 // their keys (ceplugin.SetSectionSource).
 //
-// The .env stays private to the process: it is used only to expand $VAR references in pocketbase.yaml. It is never
+// The .env stays private to the process: it is used only to expand $VAR references in pocketone.yaml. It is never
 // written to the process environment, so JS hooks ($os.getenv) and instances don't see it, except names an operator
 // lists in app.env_allow (single-app mode).
 package config
@@ -23,9 +23,9 @@ import (
 )
 
 // FileName is the config file looked for by default.
-const FileName = "pocketbase.yaml"
+const FileName = "pocketone.yaml"
 
-// Options says where the files are. Empty paths are looked up: pocketbase.yaml in the working directory, then next
+// Options says where the files are. Empty paths are looked up: pocketone.yaml in the working directory, then next
 // to the executable; .env beside the config file (or in the working directory when there is no config file).
 type Options struct {
 	ConfigPath string

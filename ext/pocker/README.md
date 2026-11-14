@@ -13,7 +13,7 @@ register on it.
 
 ## As a runtime provider
 
-`provider: pocker` in pocketbase.yaml: `pocker.Provider` reads the `pocker` section (`root`,
+`provider: pocker` in pocketone.yaml: `pocker.Provider` reads the `pocker` section (`root`,
 `egress_allow`, `hooks_pool_size`, instance limit defaults) and runs every instance of an [ext/host](../host/README.md)
 in-process. Instance versions are ignored: every instance runs the PocketOne code in the binary. Plugins read their own
 sections (`autotls`, `pitr`, `storage`, `s3redirect`, `mailrelay`).

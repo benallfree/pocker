@@ -38,7 +38,7 @@ func (allowAll) Admit(http.ResponseWriter, *http.Request, Instance) (func(), boo
 func loadConfig(t *testing.T, yaml string) {
 	t.Helper()
 	dir := t.TempDir()
-	p := filepath.Join(dir, "pocketbase.yaml")
+	p := filepath.Join(dir, "pocketone.yaml")
 	if err := os.WriteFile(p, []byte(yaml), 0o600); err != nil {
 		t.Fatal(err)
 	}

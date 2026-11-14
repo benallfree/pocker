@@ -16,7 +16,7 @@ type Plugin interface {
 	Name() string
 }
 
-// Configurer prepares a plugin before the server starts, once: a plugin reads its own pocketbase.yaml section here
+// Configurer prepares a plugin before the server starts, once: a plugin reads its own pocketone.yaml section here
 // (a [ceplugin.Section] it owns); cfg is the server's config.
 type Configurer interface {
 	Configure(cfg Config) error

@@ -4,7 +4,7 @@ Peer allow-lists, trusted proxies and client IPs, and per-IP and per-instance ra
 ([ext/host](../host/README.md)), with or without the fleet layer.
 
 > **Status.** Working: Go module `github.com/pockethost/pocketone/ext/firewall`. Linking it registers it with the
-> host; it turns on when pocketbase.yaml has a `firewall` or `rate_limits` section.
+> host; it turns on when pocketone.yaml has a `firewall` or `rate_limits` section.
 
 ```yaml
 firewall:

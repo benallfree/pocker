@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// TLSConfig enables HTTPS on Listen (pocketbase.yaml `server.tls`), from certificate files (re-read when they change,
+// TLSConfig enables HTTPS on Listen (pocketone.yaml `server.tls`), from certificate files (re-read when they change,
 // so a renewal needs no restart). Automatic certificates (ACME) are the autotls plugin (its `autotls` section).
 //
 //	tls:

@@ -105,7 +105,7 @@ func (p *Plugin) Name() string { return Name }
 // Config returns the effective configuration.
 func (p *Plugin) Config() Config { return p.cfg }
 
-// Configure reads pocketbase.yaml's `storage` section; fields set in Go are kept.
+// Configure reads pocketone.yaml's `storage` section; fields set in Go are kept.
 func (p *Plugin) Configure(pocker.Config) error {
 	c, found := Section.Get()
 	if !found {
@@ -270,5 +270,5 @@ func open(b *Bucket, prefix string) (*filesystem.System, error) {
 	return filesystem.New(prefixDriver{Driver: s3.Driver(), prefix: prefix, sign: sign}), nil
 }
 
-// Section is the key of the `storage` section (pocketbase.yaml): storage backends and mounts for a pocker host.
+// Section is the key of the `storage` section (pocketone.yaml): storage backends and mounts for a pocker host.
 var Section = ceplugin.NewSection(Name, Config{}, "Storage backends and mounts (S3, local) for a pocker host's instances: uploads, backups, PITR history.")
