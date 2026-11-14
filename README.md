@@ -95,10 +95,7 @@ every level: on a single app and on every instance under pocker. Keep changes to
 
 ## Core Bugfixes
 
-*These are changes to the PocketBase core that we believe are legitimate bugs not fixed in upstream.*
-
-These are bugs we have hit and fixed in production, not findings from a theoretical AI security audit. Each diff
-contains only the fix, on top of upstream's `develop`.
+*Bugs tracked here were found and fixed through production incidents and have not yet been fixed in upstream.*
 
 | Bug | Fix |
 |---|---|
