@@ -16,7 +16,7 @@
         const box = document.createElement("div");
         box.className = "alert alert-info m-b-sm";
         box.dataset.mailrelay = "1";
-        if (!s.enabled) {
+        if (!s.send) {
             box.className = "alert alert-warning m-b-sm";
             box.textContent = "Outgoing mail through the host is off for this instance. Turn on SMTP below to send mail.";
             return box;

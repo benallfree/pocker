@@ -7,7 +7,8 @@
 //   - SMTP off: the plugin sends it through the operator's relay (an [Upstream]) as <local part>@<Domain>, within
 //     per-instance limits. sendmail never runs.
 //
-// Pocker only: a single PocketBase app can simply configure its own SMTP.
+// It's a PocketOne plugin ([pluginkit.Plugin]): Pocker registers it on every instance. A single PocketBase app can
+// simply configure its own SMTP, but registering it there works too.
 package mailrelay
 
 import (
@@ -15,7 +16,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/pockethost/pocketone/ext/pluginkit"
 	"html"
 	"net/mail"
 	"regexp"
@@ -30,10 +30,11 @@ import (
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/security"
 	"github.com/domodwyer/mailyak/v3"
 	"github.com/gabriel-vasile/mimetype"
+	"github.com/pockethost/pocketone/ext/pluginkit"
 	"github.com/pockethost/pocketone/ext/pocker"
 )
 
-// Name is the plugin's key in a pocker config file and under an instance's `plugins:`.
+// Name is the plugin's section in pocketone.yaml and its key under an instance's `plugins:`.
 const Name = "mailrelay"
 
 // Defaults for [Config] fields left at zero.
@@ -50,8 +51,8 @@ type Upstream interface {
 	Send(ctx context.Context, from string, to []string, raw []byte) error
 }
 
-// Config is the operator's relay. Domain and Upstream are set in Go; limits can also come from the config file's
-// top-level `mailrelay:` key and per instance from `plugins: {mailrelay: {enabled, per_minute, daily}}`.
+// Config is the operator's relay. Domain and Upstream are set in Go; pocketone.yaml's `mailrelay` section fills limits
+// left at their defaults here, and an instance's `plugins: {mailrelay: {send, per_minute, daily}}` overrides both.
 type Config struct {
 	// Domain is the sending domain: every relayed message is From <local part>@Domain. Required.
 	Domain string
@@ -68,9 +69,9 @@ type Config struct {
 	MaxRecipients int
 	MaxSize       int
 
-	// LocalPart picks the address's local part for an instance (default: the first label of its id, lowercased,
-	// anything but a-z, 0-9 and "-" dropped).
-	LocalPart func(inst pocker.Instance) string
+	// LocalPart picks the address's local part from an app's id ([pluginkit.AppID]: under Pocker, the instance id).
+	// Default: the first label of the id, lowercased, anything but a-z, 0-9 and "-" dropped.
+	LocalPart func(id string) string
 
 	// Now is the clock (tests).
 	Now func() time.Time
@@ -100,8 +101,8 @@ func (c Config) withDefaults() Config {
 
 var nonLocal = regexp.MustCompile(`[^a-z0-9-]+`)
 
-func defaultLocalPart(inst pocker.Instance) string {
-	id := strings.ToLower(inst.ID)
+func defaultLocalPart(id string) string {
+	id = strings.ToLower(id)
 	if i := strings.IndexByte(id, '.'); i > 0 {
 		id = id[:i] // dev ids are hostnames: "blog.localhost" → "blog"
 	}
@@ -122,24 +123,23 @@ var (
 	errNotConfigured = errors.New("mailrelay: Config.Domain and Config.Upstream are required")
 )
 
-// Plugin is the pocker plugin. Include it with
+// Plugin is the plugin. Include it with
 //
 //	srv.Plugins = append(srv.Plugins, mailrelay.New(mailrelay.Config{Domain: "mail.example.com", Upstream: up}))
 type Plugin struct {
-	cfg     Config
-	enabled *bool
+	cfg  Config
+	send *bool // process default from the `mailrelay` section
 
 	mu    sync.Mutex
-	usage map[string]*usage // by instance id
+	usage map[string]*usage // by app id
 
 	mgr atomic.Pointer[pocker.Manager]
 }
 
 var (
-	_ pocker.Plugin     = (*Plugin)(nil)
-	_ pocker.Configurer = (*Plugin)(nil)
-	_ pocker.AppIniter  = (*Plugin)(nil)
+	_ pluginkit.Plugin  = (*Plugin)(nil)
 	_ pocker.Starter    = (*Plugin)(nil)
+	_ pocker.Configurer = (*Plugin)(nil)
 )
 
 // New returns the plugin. cfg holds the relay and the defaults for every instance.
@@ -147,33 +147,17 @@ func New(cfg Config) *Plugin {
 	return &Plugin{cfg: cfg.withDefaults(), usage: map[string]*usage{}}
 }
 
-// Name implements [pocker.Plugin].
+// Name implements [pluginkit.Plugin].
 func (p *Plugin) Name() string { return Name }
 
-// SectionConfig is the shape of the `mailrelay` section and of an instance's `plugins.mailrelay`.
+// SectionConfig is the shape of the `mailrelay` section (pocketone.yaml) and of an instance's `plugins.mailrelay`.
+//
+// `enabled` belongs to the host: `enabled: false` turns the plugin off, and an app with SMTP off then gets
+// PocketBase's own fallback (sendmail). To keep the relay in charge and refuse an instance's mail, use `send: false`.
 type SectionConfig struct {
-	Enabled   *bool `yaml:"enabled"`
-	PerMinute *int  `yaml:"per_minute"`
-	Daily     *int  `yaml:"daily"`
-}
-
-// limits are the effective settings for one instance.
-type limits struct {
-	enabled   bool
-	perMinute int
-	daily     int
-}
-
-func (y SectionConfig) apply(l *limits) {
-	if y.Enabled != nil {
-		l.enabled = *y.Enabled
-	}
-	if y.PerMinute != nil && *y.PerMinute > 0 {
-		l.perMinute = *y.PerMinute
-	}
-	if y.Daily != nil && *y.Daily > 0 {
-		l.daily = *y.Daily
-	}
+	Send      *bool `yaml:"send" json:"send"`
+	PerMinute *int  `yaml:"per_minute" json:"per_minute"`
+	Daily     *int  `yaml:"daily" json:"daily"`
 }
 
 // Configure implements [pocker.Configurer]: pocketone.yaml's `mailrelay` section. Limits set in Go win.
@@ -185,7 +169,7 @@ func (p *Plugin) Configure(pocker.Config) error {
 	if !found {
 		return nil
 	}
-	p.enabled = y.Enabled
+	p.send = y.Send
 	if y.PerMinute != nil && *y.PerMinute > 0 && p.cfg.PerMinute == DefaultPerMinute {
 		p.cfg.PerMinute = *y.PerMinute
 	}
@@ -195,35 +179,53 @@ func (p *Plugin) Configure(pocker.Config) error {
 	return nil
 }
 
-// Start implements [pocker.Starter]: keeps the manager so relayed mail shows up in the instance's own log.
-func (p *Plugin) Start(_ context.Context, m *pocker.Manager) { p.mgr.Store(m) }
+// limits are the effective settings for one app.
+type limits struct {
+	send      bool
+	perMinute int
+	daily     int
+}
 
-// limitsFor reads the instance's settings each time, so changes from the instance source apply without a restart.
-func (p *Plugin) limitsFor(inst pocker.Instance) (limits, error) {
-	l := limits{enabled: p.enabled == nil || *p.enabled, perMinute: p.cfg.PerMinute, daily: p.cfg.Daily}
-	if raw := inst.PluginConfig(Name); raw != nil {
-		var y SectionConfig
-		if err := pocker.DecodePluginConfig(raw, &y); err != nil {
-			return l, fmt.Errorf("mailrelay: instance %s: %w", inst.ID, err)
-		}
-		y.apply(&l)
+func (p *Plugin) limits(cfg pluginkit.Config) (limits, error) {
+	y := SectionConfig{Send: p.send}
+	if err := cfg.Decode(&y); err != nil {
+		return limits{}, fmt.Errorf("mailrelay: %w", err)
+	}
+	l := limits{send: y.Send == nil || *y.Send, perMinute: p.cfg.PerMinute, daily: p.cfg.Daily}
+	if y.PerMinute != nil && *y.PerMinute > 0 {
+		l.perMinute = *y.PerMinute
+	}
+	if y.Daily != nil && *y.Daily > 0 {
+		l.daily = *y.Daily
 	}
 	return l, nil
 }
 
-// Address is the From address an instance sends as.
-func (p *Plugin) Address(inst pocker.Instance) string {
-	return p.cfg.LocalPart(inst) + "@" + p.cfg.Domain
+// Start implements [pocker.Starter]: keeps the manager so relayed mail shows up in the instance's own log.
+func (p *Plugin) Start(_ context.Context, m *pocker.Manager) { p.mgr.Store(m) }
+
+// appRelay is the relay as one app sees it.
+type appRelay struct {
+	*Plugin
+	id     string
+	limits limits
 }
 
-// InitApp implements [pocker.AppIniter]: takes over the instance's mail whenever its SMTP is off.
-func (p *Plugin) InitApp(inst pocker.Instance, app core.App) error {
+// Address is the From address the app with this id ([pluginkit.AppID]) sends as.
+func (p *Plugin) Address(id string) string {
+	return p.cfg.LocalPart(id) + "@" + p.cfg.Domain
+}
+
+// Register implements [pluginkit.Plugin]: takes over the app's mail whenever its SMTP is off.
+func (p *Plugin) Register(app core.App, cfg pluginkit.Config) error {
 	if p.cfg.Domain == "" || p.cfg.Upstream == nil {
 		return errNotConfigured
 	}
-	if _, err := p.limitsFor(inst); err != nil {
+	l, err := p.limits(cfg)
+	if err != nil {
 		return err
 	}
+	r := &appRelay{Plugin: p, id: pluginkit.AppID(app), limits: l}
 	app.OnMailerSend().Bind(&hook.Handler[*core.MailerEvent]{
 		Id:       "__mailrelay__",
 		Priority: 1 << 30, // last: the app's own onMailerSend hooks run (and may change the message) first
@@ -232,20 +234,17 @@ func (p *Plugin) InitApp(inst pocker.Instance, app core.App) error {
 				return e.Next() // bring your own SMTP wins
 			}
 			// never e.Next() here: that would run sendmail on the host
-			return p.relay(inst, e.App, e.Message)
+			return r.relay(e.App, e.Message)
 		},
 	})
-	p.bindRoutes(inst, app)
+	r.bindRoutes(app)
 	return nil
 }
 
-func (p *Plugin) relay(inst pocker.Instance, app core.App, m *mailer.Message) error {
-	l, err := p.limitsFor(inst)
-	if err != nil {
-		return err
-	}
-	if !l.enabled {
-		p.logInstance(inst, "mail refused: outgoing mail is off for this instance")
+func (r *appRelay) relay(app core.App, m *mailer.Message) error {
+	p, l := r.Plugin, r.limits
+	if !l.send {
+		r.log("mail refused: outgoing mail is off for this instance")
 		return ErrDisabled
 	}
 
@@ -254,39 +253,40 @@ func (p *Plugin) relay(inst pocker.Instance, app core.App, m *mailer.Message) er
 	case len(rcpts) == 0:
 		return ErrNoRecipients
 	case len(rcpts) > p.cfg.MaxRecipients:
-		p.logInstance(inst, fmt.Sprintf("mail refused: %d recipients (max %d)", len(rcpts), p.cfg.MaxRecipients))
+		r.log(fmt.Sprintf("mail refused: %d recipients (max %d)", len(rcpts), p.cfg.MaxRecipients))
 		return ErrTooManyRcpts
 	}
 
-	from := mail.Address{Name: displayName(m.From.Name, app.Settings().Meta.SenderName), Address: p.Address(inst)}
-	raw, err := encode(m, from, replyTo(m, from.Address), inst.ID)
+	from := mail.Address{Name: displayName(m.From.Name, app.Settings().Meta.SenderName), Address: p.Address(r.id)}
+	raw, err := encode(m, from, replyTo(m, from.Address), r.id)
 	if err != nil {
 		return fmt.Errorf("mailrelay: %w", err)
 	}
 	if len(raw) > p.cfg.MaxSize {
-		p.logInstance(inst, fmt.Sprintf("mail refused: %d bytes (max %d)", len(raw), p.cfg.MaxSize))
+		r.log(fmt.Sprintf("mail refused: %d bytes (max %d)", len(raw), p.cfg.MaxSize))
 		return ErrTooLarge
 	}
 
-	if !p.take(inst.ID, l) {
-		p.logInstance(inst, fmt.Sprintf("mail refused: limit reached (%d/minute, %d/day)", l.perMinute, l.daily))
+	if !p.take(r.id, l) {
+		r.log(fmt.Sprintf("mail refused: limit reached (%d/minute, %d/day)", l.perMinute, l.daily))
 		return ErrRateLimited
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	if err := p.cfg.Upstream.Send(ctx, from.Address, rcpts, raw); err != nil {
-		p.logInstance(inst, fmt.Sprintf("mail to %s failed: %v", maskList(rcpts), err))
+		r.log(fmt.Sprintf("mail to %s failed: %v", maskList(rcpts), err))
 		return fmt.Errorf("mailrelay: %w", err)
 	}
-	p.logInstance(inst, fmt.Sprintf("mail from %s to %s accepted", from.Address, maskList(rcpts)))
+	r.log(fmt.Sprintf("mail from %s to %s accepted", from.Address, maskList(rcpts)))
 	app.Logger().Info("mailrelay: sent", "from", from.Address, "recipients", len(rcpts), "subject", m.Subject)
 	return nil
 }
 
-func (p *Plugin) logInstance(inst pocker.Instance, msg string) {
-	if m := p.mgr.Load(); m != nil {
-		m.LogInstance(inst.ID, "mailrelay", msg)
+// log writes a line to the instance's own log (under Pocker).
+func (r *appRelay) log(msg string) {
+	if m := r.mgr.Load(); m != nil && r.id != "" {
+		m.LogInstance(r.id, "mailrelay", msg)
 	}
 }
 
@@ -489,4 +489,4 @@ func maskList(list []string) string {
 }
 
 // Section is the key of the `mailrelay` section (pocketone.yaml): the shared mail relay on a pocker host.
-var Section = pluginkit.NewSection(Name, SectionConfig{}, "Shared mail relay on a pocker host: enabled, per-minute and daily limits per instance.")
+var Section = pluginkit.NewSection(Name, SectionConfig{}, "Shared mail relay on a pocker host: send, per-minute and daily limits per instance.")

@@ -68,7 +68,7 @@ func setup(t *testing.T, cfg Config, inst pocker.Instance) (*Plugin, core.App, *
 	}
 	p := New(cfg)
 	app := newApp(t)
-	if err := p.InitApp(inst, app); err != nil {
+	if err := pocker.InitPlugins(p)(inst, app); err != nil {
 		t.Fatal(err)
 	}
 	return p, app, up
@@ -121,14 +121,30 @@ func TestOwnSMTPWins(t *testing.T) {
 	}
 }
 
-func TestDisabledForInstance(t *testing.T) {
-	inst := pocker.Instance{ID: "a", Plugins: map[string]any{Name: map[string]any{"enabled": false}}}
+func TestSendOffForInstance(t *testing.T) {
+	inst := pocker.Instance{ID: "a", Plugins: map[string]any{Name: map[string]any{"send": false}}}
 	_, app, up := setup(t, Config{}, inst)
 	if err := app.NewMailClient().Send(msg("a@example.org")); !errors.Is(err, ErrDisabled) {
 		t.Fatalf("err = %v, want ErrDisabled", err)
 	}
 	if len(up.msgs) != 0 {
-		t.Fatal("sent although disabled")
+		t.Fatal("sent although send is off")
+	}
+}
+
+// `enabled: false` is the host's switch: the plugin isn't registered on that instance at all.
+func TestEnabledFalseSkipsInstance(t *testing.T) {
+	inst := pocker.Instance{ID: "a", Plugins: map[string]any{Name: map[string]any{"enabled": false}}}
+	_, app, _ := setup(t, Config{}, inst)
+	if app.OnMailerSend().Length() != 0 {
+		t.Fatal("mailrelay bound although enabled: false")
+	}
+}
+
+func TestBadSettings(t *testing.T) {
+	inst := pocker.Instance{ID: "a", Plugins: map[string]any{Name: map[string]any{"daily": "lots"}}}
+	if err := pocker.InitPlugins(New(Config{Domain: "mail.test", Upstream: &fakeUpstream{}}))(inst, newApp(t)); err == nil {
+		t.Fatal("expected an error for daily: \"lots\"")
 	}
 }
 
@@ -194,7 +210,7 @@ func TestTrapCatchesEveryInstance(t *testing.T) {
 	p := New(Config{Domain: "mail.localhost", Upstream: SMTPUpstream{Addr: smtpAddr, Timeout: 5 * time.Second}})
 	for _, id := range []string{"alpha.localhost", "beta.localhost"} {
 		app := newApp(t)
-		if err := p.InitApp(pocker.Instance{ID: id}, app); err != nil {
+		if err := pocker.InitPlugins(p)(pocker.Instance{ID: id}, app); err != nil {
 			t.Fatal(err)
 		}
 		if err := app.NewMailClient().Send(msg("user@example.com")); err != nil {

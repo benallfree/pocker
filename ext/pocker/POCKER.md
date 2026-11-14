@@ -143,7 +143,7 @@ any of:
 
 | Interface | Used for |
 |---|---|
-| `pluginkit.Plugin` | a PocketOne plugin, registered on every instance's app before it bootstraps (`Register(app, cfg)`) with the instance's `plugins.<name>` settings, its id in `pluginkit.AppID(app)`; e.g. [pitr](../pitr/README.md), [storage](../storage/README.md), [tokens](../tokens/README.md), [s3redirect](../s3redirect/README.md), [bulkmail](../bulkmail/README.md). `enabled: false` skips it for that instance. The same value works on a single app. |
+| `pluginkit.Plugin` | a PocketOne plugin, registered on every instance's app before it bootstraps (`Register(app, cfg)`) with the instance's `plugins.<name>` settings, its id in `pluginkit.AppID(app)`; e.g. [pitr](../pitr/README.md), [storage](../storage/README.md), [tokens](../tokens/README.md), [s3redirect](../s3redirect/README.md), [mailrelay](../mailrelay/README.md), [bulkmail](../bulkmail/README.md). `enabled: false` skips it for that instance. A change to an instance's `plugins:` settings restarts its app on its next request. The same value works on a single app. |
 | `Configurer` | reading its own pocketone.yaml section before the server starts (`Configure(cfg)`) |
 | `Gate` | a peer check before routing, and admission (e.g. rate limits) before an instance is served or forwarded |
 | `TLSProvider` | the main listener's TLS (e.g. automatic certificates) |

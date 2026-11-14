@@ -61,3 +61,16 @@ func TestHostedPlugin(t *testing.T) {
 		t.Fatal("enabled: false still registered or bound")
 	}
 }
+
+// Plugins read their settings at Register, so a change to an instance's plugin settings restarts its app.
+func TestPluginSettingsChangeRestarts(t *testing.T) {
+	a := Instance{ID: "a", Plugins: map[string]any{"fake": map[string]any{"daily": 7}}}
+	b := a
+	b.Plugins = map[string]any{"fake": map[string]any{"daily": 8}}
+	if !sameRuntime(a, a) {
+		t.Fatal("identical instances must share an app")
+	}
+	if sameRuntime(a, b) {
+		t.Fatal("changed plugin settings must restart the app")
+	}
+}

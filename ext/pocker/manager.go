@@ -372,11 +372,13 @@ func (m *Manager) emit(e Event) {
 	}
 }
 
-// sameRuntime reports whether two versions of an instance can share a running app.
+// sameRuntime reports whether two versions of an instance can share a running app. Plugin settings count: plugins
+// read them once, when they're registered on the app.
 func sameRuntime(a, b Instance) bool {
 	return a.Remote == b.Remote && a.Dir == b.Dir && a.Dev == b.Dev && reflect.DeepEqual(a.Secrets, b.Secrets) && a.EncryptionKey == b.EncryptionKey &&
 		reflect.DeepEqual(a.Access, b.Access) && reflect.DeepEqual(a.Limits, b.Limits) &&
-		reflect.DeepEqual(a.Superusers, b.Superusers) && reflect.DeepEqual(a.Private, b.Private)
+		reflect.DeepEqual(a.Superusers, b.Superusers) && reflect.DeepEqual(a.Private, b.Private) &&
+		reflect.DeepEqual(a.Plugins, b.Plugins)
 }
 
 // retire stops an app that new requests no longer reach, after giving in-flight requests time to finish.

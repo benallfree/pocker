@@ -9,7 +9,8 @@ shared host for every tenant. With this plugin:
 - **SMTP off:** the mail goes through the operator's relay as `<instance>@<Domain>`, within per-instance limits.
   `sendmail` never runs.
 
-Runs on: **Pocker only**. A single PocketBase app can configure its own SMTP; it doesn't need a relay.
+Runs on: **Pocker**. It's a PocketOne plugin ([`pluginkit`](../pluginkit)), so it registers on a single app too, but
+a single app can configure its own SMTP and doesn't need a relay.
 
 ## How it works
 
@@ -22,7 +23,7 @@ Runs on: **Pocker only**. A single PocketBase app can configure its own SMTP; it
 
 For each message:
 
-1. **Check it's allowed.** Is mail on for this instance (`enabled`)? Are there no more than 5 recipients (To + Cc +
+1. **Check it's allowed.** May this instance send (`send`)? Are there no more than 5 recipients (To + Cc +
    Bcc)? Is the encoded size no more than 1 MiB?
 2. **Count it.** Each message counts once against the instance's limits, however many recipients it has. Defaults are
    20 a minute and 200 a day, and the day resets at midnight UTC.
@@ -51,22 +52,27 @@ srv.Plugins = append(srv.Plugins, mailrelay.New(mailrelay.Config{
 - **`Upstream`** is any `Send(ctx, from, to, raw)`. `SMTPUpstream` ships here. It dials with its own dialer, so
   Pocker's egress rules for tenants (public addresses only) don't block a private relay. An API sender such as SES
   `SendRawEmail` fits the same interface.
-- **`LocalPart`** picks an instance's address. The default is the first label of the instance id: `blog.localhost` →
-  `blog`.
+- **`LocalPart`** picks an instance's address from its id (`pluginkit.AppID`). The default is the first label of the
+  id: `blog.localhost` → `blog`.
 
-Config file (process defaults):
+`pocketone.yaml` (process defaults; limits set in Go win):
 
 ```yaml
-mailrelay: { enabled: true, per_minute: 20, daily: 200 }
+mailrelay: { per_minute: 20, daily: 200 }
 ```
 
 Per instance, set in `instances.yaml` or by your instance source (for example, per plan):
 
 ```yaml
 plugins:
-  mailrelay: { enabled: false }        # this instance can't send through the relay (it must use its own SMTP)
+  mailrelay: { send: false }           # refuse this instance's mail unless it uses its own SMTP
   mailrelay: { per_minute: 60, daily: 2000 }
 ```
+
+A change to these settings restarts the instance's app on its next request.
+
+Use `send: false`, not `enabled: false`, to stop an instance sending. `enabled: false` turns the plugin off for that
+instance, and with SMTP off PocketBase then falls back to the host's `sendmail`. Don't set it under Pocker.
 
 ## Try it: `example/` with the dev mail trap
 
