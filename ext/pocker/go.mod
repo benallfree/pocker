@@ -6,7 +6,6 @@ require (
 	ganigeorgiev.com/pocketbase/dbx v1.13.0
 	ganigeorgiev.com/pocketbase/pocketbase v0.0.0-00010101000000-000000000000
 	github.com/dop251/goja v0.0.0-20261023121931-6ace4dde0b29
-	github.com/fsnotify/fsnotify v1.10.1
 	github.com/pockethost/pocketone/ext/ceplugin v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketone/ext/devusers v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketone/ext/host v0.0.0-00010101000000-000000000000
@@ -27,6 +26,7 @@ require (
 	github.com/dop251/goja_nodejs v0.0.0-20260212111938-1f56ff5bcf14 // indirect
 	github.com/dustin/go-humanize v1.1.0 // indirect
 	github.com/fatih/color v1.19.0 // indirect
+	github.com/fsnotify/fsnotify v1.10.1 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.15 // indirect
 	github.com/go-sourcemap/sourcemap v2.1.4+incompatible // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect

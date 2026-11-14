@@ -63,3 +63,36 @@ func TestHooksChangeRestartsOnlyThatApp(t *testing.T) {
 		t.Errorf("b after: %q", got)
 	}
 }
+
+// A new migration restarts the running app, which applies it.
+func TestMigrationChangeRestartsApp(t *testing.T) {
+	d := t.TempDir()
+	for _, sub := range []string{"pb_hooks", "pb_migrations"} {
+		if err := os.MkdirAll(filepath.Join(d, sub), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeHook(t, d, "ok")
+	a := Instance{ID: "a", Hosts: []string{"a.test"}, Dir: d}
+	m := newTestManager(t, false, a)
+	defer m.Shutdown()
+	if got := get(m, "a.test"); got != "ok" {
+		t.Fatalf("before: %q", got)
+	}
+	mig := `migrate((app) => { const c = new Collection({ name: "from_migration", type: "base" }); app.save(c) }, (app) => {})`
+	if err := os.WriteFile(filepath.Join(d, "pb_migrations", "1800000000_add.js"), []byte(mig), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		if ra, _ := m.app(a); ra != nil && ra.app != nil {
+			if _, err := ra.app.FindCollectionByNameOrId("from_migration"); err == nil {
+				break
+			}
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the new migration wasn't applied (no restart?)")
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+}

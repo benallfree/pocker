@@ -105,6 +105,7 @@ type Runtime struct {
 	ctrs  map[string]*ctr
 	held  map[string]chan struct{} // instances under maintenance (WithInstanceStopped)
 	ready atomic.Bool
+	watch *host.ScriptWatcher // restarts a container when its pb_hooks change
 
 	bg     context.Context
 	cancel context.CancelFunc
@@ -113,8 +114,9 @@ type Runtime struct {
 type ctr struct {
 	inst string
 
-	mu        sync.Mutex // serializes start/stop
-	container string     // container id ("" = not running)
+	mu        sync.Mutex     // serializes start/stop
+	container string         // container id ("" = not running)
+	last      *host.Instance // the instance as last started (nil = adopted, not started by this process)
 	port      int
 	hash      string // its LabelSpec ("" = adopted from another manager: kept until the instance changes)
 	dirty     bool   // the instance changed since the container started
@@ -169,8 +171,10 @@ func New(cfg Config) (*Runtime, error) {
 		IdleConnTimeout:     90 * time.Second,
 	}
 	bg, cancel := context.WithCancel(context.Background())
-	return &Runtime{cfg: cfg, e: newEngine(cfg.Socket), log: log, sem: make(chan struct{}, cfg.MaxConcurrentStarts),
-		http: &http.Client{Transport: tr, Timeout: 3 * time.Second}, tr: tr, ctrs: map[string]*ctr{}, bg: bg, cancel: cancel}, nil
+	rt := &Runtime{cfg: cfg, e: newEngine(cfg.Socket), log: log, sem: make(chan struct{}, cfg.MaxConcurrentStarts),
+		http: &http.Client{Transport: tr, Timeout: 3 * time.Second}, tr: tr, ctrs: map[string]*ctr{}, bg: bg, cancel: cancel}
+	rt.watch = host.NewScriptWatcher(log, rt.scriptsChanged)
+	return rt, nil
 }
 
 // Name implements [host.Runtime].
@@ -236,6 +240,7 @@ func (rt *Runtime) adopt(ctx context.Context) error {
 		c.running.Store(true)
 		c.lastUsed.Store(time.Now().UnixNano())
 		go rt.follow(c.inst, s.ID, time.Now())
+		rt.watchScripts(id, filepath.Join(rt.cfg.DataRoot, id))
 		n++
 	}
 	if n > 0 {
@@ -326,6 +331,56 @@ func (rt *Runtime) ensure(ctx context.Context, c *ctr, inst host.Instance) (int,
 	return rt.startLocked(ctx, c, inst, cfg, version)
 }
 
+// folder is an instance's folder on the host: Instance.Dir, or <DataRoot>/<id>.
+func (rt *Runtime) folder(inst host.Instance) string {
+	if inst.Dir != "" {
+		return inst.Dir
+	}
+	return filepath.Join(rt.cfg.DataRoot, inst.ID)
+}
+
+// watchScripts makes sure the instance's pb_hooks exists and watches it; a change restarts the container.
+// (pb_migrations isn't watched: stock binaries write a migration there on every dashboard schema change.)
+func (rt *Runtime) watchScripts(id, dir string) {
+	hooks := filepath.Join(dir, "pb_hooks")
+	_ = os.MkdirAll(hooks, 0o755)
+	rt.watch.Add(id, hooks)
+}
+
+// scriptsChanged restarts an instance's container after its pb_hooks changed. Requests for it wait for the new
+// container (they queue on the instance's lock). A container adopted from an earlier process is stopped instead;
+// its next request starts it with the current configuration.
+func (rt *Runtime) scriptsChanged(id string) {
+	rt.mu.Lock()
+	c, ok := rt.ctrs[id]
+	rt.mu.Unlock()
+	if !ok {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.container == "" {
+		return
+	}
+	rt.log.Info("docker: pb_hooks changed, restarting", "instance", id)
+	ctx := rt.bg
+	if c.last == nil {
+		rt.stopLocked(ctx, c)
+		return
+	}
+	inst := *c.last
+	cfg, version, err := rt.containerConfig(ctx, inst)
+	if err != nil {
+		rt.log.Warn("docker: restart after pb_hooks change", "instance", id, "error", err)
+		rt.stopLocked(ctx, c)
+		return
+	}
+	rt.stopLocked(ctx, c)
+	if _, err := rt.startLocked(ctx, c, inst, cfg, version); err != nil {
+		rt.log.Warn("docker: restart after pb_hooks change", "instance", id, "error", err)
+	}
+}
+
 // containerConfig is the container an instance should run, labelled with a hash of itself.
 func (rt *Runtime) containerConfig(ctx context.Context, inst host.Instance) (containerConfig, string, error) {
 	want := inst.Version
@@ -343,10 +398,7 @@ func (rt *Runtime) containerConfig(ctx context.Context, inst host.Instance) (con
 		return containerConfig{}, "", err
 	}
 	version := line + ":" + ver // e.g. "pb:0.36.9", "p1:0.0.1"
-	dir := inst.Dir
-	if dir == "" {
-		dir = filepath.Join(rt.cfg.DataRoot, inst.ID)
-	}
+	dir := rt.folder(inst)
 	// create the instance folder here: otherwise the daemon creates a missing bind source itself (root-owned on
 	// Linux; inside the VM with Docker Desktop, where the host never sees it)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -364,7 +416,9 @@ func (rt *Runtime) containerConfig(ctx context.Context, inst host.Instance) (con
 			return containerConfig{}, "", fmt.Errorf("prepare: %w", err)
 		}
 	}
-	cmd := []string{"./pocketbase", "serve", "--http", "0.0.0.0:8090"}
+	// --hooksWatch=false: the runtime watches pb_hooks from the host (one watcher for all containers) and restarts the
+	// container, so PocketBase's own watcher would only restart it a second time
+	cmd := []string{"./pocketbase", "serve", "--http", "0.0.0.0:8090", "--hooksWatch=false"}
 	if inst.Dev {
 		cmd = append(cmd, "--dev")
 	}
@@ -451,6 +505,9 @@ func (rt *Runtime) startLocked(ctx context.Context, c *ctr, inst host.Instance, 
 	}
 	c.container, c.port, c.hash, c.dirty = id, port, cfg.Labels[LabelSpec], false
 	c.running.Store(true)
+	started := inst
+	c.last = &started
+	rt.watchScripts(inst.ID, rt.folder(inst))
 	rt.log.Info("docker: instance started", "instance", inst.ID, "version", version, "ms", time.Since(t0).Milliseconds())
 	return port, nil
 }
@@ -504,6 +561,7 @@ func (rt *Runtime) stopLocked(ctx context.Context, c *ctr) {
 	_ = rt.e.remove(ctx, c.container)
 	c.container, c.port, c.hash, c.dirty = "", 0, "", false
 	c.running.Store(false)
+	rt.watch.Remove(c.inst)
 }
 
 // Stop stops an instance's container (its folder stays), e.g. before maintenance on its files.
@@ -594,4 +652,5 @@ func (rt *Runtime) RunningCount() int {
 // to adopt.
 func (rt *Runtime) Shutdown() {
 	rt.cancel()
+	rt.watch.Close()
 }

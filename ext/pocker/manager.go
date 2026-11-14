@@ -41,7 +41,7 @@ type Manager struct {
 
 	defaults Limits
 	onEvent  func(Event)
-	hooks    *hooksWatcher // restarts an app when its pb_hooks change
+	hooks    *host.ScriptWatcher // restarts an app when its pb_hooks or pb_migrations change
 	gate     Gate
 
 	held map[string]chan struct{} // by ID: instances under maintenance; requests wait for the channel to close
@@ -123,7 +123,7 @@ func NewManager(source InstanceSource, opts ManagerOptions) *Manager {
 		m.ownsDir = true
 		m.dir.Subscribe(m.Sync) // with a shared directory, the host subscribes its runtime
 	}
-	m.hooks = newHooksWatcher(opts.Logger, m.hooksChanged)
+	m.hooks = host.NewScriptWatcher(opts.Logger, m.hooksChanged)
 	m.handler = &host.Handler{Dir: m.dir, Gate: opts.Gate, Runtimes: []host.Runtime{m}, Forward: opts.Forward, Dev: opts.Dev, Logger: opts.Logger}
 	return m
 }
@@ -291,25 +291,27 @@ func (m *Manager) RunningCount() int {
 	return running
 }
 
-// watchHooks restarts the app when its pb_hooks change (like PocketBase's HooksWatch, but only this app and with
-// one shared watcher). The watch ends with this app, unless a newer app for the instance already took over.
+// watchHooks restarts the app when its pb_hooks or pb_migrations change (like PocketBase's HooksWatch, but only this
+// app, migrations too, and one shared watcher). The watch ends with this app, unless a newer app for the instance
+// already took over.
 func (m *Manager) watchHooks(inst Instance, slot *appSlot) {
 	if m.hooks == nil {
 		return
 	}
-	m.hooks.add(inst.ID, filepath.Join(instanceDir(m.opts, inst), "pb_hooks"))
+	m.hooks.Add(inst.ID, filepath.Join(instanceDir(m.opts, inst), "pb_hooks"))
+	m.hooks.Add(inst.ID, filepath.Join(instanceDir(m.opts, inst), "pb_migrations"))
 	slot.app.app.OnTerminate().BindFunc(func(e *core.TerminateEvent) error {
 		m.mu.RLock()
 		cur := m.apps[inst.ID]
 		m.mu.RUnlock()
 		if cur == nil || cur == slot {
-			m.hooks.remove(inst.ID)
+			m.hooks.Remove(inst.ID)
 		}
 		return e.Next()
 	})
 }
 
-// hooksChanged restarts the instance's running app (app.Restart, caught by catchRestart: only this app restarts).
+// hooksChanged (pb_hooks or pb_migrations changed) restarts the instance's running app (app.Restart, caught by catchRestart: only this app restarts).
 func (m *Manager) hooksChanged(id string) {
 	m.mu.RLock()
 	slot := m.apps[id]
@@ -325,9 +327,9 @@ func (m *Manager) hooksChanged(id string) {
 	if slot.app == nil {
 		return
 	}
-	m.log.Info("pocker: pb_hooks changed, restarting", "id", id)
+	m.log.Info("pocker: scripts changed, restarting", "id", id)
 	if inst, ok := m.dir.Get(id); ok {
-		openInstanceLog(instanceDir(m.opts, inst)).Write("stdout", "pb_hooks changed, restarting")
+		openInstanceLog(instanceDir(m.opts, inst)).Write("stdout", "pb_hooks or pb_migrations changed, restarting")
 	}
 	go func() {
 		if err := slot.app.app.Restart(); err != nil {
@@ -354,7 +356,7 @@ func (m *Manager) Shutdown() {
 		}()
 	}
 	wg.Wait()
-	m.hooks.close()
+	m.hooks.Close()
 }
 
 // Event is something that happened to an instance, for logs or owner notifications.

@@ -166,3 +166,52 @@ func TestMaintenance(t *testing.T) {
 		t.Fatalf("after maintenance: %d", code)
 	}
 }
+
+// Changing a running instance's pb_hooks restarts its container, which then serves the new code.
+func TestHooksChangeRestartsContainer(t *testing.T) {
+	socket := dockerSocket(t)
+	data := t.TempDir()
+	rt, err := New(Config{Socket: socket, Image: "alpine:3.20", DataRoot: data, Binaries: testBinaries(t),
+		Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	t.Cleanup(func() { _ = rt.e.remove(context.Background(), "p4hooks") })
+	if err := rt.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer rt.Shutdown()
+	inst := host.Instance{ID: "p4hooks", Version: "p1:0.0.*"}
+	hook := func(v string) {
+		t.Helper()
+		_ = os.MkdirAll(filepath.Join(data, inst.ID, "pb_hooks"), 0o755)
+		src := `routerAdd("GET", "/v", (e) => e.string(200, "` + v + `"))`
+		if err := os.WriteFile(filepath.Join(data, inst.ID, "pb_hooks", "main.pb.js"), []byte(src), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	hook("v1")
+	if code, body := get(t, rt, inst, "/v"); code != 200 || body != "v1" {
+		t.Fatalf("before: %d %q", code, body)
+	}
+	before := rt.get(inst.ID).container
+	hook("v2")
+	deadline := time.Now().Add(30 * time.Second)
+	for {
+		code, body := get(t, rt, inst, "/v")
+		if code == 200 && body == "v2" {
+			break
+		}
+		if code != 200 && code != 404 {
+			t.Fatalf("during restart: %d %q (requests should wait, not fail)", code, body)
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("still %d %q after the hook changed", code, body)
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	if rt.get(inst.ID).container == before {
+		t.Fatal("served v2 without a new container")
+	}
+}
