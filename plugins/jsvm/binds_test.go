@@ -1613,7 +1613,7 @@ func TestHooksBindsCount(t *testing.T) {
 	vm := goja.New()
 	hooksBinds(app, vm, nil)
 
-	testBindsCount(vm, "this", 84, t) // CE: +1 for onFilesystemCreate (upstream: 83)
+	testBindsCount(vm, "this", 84, t) // PocketOne: +1 for onFilesystemCreate (upstream: 83)
 }
 
 func TestHooksBinds(t *testing.T) {

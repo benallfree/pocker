@@ -7,7 +7,7 @@ import (
 	"github.com/dop251/goja"
 )
 
-// CE: this file lets Go plugins run JS on an app's hook runtimes.
+// PocketOne: this file lets Go plugins run JS on an app's hook runtimes.
 
 const executorsStoreKey = "__pbJsvmExecutors"
 

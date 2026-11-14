@@ -1,6 +1,6 @@
 package apis_test
 
-// CE: a request whose error isn't an ApiError is logged with the status the client got (the error handler's), not 0.
+// PocketOne: a request whose error isn't an ApiError is logged with the status the client got (the error handler's), not 0.
 
 import (
 	"errors"

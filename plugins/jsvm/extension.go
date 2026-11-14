@@ -1,6 +1,6 @@
 package jsvm
 
-// CE: Extensions. A plugin extends jsvm by implementing any of the optional methods below on one value and listing
+// PocketOne: Extensions. A plugin extends jsvm by implementing any of the optional methods below on one value and listing
 // it in Config.Extensions; jsvm only calls the methods a value has. With no extensions, jsvm behaves like upstream.
 
 import (

@@ -219,7 +219,7 @@ Landlock.
 
 These live in the repo root (PocketBase's own files), not in this plugin.
 
-Kept small and marked `// CE:` so upstream merges stay easy:
+Kept small and marked `// PocketOne:` so upstream merges stay easy:
 
 - `core.BaseAppConfig.AppMigrations`: a per-app migrations list (JS migrations from `plugins/jsvm` register there
   instead of the global `core.AppMigrations`).

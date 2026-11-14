@@ -73,7 +73,7 @@ func (app *BaseApp) registerNotifyWatcherHooks() {
 		}
 
 		if notifyWatcher != nil {
-			// CE: remove the previous notify file first and leave the new one in place (cleaned up on terminate).
+			// PocketOne: remove the previous notify file first and leave the new one in place (cleaned up on terminate).
 			// Writing and removing it at once loses the event on macOS: kqueue only reports a directory change and
 			// fsnotify rescans, so a file already gone by then is never seen (inotify on Linux reports it anyway).
 			_ = os.Remove(settingsFile)
@@ -103,7 +103,7 @@ func (app *BaseApp) registerNotifyWatcherHooks() {
 		}
 
 		if notifyWatcher != nil {
-			// CE: remove the previous notify file first and leave the new one in place (cleaned up on terminate).
+			// PocketOne: remove the previous notify file first and leave the new one in place (cleaned up on terminate).
 			// Writing and removing it at once loses the event on macOS: kqueue only reports a directory change and
 			// fsnotify rescans, so a file already gone by then is never seen (inotify on Linux reports it anyway).
 			_ = os.Remove(collectionsFile)

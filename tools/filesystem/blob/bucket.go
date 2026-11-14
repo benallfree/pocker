@@ -52,7 +52,7 @@ func NewBucket(drv Driver) *Bucket {
 	return &Bucket{drv: drv}
 }
 
-// CE: Driver returns the bucket's driver (e.g. to wrap it: a key prefix, a fallback).
+// PocketOne: Driver returns the bucket's driver (e.g. to wrap it: a key prefix, a fallback).
 func (b *Bucket) Driver() Driver {
 	return b.drv
 }

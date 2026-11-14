@@ -1278,7 +1278,7 @@ type App interface {
 	// Filesystem event hooks
 	// ---------------------------------------------------------------
 
-	// CE: OnFilesystemCreate hook is triggered every time app.NewFilesystem() or app.NewBackupsFilesystem()
+	// PocketOne: OnFilesystemCreate hook is triggered every time app.NewFilesystem() or app.NewBackupsFilesystem()
 	// creates a filesystem, before the default one. A handler may supply its own (see [FilesystemCreateEvent]).
 	// Plugins may trigger it for their own kinds too.
 	OnFilesystemCreate() *hook.Hook[*FilesystemCreateEvent]

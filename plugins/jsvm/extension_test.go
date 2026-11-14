@@ -1,6 +1,6 @@
 package jsvm
 
-// CE: tests for Config.Extensions, the lazy pool and Run, so an upstream merge that breaks one fails here and not
+// PocketOne: tests for Config.Extensions, the lazy pool and Run, so an upstream merge that breaks one fails here and not
 // only in ext/.
 
 import (

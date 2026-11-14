@@ -1240,7 +1240,7 @@ func TestRealtimeRecordResolve(t *testing.T) {
 	}
 }
 
-// CE: a superuser's subscription filter may use hidden fields, as in the list API; a regular user's may not.
+// PocketOne: a superuser's subscription filter may use hidden fields, as in the list API; a regular user's may not.
 func TestRealtimeSuperuserFilterOnHiddenField(t *testing.T) {
 	t.Parallel()
 
