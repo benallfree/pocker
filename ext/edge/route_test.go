@@ -154,6 +154,40 @@ func TestCORSAtTheEntryEdge(t *testing.T) {
 	}
 }
 
+// Both edges' firewalls set rate-limit headers: the owner's replace the entry edge's instead of being appended
+// (one value each), and headers only the entry edge sets are kept.
+func TestOwnerHeadersReplaceEntryHeaders(t *testing.T) {
+	o := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == DefaultHealthPath {
+			_, _ = io.WriteString(w, `{"status":"ok"}`)
+			return
+		}
+		w.Header().Set("X-RateLimit-Ip-Hourly-Remaining", "9990")
+		w.Header().Set("Access-Control-Expose-Headers", "X-RateLimit-Ip-Hourly-Remaining")
+		_, _ = io.WriteString(w, "ok")
+	}))
+	t.Cleanup(o.Close)
+	rt := NewRouter(RouterConfig{Edges: &YAMLProvider{List: []StaticEdge{{ID: "sgp-1", InternalURL: o.URL}}}, Logger: quietLog})
+	inst := Instance{ID: "x", Hosts: []string{"x.example.com"}, Remote: "sgp-1"}
+	w := httptest.NewRecorder()
+	w.Header().Set("X-RateLimit-Ip-Hourly-Remaining", "999") // what the entry edge's firewall set
+	w.Header().Set("Access-Control-Expose-Headers", "X-RateLimit-Ip-Hourly-Remaining")
+	w.Header().Set("X-Entry-Only", "kept")
+	rt.Forward(w, httptest.NewRequest(http.MethodGet, "http://x.example.com/api/health", nil), inst)
+	if w.Code != 200 {
+		t.Fatalf("status %d", w.Code)
+	}
+	for k, want := range map[string]string{
+		"X-RateLimit-Ip-Hourly-Remaining": "9990",
+		"Access-Control-Expose-Headers":   "X-RateLimit-Ip-Hourly-Remaining",
+		"X-Entry-Only":                    "kept",
+	} {
+		if got := w.Header().Values(k); len(got) != 1 || got[0] != want {
+			t.Fatalf("%s: %v, want [%s]", k, got, want)
+		}
+	}
+}
+
 // MultiProvider: the first source that resolves a Remote wins (YAML entries next to a mirror).
 func TestMultiProvider(t *testing.T) {
 	o := owner(t)

@@ -294,6 +294,12 @@ func (rt *Router) Forward(w http.ResponseWriter, r *http.Request, inst Instance)
 				if policy != nil {
 					policy.rewriteUpstream(res.Header)
 				}
+				// ReverseProxy appends the owner's headers to ours. Where both set one (the firewall's rate-limit
+				// headers and Access-Control-Expose-Headers on both edges), the owner's replaces ours: it counted every
+				// request for the instance, not just the ones that entered here.
+				for k := range res.Header {
+					w.Header().Del(k)
+				}
 				return nil
 			},
 			ErrorHandler: func(_ http.ResponseWriter, _ *http.Request, err error) { failed = err },
