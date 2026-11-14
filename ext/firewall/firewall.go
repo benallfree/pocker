@@ -29,14 +29,21 @@ import (
 //	  trusted_proxies: []             # peers whose client-IP headers are believed
 //	  client_ip_headers: [CF-Connecting-IP, True-Client-IP, X-Forwarded-For, X-Real-IP]
 //	  trusted_clients: []             # client IPs that get the trusted rate limits on every instance
+//	  trusted_client_headers: [X-Client-IP] # a trusted client (e.g. an SSR proxy) names its end user here
 //	  rate_limit_header_prefix: X-RateLimit
 type Config struct {
 	AllowCIDRs            []string `yaml:"allow_cidrs"`
 	TrustedProxies        []string `yaml:"trusted_proxies"`
 	ClientIPHeaders       []string `yaml:"client_ip_headers"`
 	TrustedClients        []string `yaml:"trusted_clients"`
+	TrustedClientHeaders  []string `yaml:"trusted_client_headers"`
 	RateLimitHeaderPrefix string   `yaml:"rate_limit_header_prefix"`
 }
+
+// DefaultTrustedClientHeaders are read, in order, from trusted clients (process-wide or the instance's trusted_ips):
+// a server-side proxy or SSR app sends its end user's IP there, so each user gets their own per-IP buckets (with the
+// trusted limits) instead of all sharing the proxy's.
+var DefaultTrustedClientHeaders = []string{"X-Client-IP"}
 
 // DefaultClientIPHeaders are read, in order, from trusted proxies.
 var DefaultClientIPHeaders = []string{"CF-Connecting-IP", "True-Client-IP", "X-Forwarded-For", "X-Real-IP"}
@@ -66,6 +73,7 @@ type Firewall struct {
 	allow     []netip.Prefix
 	proxies   []netip.Prefix
 	headers   []string
+	endUser   []string // trusted_client_headers
 	trusted   []netip.Prefix
 	prefix    string
 	exposeAll string
@@ -122,6 +130,7 @@ func (f *Firewall) apply(c Config, haveConfig bool, rl RateLimits, haveLimits bo
 		if f.Config.ClientIPHeaders == nil {
 			f.Config.ClientIPHeaders = c.ClientIPHeaders
 		}
+		f.Config.TrustedClientHeaders = append(c.TrustedClientHeaders, f.Config.TrustedClientHeaders...)
 		if f.Config.RateLimitHeaderPrefix == "" {
 			f.Config.RateLimitHeaderPrefix = c.RateLimitHeaderPrefix
 		}
@@ -147,6 +156,7 @@ func (f *Firewall) setup() error {
 func (f *Firewall) build() error {
 	cfg := f.Config
 	f.headers = cfg.ClientIPHeaders
+	f.endUser = cfg.TrustedClientHeaders
 	f.prefix = cfg.RateLimitHeaderPrefix
 	f.hourly = map[string]*hourlyBucket{}
 	f.concurrent = map[string]int64{}
@@ -166,6 +176,9 @@ func (f *Firewall) build() error {
 	}
 	if f.headers == nil {
 		f.headers = DefaultClientIPHeaders
+	}
+	if len(f.endUser) == 0 {
+		f.endUser = DefaultTrustedClientHeaders
 	}
 	if f.prefix == "" {
 		f.prefix = "X-RateLimit"
@@ -265,6 +278,20 @@ func (f *Firewall) ClientIP(r *http.Request) netip.Addr {
 	return peer
 }
 
+// endUserIP is the end user a trusted client names in a trusted_client_headers header (first valid IP), else client.
+func (f *Firewall) endUserIP(r *http.Request, client netip.Addr) netip.Addr {
+	for _, h := range f.endUser {
+		v := strings.TrimSpace(strings.Split(r.Header.Get(h), ",")[0])
+		if v == "" {
+			continue
+		}
+		if a, err := netip.ParseAddr(v); err == nil {
+			return a.Unmap()
+		}
+	}
+	return client
+}
+
 // rateCheck consumes the request's weight from the instance's buckets. When a limit is exceeded it writes the 429 and
 // returns ok=false; otherwise it returns a release function for the concurrency slots (call when the response ends).
 func (f *Firewall) rateCheck(w http.ResponseWriter, r *http.Request, instID string, rl RateLimits, trustedIPs []string) (release func(), ok bool) {
@@ -288,7 +315,12 @@ func (f *Firewall) rateCheck(w http.ResponseWriter, r *http.Request, instID stri
 		weight = int64(math.Max(1, math.Round(rl.FileWeight*microPerRequest)))
 	}
 
-	ipKey := client.String() + "|" + instID
+	// a trusted client may name its end user: per-IP buckets are then that user's (still with the trusted limits)
+	user := client
+	if trusted {
+		user = f.endUserIP(r, client)
+	}
+	ipKey := user.String() + "|" + instID
 	instKey := instID
 	now := time.Now()
 	h := w.Header()
@@ -310,6 +342,9 @@ func (f *Firewall) rateCheck(w http.ResponseWriter, r *http.Request, instID stri
 	}
 	retryIn := func(b *hourlyBucket) int { return int(math.Ceil(time.Until(b.reset).Seconds())) }
 	who := func() string {
+		if user != client {
+			return fmt.Sprintf("IP %s (via trusted client %s)", user, client)
+		}
 		if peer := host.PeerAddr(r); peer != client {
 			return fmt.Sprintf("IP %s (connecting IP %s)", client, peer)
 		}

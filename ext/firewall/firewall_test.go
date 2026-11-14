@@ -129,3 +129,55 @@ func TestRateLimitsTrustedWeightsConcurrency(t *testing.T) {
 }
 
 // The whole path: pocker.yaml keys, per-instance plugins.firewall from instances.yaml, header names, 429.
+
+// A trusted client (an SSR proxy) names its end user in a trusted_client_headers header: each user gets their own
+// per-IP bucket with the trusted limits. The same header from an untrusted client is ignored (no spoofing).
+func TestTrustedClientNamesEndUser(t *testing.T) {
+	fw, err := NewFirewall(Config{TrustedClients: []string{"198.51.100.1"}, TrustedClientHeaders: []string{"X-Client-IP", "X-PocketHost-Client-IP"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	inst := func(id string, trusted ...string) host.Instance {
+		rl := RateLimits{IPHourly: 1, InstanceHourly: 1000, Trusted: &RateLimitSet{IPHourly: 2, InstanceHourly: 1000}}
+		return host.Instance{ID: id, Plugins: map[string]any{"firewall": InstanceConfig{RateLimits: &rl, TrustedIPs: trusted}}}
+	}
+	do := func(remote string, in host.Instance, hdr map[string]string) int {
+		w := httptest.NewRecorder()
+		rel, ok := fw.Admit(w, fwRequest(remote, "/api/health", hdr), in)
+		if !ok {
+			return w.Code
+		}
+		rel()
+		return 200
+	}
+	user := func(h, ip string) map[string]string { return map[string]string{h: ip} }
+
+	for _, c := range []struct {
+		name, proxy, header string
+		in                 host.Instance
+	}{
+		{"process trusted_clients, PocketHost's header", "198.51.100.1:1", "X-PocketHost-Client-IP", inst("a")},
+		{"instance trusted_ips, default header", "203.0.113.50:1", "X-Client-IP", inst("b", "203.0.113.50")},
+	} {
+		// two users behind one proxy: each gets the trusted ip_hourly (2) of their own
+		for _, u := range []string{"192.0.2.10", "192.0.2.11"} {
+			for i := 0; i < 2; i++ {
+				if code := do(c.proxy, c.in, user(c.header, u)); code != 200 {
+					t.Fatalf("%s: user %s request %d: %d", c.name, u, i, code)
+				}
+			}
+			if code := do(c.proxy, c.in, user(c.header, u)); code != http.StatusTooManyRequests {
+				t.Fatalf("%s: user %s third request: %d, want 429", c.name, u, code)
+			}
+		}
+	}
+
+	// an untrusted client's header is ignored: its own (untrusted) bucket of 1, whatever user it names
+	c := inst("c")
+	if code := do("192.0.2.99:1", c, user("X-Client-IP", "192.0.2.10")); code != 200 {
+		t.Fatalf("untrusted first: %d", code)
+	}
+	if code := do("192.0.2.99:1", c, user("X-Client-IP", "192.0.2.12")); code != http.StatusTooManyRequests {
+		t.Fatalf("untrusted client naming another user must share its own bucket: %d", code)
+	}
+}
