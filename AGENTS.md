@@ -2,8 +2,8 @@
 
 PocketOne is PocketBase plus plugins. **PocketBase's own code ("core") changes only for hooks that let `ext/`
 extend or override behavior; the features themselves live in `ext/`.** Core is every path outside what PocketOne owns:
-`ext/`, `examples/ce/`, `docs/`, `README.md`, `AGENTS.md`, `CLAUDE.md`, `.github/`, `.claude/`. Each core change is marked
-`// CE:` so upstream merges stay easy.
+`ext/`, `examples/pocketone/`, `docs/`, `README.md`, `AGENTS.md`, `CLAUDE.md`, `.github/`, `.claude/`. Each core change is marked
+`// PocketOne:` so upstream merges stay easy.
 
 ## Every core change gets an independent audit before it reaches main
 
@@ -16,7 +16,7 @@ context from the change's session, or a human), and must record the result in a 
    - **Necessary:** could this live in `ext/` instead, using hooks core already has (upstream's own, or PocketOne's existing
      seams such as `OnFilesystemCreate`, `jsvm.Config.Extensions`, `BaseAppConfig.AppMigrations`/`OnLog`)?
    - **Minimal:** is it the smallest seam that works, with no feature logic, policy or plugin-specific names in core?
-   - **Sensible:** marked `// CE:`, documented on the hook, upstream behavior unchanged when nothing uses it, tested?
+   - **Sensible:** marked `// PocketOne:`, documented on the hook, upstream behavior unchanged when nothing uses it, tested?
 3. Pass: add the trailer and push. Fail: move the logic to `ext/` or shrink the seam, then audit again.
 
 Trailer forms (the last line of the commit message, after a blank line):
@@ -26,7 +26,7 @@ Core-Audit: pass - <one line: what the core change is and why it can't live in e
 Core-Audit: upstream-merge v0.x.y
 ```
 
-`upstream-merge` is only for merging a PocketBase release; resolve conflicts in the `// CE:` spots and audit any
+`upstream-merge` is only for merging a PocketBase release; resolve conflicts in the `// PocketOne:` spots and audit any
 PocketOne change the merge forced.
 
 ## Core changes that aren't hooks

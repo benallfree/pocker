@@ -3,7 +3,7 @@
 // commit, swapped in safely).
 //
 // Client half: `pocketbase deploy | dev | pull | logs [remote]` (remotes from ext/remotes). It speaks the same
-// protocol as the pockethost npm CLI, so it deploys to PocketHost edges (/_ph/deploy/v1) and to CE remotes
+// protocol as the pockethost npm CLI, so it deploys to PocketHost edges (/_ph/deploy/v1) and to PocketOne remotes
 // (/_pocker/deploy/v1), found through /_pocker/whoami.
 //
 // Server half: the deploy API. [Register] serves it on a single app (superusers; API tokens with the deploy scope);

@@ -3,13 +3,13 @@ package bulkmail
 import (
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"github.com/dop251/goja"
-	"github.com/pockethost/pocketone/ext/ceplugin"
+	"github.com/pockethost/pocketone/ext/pluginkit"
 )
 
-// Plugin is bulk mail as a PocketOne plugin ([ceplugin.Plugin]): the same value works on a single app and on
+// Plugin is bulk mail as a PocketOne plugin ([pluginkit.Plugin]): the same value works on a single app and on
 // every instance under pocker.
 //
-//	ceplugin.MustRegister(app, bulkmail.New(bulkmail.Config{}))         // a single app
+//	pluginkit.MustRegister(app, bulkmail.New(bulkmail.Config{}))         // a single app
 //	srv.Plugins = append(srv.Plugins, bulkmail.New(bulkmail.Config{})) // every pocker instance
 //
 // Settings (a pocker config file's top-level `bulkmail:` key, then an instance's `plugins.bulkmail`) apply over
@@ -20,14 +20,14 @@ type Plugin struct {
 }
 
 var (
-	_ ceplugin.Plugin   = (*Plugin)(nil)
-	_ ceplugin.JSBinder = (*Plugin)(nil)
+	_ pluginkit.Plugin   = (*Plugin)(nil)
+	_ pluginkit.JSBinder = (*Plugin)(nil)
 )
 
 // New returns the plugin. cfg holds the defaults for every app it's registered on.
 func New(cfg Config) *Plugin { return &Plugin{cfg: cfg} }
 
-// Name implements [ceplugin.Plugin].
+// Name implements [pluginkit.Plugin].
 func (p *Plugin) Name() string { return Name }
 
 // settings is the shape of the plugin's settings layers.
@@ -36,8 +36,8 @@ type settings struct {
 	Daily *int     `json:"daily"`
 }
 
-// Register implements [ceplugin.Plugin].
-func (p *Plugin) Register(app core.App, cfg ceplugin.Config) error {
+// Register implements [pluginkit.Plugin].
+func (p *Plugin) Register(app core.App, cfg pluginkit.Config) error {
 	var s settings
 	if err := cfg.Decode(&s); err != nil {
 		return err
@@ -56,7 +56,7 @@ func (p *Plugin) Register(app core.App, cfg ceplugin.Config) error {
 	return err
 }
 
-// BindJS implements [ceplugin.JSBinder]: $bulkmail in the app's JS hooks. It only reaches the app's own data, mail
+// BindJS implements [pluginkit.JSBinder]: $bulkmail in the app's JS hooks. It only reaches the app's own data, mail
 // settings and limits, so it's safe for an untrusted tenant under pocker.
 func (p *Plugin) BindJS(app core.App, vm *goja.Runtime) {
 	if For(app) != nil {

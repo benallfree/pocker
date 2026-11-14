@@ -16,25 +16,25 @@ package mailtrap
 import (
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/hook"
-	"github.com/pockethost/pocketone/ext/ceplugin"
+	"github.com/pockethost/pocketone/ext/pluginkit"
 )
 
-// Name is the plugin's name (ceplugin / pocker config key).
+// Name is the plugin's name (pluginkit / pocker config key).
 const Name = "mailtrap"
 
 const reason = "No SMTP configured"
 
-// Plugin is the ceplugin form, for pocker's Server.Plugins and ceplugin.MustRegister.
+// Plugin is the pluginkit form, for pocker's Server.Plugins and pluginkit.MustRegister.
 type Plugin struct{}
 
 // New returns the plugin.
 func New() *Plugin { return &Plugin{} }
 
-// Name implements ceplugin.Plugin.
+// Name implements pluginkit.Plugin.
 func (p *Plugin) Name() string { return Name }
 
-// Register implements ceplugin.Plugin.
-func (p *Plugin) Register(app core.App, _ ceplugin.Config) error {
+// Register implements pluginkit.Plugin.
+func (p *Plugin) Register(app core.App, _ pluginkit.Config) error {
 	Register(app)
 	return nil
 }

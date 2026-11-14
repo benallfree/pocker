@@ -2,7 +2,7 @@ package mirror
 
 import (
 	"fmt"
-	"github.com/pockethost/pocketone/ext/ceplugin"
+	"github.com/pockethost/pocketone/ext/pluginkit"
 	"log/slog"
 	"time"
 
@@ -36,7 +36,7 @@ type FileConfig struct {
 
 // Section is the key of the `mothership` section (pocketone.yaml): a community mothership this host mirrors its
 // instances and the other edges from.
-var Section = ceplugin.NewSection("mothership", FileConfig{}, "A community mothership to mirror instances and edges from: url, login, this edge's id, internal URL, region, apex.")
+var Section = pluginkit.NewSection("mothership", FileConfig{}, "A community mothership to mirror instances and edges from: url, login, this edge's id, internal URL, region, apex.")
 
 // FromSection returns a mirror for the `mothership` section, or nil when the config has none. Extensions are added to
 // the mirror's.

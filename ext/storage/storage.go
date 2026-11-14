@@ -27,7 +27,7 @@ package storage
 
 import (
 	"fmt"
-	"github.com/pockethost/pocketone/ext/ceplugin"
+	"github.com/pockethost/pocketone/ext/pluginkit"
 	"log/slog"
 	"sort"
 	"strings"
@@ -271,4 +271,4 @@ func open(b *Bucket, prefix string) (*filesystem.System, error) {
 }
 
 // Section is the key of the `storage` section (pocketone.yaml): storage backends and mounts for a pocker host.
-var Section = ceplugin.NewSection(Name, Config{}, "Storage backends and mounts (S3, local) for a pocker host's instances: uploads, backups, PITR history.")
+var Section = pluginkit.NewSection(Name, Config{}, "Storage backends and mounts (S3, local) for a pocker host's instances: uploads, backups, PITR history.")

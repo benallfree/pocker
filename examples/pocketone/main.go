@@ -1,4 +1,4 @@
-// Command pocketbase is the standard PocketOne binary: PocketBase's examples/base plus the CE plugins that ship
+// Command pocketbase is the standard PocketOne binary: PocketBase's examples/base plus the PocketOne plugins that ship
 // by default (ext/pages, ext/s3redirect, ext/bulkmail, ext/tokens, ext/remotes, ext/oauth-server, ext/deploy, ext/mcp,
 // ext/pitr, ext/autotls). It's its
 // own module so core's go.mod stays upstream's.
@@ -24,7 +24,6 @@ import (
 	"github.com/dop251/goja"
 	"github.com/pockethost/pocketone/ext/autotls"
 	"github.com/pockethost/pocketone/ext/bulkmail"
-	"github.com/pockethost/pocketone/ext/ceplugin"
 	"github.com/pockethost/pocketone/ext/config"
 	"github.com/pockethost/pocketone/ext/deploy"
 	"github.com/pockethost/pocketone/ext/docker"
@@ -34,6 +33,7 @@ import (
 	oauthserver "github.com/pockethost/pocketone/ext/oauth-server"
 	"github.com/pockethost/pocketone/ext/pages"
 	"github.com/pockethost/pocketone/ext/pitr"
+	"github.com/pockethost/pocketone/ext/pluginkit"
 	"github.com/pockethost/pocketone/ext/pocker"
 	"github.com/pockethost/pocketone/ext/remotes"
 	"github.com/pockethost/pocketone/ext/s3redirect"
@@ -79,10 +79,10 @@ func main() {
 		return sc, cfg.ResolvePath
 	}))
 
-	// PocketOne plugins that ship in the standard binary and follow the plugin contract (ceplugin): Register
+	// PocketOne plugins that ship in the standard binary and follow the plugin contract (pluginkit): Register
 	// here, and BindJS in the jsvm below. Bulk mail: campaigns to the app's own users (Mail in the dashboard, Bulk
 	// mail on Settings > Mail); nothing happens until someone starts a campaign. Defaults: 5/s, 5,000/day.
-	cePlugins := []ceplugin.Plugin{
+	defaultPlugins := []pluginkit.Plugin{
 		bulkmail.New(bulkmail.Config{}),
 		mailtrap.New(), // dev mode with SMTP off: mail goes to the inbox at http://127.0.0.1:8025, never sendmail
 	}
@@ -242,7 +242,7 @@ func main() {
 		autoTLSConfig.DNS = &autotls.DNSConfig{Provider: autoTLSDNS, APITokenEnv: autoTLSDNSTokenEnv}
 	}
 	// Auto TLS: off unless --autotls; then CertMagic serves the HTTPS certificates of `serve <domain>`
-	cePlugins = append(cePlugins, autotls.NewApp(autoTLSConfig))
+	defaultPlugins = append(defaultPlugins, autotls.NewApp(autoTLSConfig))
 
 	// ---------------------------------------------------------------
 	// Plugins and hooks:
@@ -255,8 +255,8 @@ func main() {
 		HooksWatch:    hooksWatch,
 		HooksPoolSize: hooksPool,
 		OnInit: func(vm *goja.Runtime) {
-			ceplugin.BindJS(app, vm, cePlugins...) // e.g. $bulkmail in pb_hooks
-			mcp.BindJS(vm, app)                    // $mcp.addTool in pb_hooks
+			pluginkit.BindJS(app, vm, defaultPlugins...) // e.g. $bulkmail in pb_hooks
+			mcp.BindJS(vm, app)                          // $mcp.addTool in pb_hooks
 		},
 		Extensions: []jsvm.Extension{jserrors.New()},
 	})
@@ -286,7 +286,7 @@ func main() {
 	// point-in-time restore: on by default (--pitr=false turns it off); history in pb_data/litestream/, restore from
 	// Settings → Backups or `pocketbase pitr restore`
 	pitr.MustRegister(app, pitr.Config{Enabled: &pitrEnabled, Retention: pitrRetention})
-	ceplugin.MustRegister(app, cePlugins...)
+	pluginkit.MustRegister(app, defaultPlugins...)
 
 	// migrate command (with js templates)
 	migratecmd.MustRegister(app, app.RootCmd, migratecmd.Config{

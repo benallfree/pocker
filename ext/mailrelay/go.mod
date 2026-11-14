@@ -6,9 +6,9 @@ require (
 	ganigeorgiev.com/pocketbase/pocketbase v0.0.0-00010101000000-000000000000
 	github.com/domodwyer/mailyak/v3 v3.6.2
 	github.com/gabriel-vasile/mimetype v1.4.15
-	github.com/pockethost/pocketone/ext/ceplugin v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketone/ext/devusers v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketone/ext/mailtrap v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/pluginkit v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketone/ext/pocker v0.0.0-00010101000000-000000000000
 )
 
@@ -69,7 +69,7 @@ replace github.com/pockethost/pocketone/ext/host => ../host
 
 replace github.com/pockethost/pocketone/ext/mailtrap => ../mailtrap
 
-replace github.com/pockethost/pocketone/ext/ceplugin => ../ceplugin
+replace github.com/pockethost/pocketone/ext/pluginkit => ../pluginkit
 
 replace github.com/pockethost/pocketone/ext/jserrors => ../jserrors
 

@@ -887,7 +887,7 @@ func BindApis(vm *goja.Runtime) {
 	registerFactoryAsConstructor(vm, "InternalServerError", router.NewInternalServerError)
 }
 
-// CE: httpClientKey is the global property $http.send takes its *http.Client from: an extension's HTTPClient (e.g.
+// PocketOne: httpClientKey is the global property $http.send takes its *http.Client from: an extension's HTTPClient (e.g.
 // a sandbox capping timeouts and response sizes for that app). Without it, http.DefaultClient is used.
 const httpClientKey = "__jsvm_http_client"
 
@@ -1021,7 +1021,7 @@ func BindHTTP(vm *goja.Runtime) {
 			req.Header.Set("content-type", contentType)
 		}
 
-		res, err := httpClient(vm).Do(req) // CE: the app's client when an extension sets one
+		res, err := httpClient(vm).Do(req) // PocketOne: the app's client when an extension sets one
 		if err != nil {
 			return nil, err
 		}
@@ -1287,7 +1287,7 @@ type shapeFieldInfo struct {
 	key       string
 }
 
-// CE: compileHandler compiles a serialized handler wrapped as prefix+src+suffix and returns how to map the errors it
+// PocketOne: compileHandler compiles a serialized handler wrapped as prefix+src+suffix and returns how to map the errors it
 // throws (the extensions' OnCompile; identity without any). executors must not be nil.
 func compileHandler(executors *vmsPool, prefix, src, suffix string) (*goja.Program, func(error) error) {
 	pr := goja.MustCompile(defaultScriptPath, prefix+src+suffix, true)

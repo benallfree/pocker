@@ -23,7 +23,7 @@ import (
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/mailer"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/types"
 	"github.com/dop251/goja"
-	"github.com/pockethost/pocketone/ext/ceplugin"
+	"github.com/pockethost/pocketone/ext/pluginkit"
 )
 
 const superuserToken = "eyJhbGciOiJIUzI1NiJ9.eyJpZCI6InN5d2JoZWNuaDQ2cmhtMCIsInR5cGUiOiJhdXRoIiwiY29sbGVjdGlvbklkIjoicGJjXzMxNDI2MzU4MjMiLCJleHAiOjI1MjQ2MDQ0NjEsInJlZnJlc2hhYmxlIjp0cnVlfQ.UXgO3j-0BumcugrFjbd7j0M4MQvbrLggLlcu_YNGjoY"
@@ -681,7 +681,7 @@ func TestViewAudience(t *testing.T) {
 	}
 }
 
-func TestCEPlugin(t *testing.T) {
+func TestPlugin(t *testing.T) {
 	p := New(Config{Rate: 3})
 	if p.Name() != Name {
 		t.Fatal(p.Name())
@@ -693,7 +693,7 @@ func TestCEPlugin(t *testing.T) {
 	}
 	defer app.Cleanup()
 	// process settings, then the app's own: daily 0 means no bulk mail
-	if err := p.Register(app, ceplugin.Config{{"rate": 9, "daily": 100}, {"daily": 0}}); err != nil {
+	if err := p.Register(app, pluginkit.Config{{"rate": 9, "daily": 100}, {"daily": 0}}); err != nil {
 		t.Fatal(err)
 	}
 	bm := For(app)
@@ -712,7 +712,7 @@ func TestCEPlugin(t *testing.T) {
 	// a single app with no settings keeps the defaults given to New
 	plain, _ := tests.NewTestApp()
 	defer plain.Cleanup()
-	ceplugin.MustRegister(plain, p)
+	pluginkit.MustRegister(plain, p)
 	if rate, daily, _, _ := For(plain).Limits(); rate != 3 || daily != 0 && daily != 5000 {
 		t.Fatalf("defaults: rate %v daily %d", rate, daily)
 	}

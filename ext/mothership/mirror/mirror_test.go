@@ -17,7 +17,7 @@ import (
 
 var quiet = slog.New(slog.NewTextHandler(io.Discard, nil))
 
-// mothershipApp is a real CE mothership on a local test server: the canonical collections, a superuser, and an
+// mothershipApp is a real PocketOne mothership on a local test server: the canonical collections, a superuser, and an
 // `owners` collection plus instances.owner standing in for a multitenant extension's schema.
 func mothershipApp(t *testing.T) (*tests.TestApp, string) {
 	t.Helper()

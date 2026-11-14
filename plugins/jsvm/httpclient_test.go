@@ -1,6 +1,6 @@
 package jsvm
 
-// CE: $http.send uses the runtime's own *http.Client when one is set under httpClientKey.
+// PocketOne: $http.send uses the runtime's own *http.Client when one is set under httpClientKey.
 
 import (
 	"io"

@@ -21,7 +21,7 @@ in Go and page code in the app's JS VM.
 ## Speed
 
 `ext/pages` against npm PocketPages 0.22.5 (the last 0.x release), serving the same starter kit pages: the 0.x kits
-in `pb_hooks/pages` on stock PocketBase 0.41.1, the v1 ports in `pb_pages` on the CE binary.
+in `pb_hooks/pages` on stock PocketBase 0.41.1, the v1 ports in `pb_pages` on the PocketOne binary.
 
 | Page | Version | Requests/s (50 concurrent) | p50 | p99 | One at a time (median) |
 |---|---|---:|---:|---:|---:|
@@ -29,7 +29,7 @@ in `pb_hooks/pages` on stock PocketBase 0.41.1, the v1 ports in `pb_pages` on th
 | | **ext/pages** | **10,850** | **1.8 ms** | **37 ms** | **0.2 ms** |
 | `daisyui-docs` `/docs/overview` (layouts, Markdown, partial) | npm 0.22.5 | 580 | 28 ms | 1.1 s | 6.5 ms |
 | | **ext/pages** | **6,510** | **4.1 ms** | **49 ms** | **0.4 ms** |
-| PocketBase's own `/api/health` (the ceiling) | CE | 55,000 | 0.9 ms | 2.4 ms | 0.1 ms |
+| PocketBase's own `/api/health` (the ceiling) | PocketOne | 55,000 | 0.9 ms | 2.4 ms | 0.1 ms |
 
 About **17.5× more requests per second** on the simple page and **11×** on the docs page, with p99 latency 20× lower.
 Single requests take 0.2 to 0.4 ms instead of 6 ms. Memory after each run was similar (170 to 350 MB for both).
@@ -45,7 +45,7 @@ links `app.css`. Rerun it with [`bench/run.sh`](bench/run.sh):
 
 ```bash
 cp -R starters/daisyui-docs /tmp/v1-docs
-pocketbase superuser upsert admin@example.com password --dir=/tmp/v1-docs/pb_data  # the CE binary
+pocketbase superuser upsert admin@example.com password --dir=/tmp/v1-docs/pb_data  # the PocketOne binary
 bench/run.sh v1-docs 8804 /docs/overview "$(which pocketbase)" /tmp/v1-docs
 ```
 
@@ -68,7 +68,7 @@ cd myapp
 pocketbase serve --dir ./pb_data
 ```
 
-The standard CE binary ([`examples/ce`](../../examples/ce/main.go)) includes pages: put a `pb_pages` folder next
+The standard PocketOne binary ([`examples/pocketone`](../../examples/pocketone/main.go)) includes pages: put a `pb_pages` folder next
 to `pb_data` and run `pocketbase serve`. `--pagesDir` points it somewhere else. In your own Go build:
 
 ```go
@@ -95,7 +95,7 @@ srv := &pocker.Server{Config: cfg, Plugins: []pocker.Plugin{pockerplugin.New(pag
   call stack). `include`, `require`, `ctx.resolve`, `ctx.res.file` and `asset` never reach outside the instance's
   `pb_pages`; `$os` file access stays inside the instance folder. Tests: [pockerplugin_test.go](pockerplugin/pockerplugin_test.go).
 - An instance turns pages off with `plugins: { pages: { enabled: false } }`.
-- It's its own package, so single-app builds (like the standard CE binary) don't link pocker.
+- It's its own package, so single-app builds (like the standard PocketOne binary) don't link pocker.
 
 Measured (same machine as above, docs kit): each awake instance adds about **2.3 MB** (50 instances: 41 MB idle to
 155 MB). One instance under pocker serves about **4,000 requests/s** (p50 5.6 ms, p99 80 ms at 50 concurrent): less

@@ -62,7 +62,7 @@ replace (
 
 replace github.com/pockethost/pocketone/ext/host => ../../host
 
-replace github.com/pockethost/pocketone/ext/ceplugin => ../../ceplugin
+replace github.com/pockethost/pocketone/ext/pluginkit => ../../pluginkit
 
 replace github.com/pockethost/pocketone/ext/jserrors => ../../jserrors
 

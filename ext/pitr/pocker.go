@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/pockethost/pocketone/ext/ceplugin"
+	"github.com/pockethost/pocketone/ext/pluginkit"
 	"time"
 
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
@@ -102,4 +102,4 @@ func (p *Plugin) Start(ctx context.Context, _ *pocker.Manager) {
 }
 
 // Section is the key of the `pitr` section (pocketone.yaml): point-in-time restore defaults on a pocker host.
-var Section = ceplugin.NewSection(Name, Config{}, "Point-in-time restore on a pocker host: on by default, retention, snapshot interval (instances may override).")
+var Section = pluginkit.NewSection(Name, Config{}, "Point-in-time restore on a pocker host: on by default, retention, snapshot interval (instances may override).")

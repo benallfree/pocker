@@ -30,10 +30,10 @@ Certificates are issued for the domains given to `serve` (and their `www.` varia
 other hostname is refused at the handshake. Challenges are TLS-ALPN-01 on the HTTPS port, or DNS-01 with a provider.
 HTTP-01 isn't used, because port 80 is PocketBase's redirect server. Certificates live in `pb_data/.autotls`.
 
-In Go, register it like any CE plugin:
+In Go, register it like any PocketOne plugin:
 
 ```go
-ceplugin.MustRegister(app, autotls.NewApp(autotls.Config{Auto: true, Email: "ops@example.com"}))
+pluginkit.MustRegister(app, autotls.NewApp(autotls.Config{Auto: true, Email: "ops@example.com"}))
 ```
 
 ## Under pocker

@@ -1,4 +1,4 @@
-package ceplugin
+package pluginkit
 
 // Typed config sections. A plugin owns one top-level section of the config file (pocketone.yaml, read by
 // ext/config) and exports its key; reading a section requires that key, so a plugin can only read the sections it
@@ -59,7 +59,7 @@ func NewSectionFunc[T any](name string, def func() T, doc string) *Section[T] {
 	secMu.Lock()
 	defer secMu.Unlock()
 	if _, dup := secInfos[name]; dup {
-		panic(fmt.Sprintf("ceplugin: config section %q is registered twice", name))
+		panic(fmt.Sprintf("pluginkit: config section %q is registered twice", name))
 	}
 	secInfos[name] = SectionInfo{Name: name, Doc: doc, Default: def(), check: func(src SectionSource) error {
 		v := def()

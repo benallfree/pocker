@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/pockethost/pocketone/ext/ceplugin"
+	"github.com/pockethost/pocketone/ext/pluginkit"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
@@ -17,7 +17,7 @@ func NewCommand(opts func() Options) *cobra.Command {
 		Short: "Lists the pocketone.yaml sections this binary understands, with their defaults",
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			out := cmd.OutOrStdout()
-			for _, s := range ceplugin.Sections() {
+			for _, s := range pluginkit.Sections() {
 				fmt.Fprintf(out, "# %s\n", strings.ReplaceAll(s.Doc, "\n", "\n# "))
 				b, _ := yaml.Marshal(map[string]any{s.Name: s.Default})
 				fmt.Fprintf(out, "%s\n", b)

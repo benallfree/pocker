@@ -883,7 +883,7 @@ func realtimeCanAccessRecord(
 		From(record.Collection().Name).
 		AndWhere(dbx.HashExp{record.Collection().Name + ".id": record.Id})
 
-	// CE: superusers may filter on hidden fields and superuser-only collections here too, as in the list API
+	// PocketOne: superusers may filter on hidden fields and superuser-only collections here too, as in the list API
 	// (e.g. a back-relation into a collection with no list rule); before, such a filter failed and the event was dropped.
 	resolver := core.NewRecordFieldResolver(app, record.Collection(), requestInfo, requestInfo.HasSuperuserAuth())
 	expr, err := search.FilterData(filter).BuildExpr(resolver)

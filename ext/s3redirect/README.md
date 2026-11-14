@@ -34,9 +34,9 @@ bucket allowing `GET` from your origin. Plain `<img>`, `<video>` and links need 
 **Inline vs attachment:** PocketBase decides this from the stored content type; the plugin goes by the file extension
 (it doesn't HEAD the object, so a redirect costs no extra round trip). They agree for every file PocketBase names.
 
-## In the standard CE binary
+## In the standard PocketOne binary
 
-`examples/ce` (the PocketOne release binary) registers it **on by default**: turn on S3 in Settings → Files
+`examples/pocketone` (the PocketOne release binary) registers it **on by default**: turn on S3 in Settings → Files
 storage and downloads redirect. Flags: `--s3Redirect=false` streams as before, `--s3RedirectTTL 2m` changes how long
 each URL is valid.
 

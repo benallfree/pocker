@@ -127,7 +127,7 @@ func (p *plugin) createCommand() *cobra.Command {
 				// note: system migrations are always applied as part of the bootstrap process
 				var list = core.MigrationsList{}
 				list.Copy(core.SystemMigrations)
-				list.Copy(*core.AppMigrationsOf(p.app)) // CE: per-app list
+				list.Copy(*core.AppMigrationsOf(p.app)) // PocketOne: per-app list
 
 				runner := core.NewMigrationsRunner(p.app, list)
 

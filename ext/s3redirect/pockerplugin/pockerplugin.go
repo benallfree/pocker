@@ -1,5 +1,5 @@
 // Package pockerplugin turns on s3redirect for every pocker instance. It's its own package so single-app builds of
-// ext/s3redirect (like the standard CE binary) don't link pocker.
+// ext/s3redirect (like the standard PocketOne binary) don't link pocker.
 //
 //	srv.Plugins = append(srv.Plugins, pockerplugin.New(s3redirect.Config{}))
 //
@@ -11,7 +11,7 @@ package pockerplugin
 
 import (
 	"fmt"
-	"github.com/pockethost/pocketone/ext/ceplugin"
+	"github.com/pockethost/pocketone/ext/pluginkit"
 
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"github.com/pockethost/pocketone/ext/pocker"
@@ -96,4 +96,4 @@ func instanceConfig(inst pocker.Instance) (s3redirect.AppConfig, error) {
 
 // Section is the key of the `s3redirect` section (pocketone.yaml): signed S3 redirects for file downloads on a
 // pocker host.
-var Section = ceplugin.NewSection(Name, s3redirect.Config{}, "Signed S3 redirects for file downloads on a pocker host: enabled, URL lifetime.")
+var Section = pluginkit.NewSection(Name, s3redirect.Config{}, "Signed S3 redirects for file downloads on a pocker host: enabled, URL lifetime.")

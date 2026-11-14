@@ -2,7 +2,7 @@ package pitr
 
 import (
 	"context"
-	"github.com/pockethost/pocketone/ext/ceplugin"
+	"github.com/pockethost/pocketone/ext/pluginkit"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -160,8 +160,8 @@ func (s sectionSource) DecodeSection(name string, out any) (bool, error) {
 }
 
 func TestConfigureAndInstanceConfig(t *testing.T) {
-	ceplugin.SetSectionSource(sectionSource{"pitr": "enabled: false\nretention: 48h\n"})
-	t.Cleanup(func() { ceplugin.SetSectionSource(nil) })
+	pluginkit.SetSectionSource(sectionSource{"pitr": "enabled: false\nretention: 48h\n"})
+	t.Cleanup(func() { pluginkit.SetSectionSource(nil) })
 	p := New(Config{SnapshotInterval: time.Hour, Logger: quiet})
 	if err := p.Configure(pocker.Config{}); err != nil {
 		t.Fatal(err)

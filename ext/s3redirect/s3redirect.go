@@ -15,7 +15,7 @@
 //	app := pocketbase.New()
 //	s3redirect.MustRegister(app, s3redirect.Config{TTL: 5 * time.Minute})
 //
-// The standard CE binary (examples/ce) registers it by default. Many apps in one process: see the pockerplugin
+// The standard PocketOne binary (examples/pocketone) registers it by default. Many apps in one process: see the pockerplugin
 // subpackage.
 package s3redirect
 

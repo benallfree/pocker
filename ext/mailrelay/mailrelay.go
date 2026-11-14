@@ -15,7 +15,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/pockethost/pocketone/ext/ceplugin"
+	"github.com/pockethost/pocketone/ext/pluginkit"
 	"html"
 	"net/mail"
 	"regexp"
@@ -489,4 +489,4 @@ func maskList(list []string) string {
 }
 
 // Section is the key of the `mailrelay` section (pocketone.yaml): the shared mail relay on a pocker host.
-var Section = ceplugin.NewSection(Name, SectionConfig{}, "Shared mail relay on a pocker host: enabled, per-minute and daily limits per instance.")
+var Section = pluginkit.NewSection(Name, SectionConfig{}, "Shared mail relay on a pocker host: enabled, per-minute and daily limits per instance.")

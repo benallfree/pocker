@@ -23,7 +23,7 @@ import (
 	"github.com/pockethost/pocketone/ext/remotes"
 )
 
-// API paths. A CE remote serves PockerPrefix; PocketHost edges serve LegacyPrefix (the npm CLI's), which the client
+// API paths. A PocketOne remote serves PockerPrefix; PocketHost edges serve LegacyPrefix (the npm CLI's), which the client
 // falls back to.
 const (
 	PockerPrefix = "/_pocker/deploy/v1"

@@ -63,4 +63,3 @@ func TestHooksChangeRestartsOnlyThatApp(t *testing.T) {
 		t.Errorf("b after: %q", got)
 	}
 }
-

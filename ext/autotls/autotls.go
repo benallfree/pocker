@@ -6,10 +6,10 @@
 //
 //     srv := &pocker.Server{Config: cfg, Plugins: []pocker.Plugin{autotls.New()}}
 //
-//   - On a single app, [NewApp] is a [ceplugin.Plugin] that replaces PocketBase's built-in autocert on
+//   - On a single app, [NewApp] is a [pluginkit.Plugin] that replaces PocketBase's built-in autocert on
 //     `pocketbase serve example.com` (or `--https`) with CertMagic: wildcards through DNS-01, other CAs, extra domains.
 //
-//     ceplugin.MustRegister(app, autotls.NewApp(autotls.Config{Auto: true, Email: "ops@example.com"}))
+//     pluginkit.MustRegister(app, autotls.NewApp(autotls.Config{Auto: true, Email: "ops@example.com"}))
 package autotls
 
 import (
@@ -17,7 +17,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"github.com/pockethost/pocketone/ext/ceplugin"
+	"github.com/pockethost/pocketone/ext/pluginkit"
 	"net"
 	"net/http"
 	"os"
@@ -252,4 +252,4 @@ func normalizeHost(h string) string {
 }
 
 // Section is the key of the `autotls` section (pocketone.yaml): automatic certificates for a pocker host.
-var Section = ceplugin.NewSection("autotls", Config{}, "Automatic HTTPS certificates (ACME) for a pocker host: auto, email, CA, domains, DNS-01.")
+var Section = pluginkit.NewSection("autotls", Config{}, "Automatic HTTPS certificates (ACME) for a pocker host: auto, email, CA, domains, DNS-01.")

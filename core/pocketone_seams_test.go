@@ -1,6 +1,6 @@
 package core_test
 
-// CE: tests for the core seams ext/ relies on (BaseAppConfig.AppMigrations and OnLog), so an upstream merge that
+// PocketOne: tests for the core seams ext/ relies on (BaseAppConfig.AppMigrations and OnLog), so an upstream merge that
 // breaks one fails here and not only in ext/.
 
 import (

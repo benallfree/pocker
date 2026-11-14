@@ -7,7 +7,7 @@ require (
 	ganigeorgiev.com/pocketbase/ozzo-validation/v4 v4.4.1
 	ganigeorgiev.com/pocketbase/pocketbase v0.0.0-00010101000000-000000000000
 	github.com/dop251/goja v0.0.0-20261023121931-6ace4dde0b29
-	github.com/pockethost/pocketone/ext/ceplugin v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/pluginkit v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketone/ext/devusers v0.0.0-00010101000000-000000000000
 )
 
@@ -62,7 +62,7 @@ replace github.com/pockethost/pocketone/ext/edge => ../edge
 
 replace github.com/pockethost/pocketone/ext/host => ../host
 
-replace github.com/pockethost/pocketone/ext/ceplugin => ../ceplugin
+replace github.com/pockethost/pocketone/ext/pluginkit => ../pluginkit
 
 replace github.com/pockethost/pocketone/ext/jserrors => ../jserrors
 

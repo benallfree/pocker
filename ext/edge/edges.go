@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pockethost/pocketone/ext/ceplugin"
+	"github.com/pockethost/pocketone/ext/pluginkit"
 )
 
 // Edge is one server in a fleet: another edge requests can be forwarded to.
@@ -167,7 +167,7 @@ func ParsePBTime(v string) (time.Time, error) {
 }
 
 // Section is the key of the `edges` section (pocketone.yaml, ext/config).
-var Section = ceplugin.NewSection("edges", EdgesConfig{}, "The fleet: this edge's id and a fixed list of the other edges (id, internal_url, region).")
+var Section = pluginkit.NewSection("edges", EdgesConfig{}, "The fleet: this edge's id and a fixed list of the other edges (id, internal_url, region).")
 
 // FromSection builds the edge provider for the `edges` section (nil, nil when the config file has none).
 func FromSection(log *slog.Logger) (EdgeSource, error) {

@@ -42,7 +42,7 @@ func serveApp(t *testing.T, app *tests.TestApp) string {
 	return srv.URL
 }
 
-type ceRemote struct {
+type p1Remote struct {
 	app      *tests.TestApp
 	url      string
 	dir      string
@@ -50,14 +50,14 @@ type ceRemote struct {
 	tk       *tokens.Tokens
 }
 
-func newCERemote(t *testing.T) *ceRemote {
+func newP1Remote(t *testing.T) *p1Remote {
 	t.Helper()
 	app, err := tests.NewTestApp()
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(app.Cleanup)
-	r := &ceRemote{app: app, dir: t.TempDir()}
+	r := &p1Remote{app: app, dir: t.TempDir()}
 	r.tk = tokens.MustRegister(app, tokens.Config{Collections: []string{"_superusers", "users"}})
 	remotes.MustRegister(app, remotes.Config{})
 	MustRegister(app, Config{Dir: r.dir, Restart: func(core.App) error { r.restarts.Add(1); return nil }})
@@ -72,7 +72,7 @@ func newCERemote(t *testing.T) *ceRemote {
 	return r
 }
 
-func (r *ceRemote) token(t *testing.T, collection, email string, scopes ...string) string {
+func (r *p1Remote) token(t *testing.T, collection, email string, scopes ...string) string {
 	t.Helper()
 	owner, err := r.app.FindAuthRecordByEmail(collection, email)
 	if err != nil {
@@ -85,7 +85,7 @@ func (r *ceRemote) token(t *testing.T, collection, email string, scopes ...strin
 	return secret
 }
 
-func (r *ceRemote) client(t *testing.T, token string) *Client {
+func (r *p1Remote) client(t *testing.T, token string) *Client {
 	t.Helper()
 	rc := &remotes.Client{Remote: &remotes.Remote{Name: "ce", URL: r.url}, Token: token, TokenSource: "test", HTTP: remotes.NewHTTPClient()}
 	c, err := NewClient(context.Background(), rc)
@@ -95,8 +95,8 @@ func (r *ceRemote) client(t *testing.T, token string) *Client {
 	return c
 }
 
-func TestCEToCE(t *testing.T) {
-	r := newCERemote(t)
+func TestP1ToP1(t *testing.T) {
+	r := newP1Remote(t)
 	ctx := context.Background()
 	c := r.client(t, r.token(t, "_superusers", "test@example.com", ScopeDeploy))
 	if c.Prefix != PockerPrefix {
@@ -194,8 +194,8 @@ func TestCEToCE(t *testing.T) {
 	}
 }
 
-func TestCEToCEWithImpersonateLogin(t *testing.T) {
-	r := newCERemote(t)
+func TestP1ToP1WithImpersonateLogin(t *testing.T) {
+	r := newP1Remote(t)
 	rc := &remotes.Client{Remote: &remotes.Remote{Name: "ce", URL: r.url}, HTTP: remotes.NewHTTPClient()}
 	su, _ := r.app.FindAuthRecordByEmail(core.CollectionNameSuperusers, "test@example.com")
 	jwt, err := su.NewStaticAuthToken(time.Hour)

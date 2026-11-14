@@ -38,7 +38,7 @@ never devDependencies) and shipped as plain files, so plain JS hooks can `requir
 owns its root `node_modules` (packages no longer shipped are removed). The collector is
 [`nodemodules`](nodemodules/nodemodules.go), a port of the npm CLI's.
 
-The client finds the API through `/_pocker/whoami` (`/_pocker/deploy/v1` on CE remotes) and falls back to
+The client finds the API through `/_pocker/whoami` (`/_pocker/deploy/v1` on PocketOne remotes) and falls back to
 `/_ph/deploy/v1`, so it deploys to PocketHost edges with a `ph_pat_` token today (`POCKETHOST_TOKEN`, or the
 `pockethost` remote read from `.pockethostconfig`).
 
@@ -65,7 +65,7 @@ Elsewhere, build the API yourself: `deploy.New(deploy.Options{Prefix, Backend, I
 PlatformPaths, Logs})` and mount `api.Wrap(next)`. `Backend` decides which instance a request is for
 (`Lookup(r)`), who it acts as (`Authenticate(r, inst)` → `Auth{UserID, Scopes: read/write, Via, TokenLabel}`,
 `*AuthError`, or `ErrNoAccess` for a 404) and records history; `Instances` is pocker's Manager (stop, swap, start);
-`FileLogs` tails pocker's `logs/exec.log`. PocketHost EE composes it with its PocketHost-token backend and keeps
+`FileLogs` tails pocker's `logs/exec.log`. PocketHost composes it with its PocketHost-token backend and keeps
 `/_ph/deploy/v1`.
 
 ## License

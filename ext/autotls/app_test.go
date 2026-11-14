@@ -10,7 +10,7 @@ import (
 
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"ganigeorgiev.com/pocketbase/pocketbase/tests"
-	"github.com/pockethost/pocketone/ext/ceplugin"
+	"github.com/pockethost/pocketone/ext/pluginkit"
 	"golang.org/x/crypto/acme/autocert"
 )
 
@@ -35,7 +35,7 @@ func TestAppOffLeavesPocketBaseTLS(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer app.Cleanup()
-	ceplugin.MustRegister(app, NewApp(Config{}))
+	pluginkit.MustRegister(app, NewApp(Config{}))
 	e, original := serveEvent(t, app)
 	if e.Server.TLSConfig != original {
 		t.Fatal("auto off must not touch the server's TLS config")
@@ -60,7 +60,7 @@ func TestAppSettingsLayerTurnsItOn(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer app.Cleanup()
-	layers := ceplugin.Config{{"auto": true, "ca": "letsencrypt-staging"}}
+	layers := pluginkit.Config{{"auto": true, "ca": "letsencrypt-staging"}}
 	if err := NewApp(Config{}).Register(app, layers); err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +76,7 @@ func TestAppSwapsTLSAndRefusesUnknownHosts(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer app.Cleanup()
-	ceplugin.MustRegister(app, NewApp(Config{Auto: true, CA: "letsencrypt-staging"}))
+	pluginkit.MustRegister(app, NewApp(Config{Auto: true, CA: "letsencrypt-staging"}))
 	e, original := serveEvent(t, app)
 	cfg := e.Server.TLSConfig
 	if cfg == original || cfg.GetCertificate == nil {

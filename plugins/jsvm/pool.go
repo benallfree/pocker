@@ -16,12 +16,12 @@ type vmsPool struct {
 	mux     sync.RWMutex
 	factory func() *goja.Runtime
 	items   []*poolItem
-	ext     extensions    // CE: Config.Extensions (OnCall around every call, OnCompile per handler)
-	loader  *goja.Runtime // CE: the runtime that registers handlers, passed to OnCompile
-	max     int           // CE: newLazyPool grows up to max items
+	ext     extensions    // PocketOne: Config.Extensions (OnCall around every call, OnCompile per handler)
+	loader  *goja.Runtime // PocketOne: the runtime that registers handlers, passed to OnCompile
+	max     int           // PocketOne: newLazyPool grows up to max items
 }
 
-// CE: newLazyPool creates a pool that starts empty and keeps up to max vms, created on demand.
+// PocketOne: newLazyPool creates a pool that starts empty and keeps up to max vms, created on demand.
 func newLazyPool(max int, factory func() *goja.Runtime) *vmsPool {
 	if max < 1 {
 		max = 1
@@ -75,7 +75,7 @@ func (p *vmsPool) run(call func(vm *goja.Runtime) error) error {
 	// by adding the created item in the pool with some timer for removal
 	if freeItem == nil {
 		vm := p.factory()
-		// CE: a lazy pool keeps the new vm while it has room (built above, outside the lock)
+		// PocketOne: a lazy pool keeps the new vm while it has room (built above, outside the lock)
 		if p.max > 0 {
 			p.mux.Lock()
 			if len(p.items) < p.max {
@@ -99,7 +99,7 @@ func (p *vmsPool) run(call func(vm *goja.Runtime) error) error {
 	return execErr
 }
 
-// CE: call runs fn on vm inside the extensions' OnCall.
+// PocketOne: call runs fn on vm inside the extensions' OnCall.
 func (p *vmsPool) call(fn func(vm *goja.Runtime) error, vm *goja.Runtime) error {
 	return p.ext.call(vm, func() error { return fn(vm) })
 }

@@ -49,7 +49,7 @@ func TestNotifyWatcher_SettingsUpdate(t *testing.T) {
 	})
 
 	app2.OnSettingsReload().BindFunc(func(e *core.SettingsReloadEvent) error {
-		// CE: signal after e.Next(), which is what loads the new settings; signalling before it let the test read
+		// PocketOne: signal after e.Next(), which is what loads the new settings; signalling before it let the test read
 		// app2's settings before they were reloaded.
 		err := e.Next()
 		testEvents.SetFunc(app2, func(old int) int {

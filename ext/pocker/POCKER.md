@@ -224,7 +224,7 @@ Landlock.
 
 These live in the repo root (PocketBase's own files), not in this plugin.
 
-Kept small and marked `// CE:` so upstream merges stay easy:
+Kept small and marked `// PocketOne:` so upstream merges stay easy:
 
 - `core.BaseAppConfig.AppMigrations`: a per-app migrations list (JS migrations from `plugins/jsvm` register there
   instead of the global `core.AppMigrations`).
@@ -259,5 +259,5 @@ the newest PocketOne.
 git remote add upstream https://ganigeorgiev.com/git/pocketbase/pocketbase
 git config remote.upstream.tagOpt --no-tags
 git fetch upstream refs/tags/v0.41.2   # one release, without creating the tag here
-git merge FETCH_HEAD   # resolve conflicts in the CE-marked spots, rerun `go test ./core/... ./plugins/jsvm/...` and `go test ./...` in `ext/pocker` and `ext/sandbox`
+git merge FETCH_HEAD   # resolve conflicts in the PocketOne-marked spots, rerun `go test ./core/... ./plugins/jsvm/...` and `go test ./...` in `ext/pocker` and `ext/sandbox`
 ```

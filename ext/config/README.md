@@ -11,7 +11,7 @@ binary.
 Each plugin owns one top-level section, declared in its own package with a typed key:
 
 ```go
-var Section = ceplugin.NewSection("firewall", Config{ /* defaults */ }, "doc…")
+var Section = pluginkit.NewSection("firewall", Config{ /* defaults */ }, "doc…")
 
 cfg, found := firewall.Section.Get()  // its defaults with the file's values applied
 cfg, err := firewall.Section.Require() // fails when the file doesn't have it

@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// Realtime filters through a back-relation into a superuser-only collection reach a superuser subscriber (the CE fix
+// Realtime filters through a back-relation into a superuser-only collection reach a superuser subscriber (the PocketOne fix
 // in apis/realtime.go); extension views such as "owners of this edge's instances" depend on it.
 func TestRealtimeBackRelationFilter(t *testing.T) {
 	app, url := mothershipApp(t)

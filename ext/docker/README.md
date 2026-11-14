@@ -7,7 +7,7 @@ PocketBase (or PocketOne) binary of the version it asks for, so one host serves 
 **Runs on:** [ext/host](../host/README.md), with a Docker daemon; add [ext/edge](../edge/README.md) for a fleet and
 [ext/firewall](../firewall/README.md) for rate limits. `example/main.go` is a minimal docker host.
 
-> **Status.** Working: Go module `github.com/pockethost/pocketbase/ext/docker`, tested against a real Docker daemon
+> **Status.** Working: Go module `github.com/pockethost/pocketone/ext/docker`, tested against a real Docker daemon
 > (upstream PocketBase 0.23 and PocketOne 0.0.1 side by side, alone and as a host's runtime). Not yet in production.
 
 ## How it runs an instance
