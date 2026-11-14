@@ -16,7 +16,6 @@ import (
 	"ganigeorgiev.com/pocketbase/pocketbase/apis"
 	"ganigeorgiev.com/pocketbase/pocketbase/cmd"
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
-	"ganigeorgiev.com/pocketbase/pocketbase/plugins/ghupdate"
 	"ganigeorgiev.com/pocketbase/pocketbase/plugins/jsvm"
 	"ganigeorgiev.com/pocketbase/pocketbase/plugins/migratecmd"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/hook"
@@ -38,6 +37,7 @@ import (
 	"github.com/pockethost/pocketone/ext/remotes"
 	"github.com/pockethost/pocketone/ext/s3redirect"
 	"github.com/pockethost/pocketone/ext/tokens"
+	"github.com/pockethost/pocketone/ext/upgrade"
 )
 
 // PoweredBy is the X-Powered-By this binary sends on every response: "PocketOne 0.0.2" (see pocker.Version).
@@ -295,9 +295,9 @@ func main() {
 		Dir:          migrationsDir,
 	})
 
-	// update command: PocketOne releases on GitHub (pockethost/pocketone), not upstream.
-	// Custom builds that publish their own releases change Owner/Repo here.
-	ghupdate.MustRegister(app, app.RootCmd, ghupdate.Config{Owner: "pockethost", Repo: "pocketbase"})
+	// upgrade command: latest PocketOne release from GitHub (pockethost/pocketone); keeps the old executable as
+	// pocketone-<version>. Custom builds that publish their own releases set Owner/Repo/ArchivePrefix here.
+	upgrade.MustRegister(app, app.RootCmd, upgrade.Config{})
 
 	// static route to serves files from the provided public dir
 	// (if publicDir exists and the route path is not already defined)

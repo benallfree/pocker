@@ -42,6 +42,7 @@ choose not to use them.
 | **[Tokens](ext/tokens/README.md)** | Long-lived API tokens (`pbt_…`) with scopes. |
 | **[Deploy](ext/deploy/README.md)** | `pocketone deploy \| dev \| pull \| logs` and the deploy API. |
 | **[Remotes](ext/remotes/README.md)** | Named remotes and saved logins for the `pocketone` command. |
+| **[Upgrade](ext/upgrade/README.md)** | `pocketone upgrade` to the latest release; the old executable is kept as `pocketone-<version>`, never deleted. |
 
 ## Community Plugins
 

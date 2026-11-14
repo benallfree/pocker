@@ -26,6 +26,7 @@ require (
 	github.com/pockethost/pocketone/ext/s3redirect v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketone/ext/servertiming v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketone/ext/tokens v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/upgrade v0.0.0-00010101000000-000000000000
 )
 
 require (
@@ -152,3 +153,5 @@ replace github.com/pockethost/pocketone/ext/firewall => ../../ext/firewall
 replace github.com/pockethost/pocketone/ext/mothership => ../../ext/mothership
 
 replace github.com/pockethost/pocketone/ext/servertiming => ../../ext/servertiming
+
+replace github.com/pockethost/pocketone/ext/upgrade => ../../ext/upgrade
