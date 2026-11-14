@@ -129,7 +129,7 @@ func (p *Plugin) store(retention time.Duration) (*litestream.Store, error) {
 	return s, nil
 }
 
-// Close flushes and closes every store. Apps should be terminated first.
+// Close flushes and closes every store ([pluginkit.Closer]). Apps should be terminated first.
 func (p *Plugin) Close(ctx context.Context) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -191,7 +191,7 @@ func (a *appPITR) destination() (*destination, error) {
 }
 
 // SetupApp adds point-in-time restore to app. Call it before the app bootstraps (pocketbase.New → before Start;
-// under pocker the plugin's InitApp calls it). Replication starts when the app serves (OnServe), so CLI commands run in another
+// under pocker the plugin's Register calls it). Replication starts when the app serves (OnServe), so CLI commands run in another
 // process never write to the history. With PITR disabled for the app it adds nothing.
 func (p *Plugin) SetupApp(app core.App, ac AppConfig) error {
 	enabled, retention := p.resolve(ac)

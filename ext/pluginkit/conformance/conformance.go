@@ -1,6 +1,6 @@
 // Package conformance is the shared test every PocketOne plugin runs. It checks what any [pluginkit.Plugin] must get
 // right whatever it does: it registers and runs on a fresh app and shuts down cleanly, it leaves PocketBase's own
-// collections alone and names its own `_<name>_…`, and one plugin value can serve many apps at once (as under pocker)
+// collections alone and names its own `_<name>` or `_<name>_…`, and one plugin value can serve many apps at once (as under pocker)
 // without one app's registration reaching another.
 //
 // A plugin's test file calls it once:
@@ -14,6 +14,7 @@
 package conformance
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -21,6 +22,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -83,7 +85,7 @@ func withApps(o Options) Options {
 }
 
 // CheckLifecycle: Register, bootstrap, migrations, serve hooks and terminate all succeed, and nothing the plugin
-// started outlives the app.
+// started outlives the app (and, for a [pluginkit.Closer], its Close).
 func CheckLifecycle(t TB, p pluginkit.Plugin, o Options) {
 	before := goroutines()
 	app := newApp(t)
@@ -93,14 +95,22 @@ func CheckLifecycle(t TB, p pluginkit.Plugin, o Options) {
 	if err := stop(app); err != nil {
 		t.Fatalf("shutdown: %v", err)
 	}
+	if c, ok := p.(pluginkit.Closer); ok {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		err := c.Close(ctx)
+		cancel()
+		if err != nil {
+			t.Errorf("Close: %v", err)
+		}
+	}
 	if leaked := waitGoroutines(before, o.GoroutineSlack, 2*time.Second); len(leaked) > 0 {
-		t.Errorf("%d goroutine(s) outlived the app (stop them in OnTerminate):\n\n%s", len(leaked),
+		t.Errorf("%d goroutine(s) outlived the app (stop them in OnTerminate, or in Close for shared ones):\n\n%s", len(leaked),
 			strings.Join(leaked, "\n\n"))
 	}
 }
 
 // CheckCollections: PocketBase's own collections are unchanged, and every collection the plugin adds is named
-// `_<name>_…` (or allowed with a reason).
+// `_<name>` or `_<name>_…` (or allowed with a reason).
 func CheckCollections(t TB, p pluginkit.Plugin, o Options) {
 	base := newApp(t)
 	if err := start(base, nil, nil); err != nil {
@@ -132,14 +142,14 @@ func CheckCollections(t TB, p pluginkit.Plugin, o Options) {
 	}
 	sort.Strings(added)
 	for _, name := range added {
-		if strings.HasPrefix(name, prefix) {
+		if name == "_"+p.Name() || strings.HasPrefix(name, prefix) {
 			continue
 		}
 		if reason, ok := o.AllowCollections[name]; ok && reason != "" {
 			continue
 		}
-		t.Errorf("collection %q: plugin collections must be named %s… (or listed in AllowCollections with a reason)",
-			name, prefix)
+		t.Errorf("collection %q: plugin collections must be named _%s or %s… (or listed in AllowCollections with a reason)",
+			name, p.Name(), prefix)
 	}
 }
 
@@ -207,9 +217,14 @@ func allHookCounts(apps []*core.BaseApp) []map[string]int {
 	return out
 }
 
+var appSeq atomic.Int64
+
+// newApp is a fresh app with its own host id ([pluginkit.AppID]), as pocker gives each instance.
 func newApp(t TB) *core.BaseApp {
 	t.Helper()
-	return core.NewBaseApp(core.BaseAppConfig{DataDir: t.TempDir(), EncryptionEnv: "", QueryTimeout: 10 * time.Second})
+	app := core.NewBaseApp(core.BaseAppConfig{DataDir: t.TempDir(), EncryptionEnv: "", QueryTimeout: 10 * time.Second})
+	pluginkit.SetAppID(app, fmt.Sprintf("app%d", appSeq.Add(1)))
+	return app
 }
 
 // start registers p (if any) and runs the app up to serving.

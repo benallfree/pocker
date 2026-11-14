@@ -1,6 +1,10 @@
 package pluginkit
 
-import "testing"
+import (
+	"testing"
+
+	"ganigeorgiev.com/pocketbase/pocketbase/core"
+)
 
 func TestConfigLayers(t *testing.T) {
 	type settings struct {
@@ -45,5 +49,32 @@ func TestLayer(t *testing.T) {
 	}
 	if _, err := Layer("nope"); err == nil {
 		t.Fatal("a non-map value must fail")
+	}
+}
+
+func TestAppID(t *testing.T) {
+	app := core.NewBaseApp(core.BaseAppConfig{DataDir: t.TempDir()})
+	if got := AppID(app); got != "" {
+		t.Fatalf("unset AppID = %q, want empty", got)
+	}
+	SetAppID(app, "blog")
+	if got := AppID(app); got != "blog" {
+		t.Fatalf("AppID = %q, want blog", got)
+	}
+}
+
+func TestDuration(t *testing.T) {
+	var out struct {
+		A *Duration `json:"a"`
+		B Duration  `json:"b"`
+	}
+	if err := (Config{{"a": "72h", "b": float64(5)}}).Decode(&out); err != nil {
+		t.Fatal(err)
+	}
+	if out.A == nil || *out.A != Duration(72*3600*1e9) || out.B != 5 {
+		t.Fatalf("got %v %v", out.A, out.B)
+	}
+	if err := (Config{{"a": "soon"}}).Decode(&out); err == nil {
+		t.Fatal("bad duration accepted")
 	}
 }

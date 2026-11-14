@@ -37,6 +37,7 @@ func (h *hostedPlugin) InitApp(inst Instance, app core.App) error {
 	if !cfg.Enabled() {
 		return nil
 	}
+	pluginkit.SetAppID(app, inst.ID)
 	if err := h.p.Register(app, cfg); err != nil {
 		return fmt.Errorf("plugin %s: instance %s: %w", h.p.Name(), inst.ID, err)
 	}
@@ -51,5 +52,23 @@ func (h *hostedPlugin) InitJS(inst Instance, app core.App, vm *goja.Runtime) {
 	}
 	if cfg, err := h.config(inst); err == nil && cfg.Enabled() {
 		b.BindJS(app, vm)
+	}
+}
+
+// InitPlugins returns a ManagerOptions.Init that registers PocketOne plugins on each instance the way [Server] does,
+// with each instance's `plugins.<name>` settings (there's no config file, so no process layer). For a Manager built
+// by hand, e.g. in tests.
+func InitPlugins(plugins ...pluginkit.Plugin) func(Instance, core.App) error {
+	hosted := make([]*hostedPlugin, len(plugins))
+	for i, p := range plugins {
+		hosted[i] = &hostedPlugin{p: p}
+	}
+	return func(inst Instance, app core.App) error {
+		for _, h := range hosted {
+			if err := h.InitApp(inst, app); err != nil {
+				return err
+			}
+		}
+		return nil
 	}
 }

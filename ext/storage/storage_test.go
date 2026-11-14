@@ -137,7 +137,7 @@ func TestDefaultBucketUnderPocker(t *testing.T) {
 	var mu sync.Mutex
 	apps := map[string]core.App{}
 	m := pocker.NewManager(insts, pocker.ManagerOptions{
-		PBRoot: pbRoot, Logger: quiet, Init: p.InitApp,
+		PBRoot: pbRoot, Logger: quiet, Init: pocker.InitPlugins(p),
 		Setup: func(inst pocker.Instance, app core.App) error {
 			mu.Lock()
 			apps[inst.ID] = app

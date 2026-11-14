@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/pockethost/pocketone/ext/pluginkit"
 	"time"
 
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
+	"github.com/pockethost/pocketone/ext/pluginkit"
 	"github.com/pockethost/pocketone/ext/pocker"
 )
 
@@ -15,12 +15,12 @@ import (
 //
 //	srv.Plugins = append(srv.Plugins, pitr.New(pitr.Config{}))
 //
-// Process settings come from the config file's top-level `pitr:` key (fields set in Go win), per-instance settings
-// from the instance's `plugins: {pitr: {enabled, retention}}`.
+// Process settings come from pocketone.yaml's `pitr` section (fields set in Go win), per-instance settings
+// from the instance's `plugins: {pitr: {enabled, retention}}` (pocker hosts it as a [pluginkit.Plugin]).
 var (
 	_ pocker.Plugin     = (*Plugin)(nil)
 	_ pocker.Configurer = (*Plugin)(nil)
-	_ pocker.AppIniter  = (*Plugin)(nil)
+	_ pluginkit.Plugin  = (*Plugin)(nil)
 	_ pocker.Starter    = (*Plugin)(nil)
 )
 
@@ -42,42 +42,24 @@ func (p *Plugin) Configure(pocker.Config) error {
 	return nil
 }
 
-// InitApp sets up an instance's app before it bootstraps. The instance may set `enabled` and `retention`. Where its
-// history goes is decided per app: its own PITR S3 setting, else the server's storage (`litestream` kind), else its
-// pb_data/litestream/.
-func (p *Plugin) InitApp(inst pocker.Instance, app core.App) error {
-	ac, err := instanceConfig(inst)
-	if err != nil {
-		return err
-	}
-	return p.SetupApp(app, ac)
+// settings is the shape of an instance's `plugins.pitr`. Only `enabled` and `retention` are read per app.
+type settings struct {
+	Enabled   *bool               `json:"enabled"`
+	Retention *pluginkit.Duration `json:"retention"`
 }
 
-func instanceConfig(inst pocker.Instance) (AppConfig, error) {
-	var ac AppConfig
-	raw := inst.PluginConfig(Name)
-	if raw == nil {
-		return ac, nil
+// Register implements [pluginkit.Plugin]: sets up app before it bootstraps. Where its history goes is decided per
+// app: its own PITR S3 setting, else the server's storage (`litestream` kind), else its pb_data/litestream/.
+func (p *Plugin) Register(app core.App, layers pluginkit.Config) error {
+	var s settings
+	if err := layers.Decode(&s); err != nil {
+		return fmt.Errorf("pitr: %w", err)
 	}
-	if ac2, ok := raw.(AppConfig); ok {
-		return ac2, nil
+	ac := AppConfig{Enabled: s.Enabled}
+	if s.Retention != nil {
+		ac.Retention = time.Duration(*s.Retention)
 	}
-	if ac2, ok := raw.(*AppConfig); ok && ac2 != nil {
-		return *ac2, nil
-	}
-	var probe map[string]any
-	if err := pocker.DecodePluginConfig(raw, &probe); err != nil {
-		return ac, fmt.Errorf("pitr: instance %s: %w", inst.ID, err)
-	}
-	for k := range probe {
-		if k != "enabled" && k != "retention" {
-			return ac, fmt.Errorf("pitr: instance %s: %q can't be set per instance (only enabled, retention)", inst.ID, k)
-		}
-	}
-	if err := pocker.DecodePluginConfig(raw, &ac); err != nil {
-		return ac, fmt.Errorf("pitr: instance %s: %w", inst.ID, err)
-	}
-	return ac, nil
+	return p.SetupApp(app, ac)
 }
 
 // Start waits for the server to stop, then for every app to flush and detach (the manager stops them), and closes

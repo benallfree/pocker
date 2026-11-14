@@ -15,7 +15,7 @@
 //	    litestream: r2-eu  # PITR history (ext/pitr asks for kind "litestream")
 //
 // Each app gets <backend prefix><root><kind>/ per mounted kind and can't reach anything outside it. The root is the
-// caller's choice and opaque to the plugin: under pocker, InitApp passes "instances/<id>/"; a single app passes "" (or
+// caller's choice and opaque to the plugin: under pocker, Register uses "instances/<id>/"; a single app passes "" (or
 // any name). Several deployments sharing one bucket keep apart with their own backend prefix or roots. When an app turns on its own S3 for uploads
 // or backups, PocketBase's normal code takes over with the app's credentials. Other kinds are served whenever they're
 // mounted: the plugin asking for them (e.g. ext/pitr) checks its own app setting first. Without mounts the plugin
@@ -27,13 +27,13 @@ package storage
 
 import (
 	"fmt"
-	"github.com/pockethost/pocketone/ext/pluginkit"
 	"log/slog"
 	"sort"
 	"strings"
 
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/filesystem"
+	"github.com/pockethost/pocketone/ext/pluginkit"
 	"github.com/pockethost/pocketone/ext/pocker"
 	"github.com/pockethost/pocketone/ext/s3redirect/sigv4"
 )
@@ -73,11 +73,6 @@ type Bucket struct {
 	ForcePathStyle bool   `yaml:"force_path_style"`
 }
 
-// InstanceConfig is an instance's `plugins.storage`.
-type InstanceConfig struct {
-	Enabled *bool `yaml:"enabled"`
-}
-
 // Plugin is the pocker plugin.
 type Plugin struct {
 	cfg Config
@@ -87,7 +82,7 @@ type Plugin struct {
 var (
 	_ pocker.Plugin     = (*Plugin)(nil)
 	_ pocker.Configurer = (*Plugin)(nil)
-	_ pocker.AppIniter  = (*Plugin)(nil)
+	_ pluginkit.Plugin  = (*Plugin)(nil)
 )
 
 // New returns the plugin for cfg.
@@ -233,30 +228,31 @@ func (p *Plugin) Bind(app core.App, root string) error {
 	return nil
 }
 
-// InitApp binds the instance's app to the mounts under "instances/<id>/", unless the instance has the plugin off.
-func (p *Plugin) InitApp(inst pocker.Instance, app core.App) error {
-	var ic InstanceConfig
-	if raw := inst.PluginConfig(Name); raw != nil {
-		var probe map[string]any
-		if err := pocker.DecodePluginConfig(raw, &probe); err == nil {
-			for k := range probe {
-				if k != "enabled" {
-					return fmt.Errorf("storage: instance %s: %q can't be set per instance (only enabled)", inst.ID, k)
-				}
-			}
-		}
-		if err := pocker.DecodePluginConfig(raw, &ic); err != nil {
-			return fmt.Errorf("storage: instance %s: %w", inst.ID, err)
-		}
+// settings is the shape of an app's settings layers (an instance's `plugins.storage`). Only `enabled` is read per
+// app; backends and mounts are the operator's, from [Configure] or the Config given to [New].
+type settings struct {
+	Enabled *bool `json:"enabled"`
+}
+
+// Register implements [pluginkit.Plugin]: binds app to the mounts under "instances/<id>/" (its [pluginkit.AppID])
+// under pocker, or at the backends' roots on a single app, unless the app has the plugin off.
+func (p *Plugin) Register(app core.App, layers pluginkit.Config) error {
+	var s settings
+	if err := layers.Decode(&s); err != nil {
+		return err
 	}
 	enabled := on(p.cfg.Enabled)
-	if ic.Enabled != nil {
-		enabled = *ic.Enabled
+	if s.Enabled != nil {
+		enabled = *s.Enabled
 	}
 	if !enabled {
 		return nil
 	}
-	return p.Bind(app, "instances/"+inst.ID+"/")
+	root := ""
+	if id := pluginkit.AppID(app); id != "" {
+		root = "instances/" + id + "/"
+	}
+	return p.Bind(app, root)
 }
 
 // open returns b fenced to prefix.

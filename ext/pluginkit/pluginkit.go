@@ -21,8 +21,10 @@
 package pluginkit
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
 	"github.com/dop251/goja"
@@ -46,9 +48,17 @@ type JSBinder interface {
 	BindJS(app core.App, vm *goja.Runtime)
 }
 
-// Config is a plugin's settings for one app, as layers applied in order: the process config (a pocker config
-// file's top-level `<name>:` key), then the app's own (an instance's `plugins.<name>`). Each layer is a map from
-// YAML or JSON. The plugin's own defaults, the ones given to its constructor, sit under all of them.
+// Closer is a plugin that holds process-wide resources shared by all its apps (a pool, a store, a connection) and
+// releases them once every app has stopped. A single app closes it from OnTerminate; under pocker the plugin closes
+// itself when the server stops (today through pocker.Starter, as ext/pitr does). The conformance test calls it
+// after stopping its apps, so a plugin that keeps goroutines across apps implements it.
+type Closer interface {
+	Close(ctx context.Context) error
+}
+
+// Config is a plugin's settings for one app, as layers applied in order (under pocker, one: the instance's
+// `plugins.<name>`). Each layer is a map from YAML or JSON. The plugin's own defaults, the ones given to its
+// constructor (and its pocketone.yaml section, see [NewSection]), sit under all of them.
 type Config []map[string]any
 
 // Decode applies every layer, in order, onto out (a pointer to a struct with json tags, or a map): keys a layer
@@ -121,4 +131,40 @@ func BindJS(app core.App, vm *goja.Runtime, plugins ...Plugin) {
 			b.BindJS(app, vm)
 		}
 	}
+}
+
+const appIDKey = "pluginkit.appId"
+
+// SetAppID records the host's identifier for app (under pocker, the instance id). Hosts call it before Register.
+func SetAppID(app core.App, id string) { app.Store().Set(appIDKey, id) }
+
+// AppID is the host's identifier for app, set with [SetAppID]: under pocker, the instance id. It's "" on a single app,
+// where there's only one. Use it for whatever must differ per app in shared state: a bucket prefix, a sender
+// address, a rate-limit key.
+func AppID(app core.App) string {
+	id, _ := app.Store().Get(appIDKey).(string)
+	return id
+}
+
+// Duration is a time.Duration for settings structs passed to [Config.Decode]: it reads "72h" or "90s" (what YAML
+// config files hold) as well as a number of nanoseconds.
+type Duration time.Duration
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (d *Duration) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err == nil {
+		v, err := time.ParseDuration(s)
+		if err != nil {
+			return err
+		}
+		*d = Duration(v)
+		return nil
+	}
+	var n int64
+	if err := json.Unmarshal(b, &n); err != nil {
+		return fmt.Errorf("duration must be a string like \"72h\" or a number of nanoseconds: %w", err)
+	}
+	*d = Duration(n)
+	return nil
 }

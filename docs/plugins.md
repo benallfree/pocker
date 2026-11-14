@@ -36,8 +36,9 @@ func (p *Plugin) BindJS(app core.App, vm *goja.Runtime) { /* vm.Set("$hello", ..
 - **Single app:** `pluginkit.MustRegister(app, plugins...)`, and `pluginkit.BindJS(app, vm, plugins...)` in jsvm's
   `OnInit`. The standard binary does this for the plugins it ships ([`examples/pocketone`](../examples/pocketone/main.go)).
 - **Pocker:** put the plugin in `Server.Plugins`. Pocker calls `Register` for every instance with that instance's
-  settings: the config file's top-level `<name>:` key, then the instance's `plugins.<name>`, over the defaults given
-  to your constructor. `enabled: false` (the instance wins) means `Register` and `BindJS` are never called for it.
+  settings (its `plugins.<name>`), over the defaults given to your constructor; process-wide settings come from a
+  pocketone.yaml section your plugin owns (`pluginkit.NewSection`). `enabled: false` means `Register` and `BindJS`
+  are never called for that instance.
 - **No pocker import:** a contract plugin doesn't depend on ext/pocker, so single-app builds don't link it. Reach for
   the host interfaces below only for what's process-wide (a request gate, TLS, background jobs).
 - [bulkmail](../ext/bulkmail/plugin.go) is the reference implementation.
@@ -146,7 +147,7 @@ document.addEventListener("mount:pageBackupsSettings", (e) => {
 
 | Field | Use it for |
 |---|---|
-| `Server.Plugins` | Packaged host plugins (`Configurer`, `Gate`, `TLSProvider`, `Wrapper`, `Starter`, `AppIniter`; see [POCKER.md](../ext/pocker/POCKER.md#plugins)), e.g. [autotls](../ext/autotls), [servertiming](../ext/servertiming), [pitr](../ext/pitr). |
+| `Server.Plugins` | Plugins: any `pluginkit.Plugin` (registered on every instance), plus host-only extras (`Configurer`, `Gate`, `TLSProvider`, `Wrapper`, `Starter`; see [POCKER.md](../ext/pocker/POCKER.md#plugins)), e.g. [pitr](../ext/pitr), [storage](../ext/storage), [autotls](../ext/autotls), [servertiming](../ext/servertiming). |
 | `Server.Wrap` | Middleware around every instance request, e.g. auth in front of all instances, metrics, headers. |
 | `Server.OnStart` | Gets the `Manager` before the first request: start background jobs (schedules, sweeps) in your own goroutines. |
 | `Server.OnEvent` | Instance events: started, stopped, restarted, failed. |
@@ -223,7 +224,7 @@ ext/<name>/
   ```
 
   It checks that the plugin registers, migrates, serves and shuts down on a fresh app with no goroutines left
-  behind; that PocketBase's own collections are unchanged and every collection it adds is named `_<name>_…`; and
+  behind; that PocketBase's own collections are unchanged and every collection it adds is named `_<name>` or `_<name>_…`; and
   that one plugin value serves several apps at once (as under pocker) without registering on one app touching
   another's hooks. Run it with `go test -race`. It's the minimum every plugin passes; your own tests cover the
   feature.

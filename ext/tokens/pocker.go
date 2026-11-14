@@ -1,16 +1,15 @@
 package tokens
 
 import (
-	"fmt"
-
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
-	"github.com/pockethost/pocketone/ext/pocker"
+	"github.com/pockethost/pocketone/ext/pluginkit"
 )
 
 // Name is the plugin's key under an instance's `plugins:`.
 const Name = "tokens"
 
-// Plugin is API tokens under a pocker server: every instance gets its own _tokens, routes and screen.
+// Plugin is API tokens as a PocketOne plugin: on a single app with pluginkit.MustRegister, and under pocker every
+// instance gets its own _tokens, routes and screen.
 //
 //	srv.Plugins = append(srv.Plugins, tokens.New(tokens.Config{}))
 //
@@ -18,34 +17,27 @@ const Name = "tokens"
 // tokens. Scopes are registered per app by the plugins that own them (they call tokens.For(app).RegisterScope).
 type Plugin struct{ cfg Config }
 
-var (
-	_ pocker.Plugin    = (*Plugin)(nil)
-	_ pocker.AppIniter = (*Plugin)(nil)
-)
+var _ pluginkit.Plugin = (*Plugin)(nil)
 
-// New returns the pocker plugin. cfg holds the defaults for every instance.
+// New returns the plugin. cfg holds the defaults for every app.
 func New(cfg Config) *Plugin { return &Plugin{cfg: cfg} }
 
-// Name implements [pocker.Plugin].
+// Name implements [pluginkit.Plugin].
 func (p *Plugin) Name() string { return Name }
 
-type instanceConfig struct {
-	Enabled     *bool    `yaml:"enabled"`
-	Collections []string `yaml:"collections"`
+type settings struct {
+	Collections []string `json:"collections"`
 }
 
-// InitApp implements [pocker.AppIniter].
-func (p *Plugin) InitApp(inst pocker.Instance, app core.App) error {
+// Register implements [pluginkit.Plugin].
+func (p *Plugin) Register(app core.App, layers pluginkit.Config) error {
 	cfg := p.cfg
-	var y instanceConfig
-	if err := pocker.DecodePluginConfig(inst.PluginConfig(Name), &y); err != nil {
-		return fmt.Errorf("tokens: instance %s: %w", inst.ID, err)
+	var s settings
+	if err := layers.Decode(&s); err != nil {
+		return err
 	}
-	if y.Enabled != nil && !*y.Enabled {
-		return nil
-	}
-	if len(y.Collections) > 0 {
-		cfg.Collections = y.Collections
+	if len(s.Collections) > 0 {
+		cfg.Collections = s.Collections
 	}
 	_, err := Register(app, cfg)
 	return err

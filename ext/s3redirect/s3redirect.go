@@ -15,8 +15,8 @@
 //	app := pocketbase.New()
 //	s3redirect.MustRegister(app, s3redirect.Config{TTL: 5 * time.Minute})
 //
-// The standard PocketOne binary (examples/pocketone) registers it by default. Many apps in one process: see the pockerplugin
-// subpackage.
+// The standard PocketOne binary (examples/pocketone) registers it by default. Many apps in one process: put New(cfg) in
+// pocker's Server.Plugins (it's a [pluginkit.Plugin]).
 package s3redirect
 
 import (
@@ -28,6 +28,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
@@ -74,6 +75,8 @@ type Plugin struct {
 	cfg    Config
 	log    *slog.Logger
 	ttlSet bool // set in Go: the config file doesn't override it
+
+	sectionOnce sync.Once
 }
 
 // New returns the plugin for cfg, filling defaults.
@@ -110,8 +113,8 @@ func (p *Plugin) resolve(ac AppConfig) (enabled bool, ttl time.Duration) {
 	return enabled, ttl
 }
 
-// SetupApp binds the redirect to app's file downloads. A single app calls it through [Register]; under pocker the
-// plugin's InitApp calls it for each instance.
+// SetupApp binds the redirect to app's file downloads. A single app calls it through the package's Register; the
+// plugin's Register method (pocker, pluginkit) calls it for each app.
 func (p *Plugin) SetupApp(app core.App, ac AppConfig) error {
 	enabled, ttl := p.resolve(ac)
 	if !enabled {

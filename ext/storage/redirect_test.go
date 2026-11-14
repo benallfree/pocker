@@ -15,7 +15,6 @@ import (
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/filesystem"
 	"github.com/pockethost/pocketone/ext/pocker"
 	"github.com/pockethost/pocketone/ext/s3redirect"
-	"github.com/pockethost/pocketone/ext/s3redirect/pockerplugin"
 )
 
 // With ext/s3redirect on the same server, downloads of default-bucket files become signed redirects to the
@@ -23,16 +22,11 @@ import (
 func TestS3RedirectSeesDefaultBucket(t *testing.T) {
 	b := startMinio(t)
 	st := New(Config{Bucket: b, Logger: quiet})
-	rd := pockerplugin.New(s3redirect.Config{Logger: quiet})
+	rd := s3redirect.New(s3redirect.Config{Logger: quiet})
 	var appA core.App
 	m := pocker.NewManager(fixedSource{{ID: "a", Hosts: []string{"a.test"}}}, pocker.ManagerOptions{
 		PBRoot: t.TempDir(), Logger: quiet,
-		Init: func(inst pocker.Instance, app core.App) error {
-			if err := st.InitApp(inst, app); err != nil {
-				return err
-			}
-			return rd.InitApp(inst, app)
-		},
+		Init:  pocker.InitPlugins(st, rd),
 		Setup: func(_ pocker.Instance, app core.App) error { appA = app; return nil },
 	})
 	ctx, cancel := context.WithCancel(context.Background())

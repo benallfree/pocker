@@ -2,7 +2,6 @@ package pitr
 
 import (
 	"context"
-	"github.com/pockethost/pocketone/ext/pluginkit"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -13,6 +12,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
+	"github.com/pockethost/pocketone/ext/pluginkit"
 	"github.com/pockethost/pocketone/ext/pocker"
 )
 
@@ -37,7 +37,7 @@ func TestPockerRestoreRestartsOnlyThatInstance(t *testing.T) {
 	m := pocker.NewManager(fixedSource{a, b}, pocker.ManagerOptions{
 		PBRoot: t.TempDir(),
 		Logger: quiet,
-		Init:   p.InitApp, // what pocker.Server wires for plugins implementing pocker.AppIniter
+		Init:   pocker.InitPlugins(p), // what pocker.Server does for pluginkit plugins
 		Setup: func(inst pocker.Instance, app core.App) error {
 			mu.Lock()
 			apps[inst.ID] = append(apps[inst.ID], app)
@@ -176,9 +176,14 @@ func TestConfigureAndInstanceConfig(t *testing.T) {
 	if p2.Config().Retention != 24*time.Hour {
 		t.Fatalf("file overrode a Go-set retention: %v", p2.Config().Retention)
 	}
-	// instances can't carry a bucket
-	inst := pocker.Instance{ID: "x", Plugins: map[string]any{"pitr": map[string]any{"bucket": map[string]any{"secret": "s"}}}}
-	if err := p.InitApp(inst, core.NewBaseApp(core.BaseAppConfig{DataDir: t.TempDir()})); err == nil || !strings.Contains(err.Error(), "bucket") {
+	// an instance can't pick a bucket: the key isn't read per app (only enabled, retention)
+	if err := p.Register(core.NewBaseApp(core.BaseAppConfig{DataDir: t.TempDir()}),
+		pluginkit.Config{{"bucket": map[string]any{"secret": "s"}}}); err != nil {
 		t.Fatalf("bucket in instance config: %v", err)
+	}
+	// a bad retention is an error, not a silent default
+	if err := p.Register(core.NewBaseApp(core.BaseAppConfig{DataDir: t.TempDir()}),
+		pluginkit.Config{{"retention": "soon"}}); err == nil {
+		t.Fatal("bad retention accepted")
 	}
 }

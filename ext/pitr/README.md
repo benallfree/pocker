@@ -43,7 +43,7 @@ Replication runs only while the app serves (`OnServe`), never for CLI commands.
 
 ## Many apps (pocker)
 
-A pocker plugin (`Configurer`, `AppIniter`, `Starter`):
+A [pluginkit](../pluginkit/pluginkit.go) plugin, which pocker hosts on every instance, plus pocker's `Configurer` and `Starter` for its process settings and shutdown:
 
 ```go
 srv := &pocker.Server{Config: cfg, Plugins: []pocker.Plugin{pitr.New(pitr.Config{})}}

@@ -53,12 +53,11 @@ Then turn on S3 in Settings → Files storage.
 ## Many apps (pocker)
 
 ```go
-import "github.com/pockethost/pocketone/ext/s3redirect/pockerplugin"
-
-srv.Plugins = append(srv.Plugins, pockerplugin.New(s3redirect.Config{}))
+srv.Plugins = append(srv.Plugins, s3redirect.New(s3redirect.Config{}))
 ```
 
-The pocker part is its own package, so single-app builds (like the standard binary) don't link pocker.
+The plugin is a [pluginkit](../pluginkit/pluginkit.go) plugin, so the same value works on a single app and on every
+pocker instance; it doesn't link pocker.
 
 ```yaml
 s3redirect:            # server defaults
