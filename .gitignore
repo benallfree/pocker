@@ -25,3 +25,6 @@ CHANGELOG_8_15.html
 /examples/ce/ce
 /examples/ce/pocketbase
 /ext/pocker/cmd/pocker/pocker
+
+# Agent worktrees (local only)
+.claude/worktrees/
