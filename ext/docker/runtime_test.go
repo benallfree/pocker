@@ -88,7 +88,7 @@ func TestRuntime(t *testing.T) {
 	tb := testBinaries(t)
 	data := t.TempDir()
 	quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-	if os.Getenv("CE_DOCKER_DEBUG") != "" {
+	if os.Getenv("POCKETONE_DOCKER_DEBUG") != "" {
 		quiet = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	}
 	cfg := Config{Socket: socket, Image: "alpine:3.20", DataRoot: data, Binaries: tb, Versions: testVersions(t, tb),

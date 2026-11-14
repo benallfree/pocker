@@ -28,7 +28,7 @@ A plugin registered on the same app reaches the server with `mcp.For(app)`.
 
 ## Sign-in
 
-With `ext/tokens` and `ext/oauth-server` on the app (both are in the standard CE binary), `/mcp` uses OAuth the way Claude connectors and Claude Code expect it:
+With `ext/tokens` and `ext/oauth-server` on the app (both are in the standard PocketOne binary), `/mcp` uses OAuth the way Claude connectors and Claude Code expect it:
 
 1. A request without a token gets `401` with `WWW-Authenticate: Bearer resource_metadata="https://<host>/.well-known/oauth-protected-resource/mcp", scope="mcp:read mcp:write"`.
 2. The protected resource metadata names the app as its authorization server. oauth-server publishes the authorization server metadata, with PKCE S256, CIMD and dynamic registration.

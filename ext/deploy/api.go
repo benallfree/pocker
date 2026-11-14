@@ -17,7 +17,7 @@ import (
 	"time"
 )
 
-// Prefix is the API path of the PocketHost edge (the npm CLI's); [PockerPrefix] is the CE default. Options.Prefix
+// Prefix is the API path of the PocketHost edge (the npm CLI's); [PockerPrefix] is the PocketOne default. Options.Prefix
 // picks one.
 const Prefix = LegacyPrefix
 

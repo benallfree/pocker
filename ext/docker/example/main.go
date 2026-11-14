@@ -7,7 +7,7 @@
 //
 //	instances:
 //	  - { id: blog, hosts: [blog.localhost], version: "pb:0.23.*" }
-//	  - { id: shop, hosts: [shop.localhost], version: "ce:0.0.*" }
+//	  - { id: shop, hosts: [shop.localhost], version: "p1:0.0.*" }
 package main
 
 import (

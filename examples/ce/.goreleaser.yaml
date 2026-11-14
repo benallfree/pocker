@@ -16,7 +16,7 @@ before:
 
 builds:
   - id: build_noncgo
-    # the standard CE binary: examples/base + the default CE plugins, in its own module
+    # the standard PocketOne binary: examples/base + the default PocketOne plugins, in its own module
     dir: examples/ce
     main: .
     binary: pocketone

@@ -1,5 +1,5 @@
 // Package pockerplugin serves pb_pages for every pocker instance. It's its own package so single-app builds of
-// ext/pages (like the standard CE binary) don't link pocker.
+// ext/pages (like the standard PocketOne binary) don't link pocker.
 package pockerplugin
 
 import (

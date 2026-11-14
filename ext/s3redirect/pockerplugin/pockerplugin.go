@@ -1,5 +1,5 @@
 // Package pockerplugin turns on s3redirect for every pocker instance. It's its own package so single-app builds of
-// ext/s3redirect (like the standard CE binary) don't link pocker.
+// ext/s3redirect (like the standard PocketOne binary) don't link pocker.
 //
 //	srv.Plugins = append(srv.Plugins, pockerplugin.New(s3redirect.Config{}))
 //
