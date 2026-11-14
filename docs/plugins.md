@@ -228,6 +228,17 @@ ext/<name>/
   that one plugin value serves several apps at once (as under pocker) without registering on one app touching
   another's hooks. Run it with `go test -race`. It's the minimum every plugin passes; your own tests cover the
   feature.
+- **CI enforces both.** [`.github/workflows/plugins.yml`](../.github/workflows/plugins.yml) fails when a module that
+  implements `pluginkit.Plugin` has no conformance test, then builds, vets and runs `go test -race` on every module the
+  change affects: the modules it touches, every module that reaches one of them through a `replace`, or all of them
+  for a core change. Run the same checks locally from the repository root:
+
+  ```bash
+  go run ./.github/plugins check
+  go run ./.github/plugins affected origin/main HEAD
+  ```
+
+  Tests that need an external tool (MinIO, Docker) skip themselves when it isn't installed, so they don't block CI.
 - **Dependencies stay in your module.** Heavy libraries go in your plugin's `go.mod`, never in core's.
 - **Single app first.** Where it makes sense, a plugin should work on one PocketBase app, and add more under the
   pocker (multitenant) host.

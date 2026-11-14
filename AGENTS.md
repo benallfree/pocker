@@ -42,6 +42,9 @@ Bug fixes to upstream behavior, each tested and meant for upstream; drop each on
 
 - Plugins are their own Go modules under `ext/<name>/` with a README and a minimal `example/main.go`
   (`docs/plugins.md`). Modules that reach another `ext/` module add a `replace` for it.
+- Plugin CI (`.github/workflows/plugins.yml`, tool in `.github/plugins/`): every `pluginkit.Plugin` module has a
+  conformance test, and each module a change affects builds, vets and passes `go test -race`. Check locally with
+  `go run ./.github/plugins check` and `go run ./.github/plugins affected origin/main HEAD`.
 - Build checks: `go build -o /dev/null ./...` (a plain `go build` in a single-main module writes a binary into the
   tree). Stage files by name; never commit built binaries.
 - Plans and internal notes go in a private maintainer repo, never here.

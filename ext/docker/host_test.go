@@ -32,7 +32,7 @@ func (tagGate) Admit(w http.ResponseWriter, _ *http.Request, inst host.Instance)
 func TestHostWithDocker(t *testing.T) {
 	socket := dockerSocket(t)
 	tb := testBinaries(t)
-	root := t.TempDir()
+	root := dataDir(t)
 	data := filepath.Join(root, "instances")
 	instances := filepath.Join(root, "instances.yaml")
 	if err := os.WriteFile(instances, []byte(`
@@ -123,7 +123,7 @@ instances:
 func TestMaintenance(t *testing.T) {
 	socket := dockerSocket(t)
 	tb := testBinaries(t)
-	rt, err := New(Config{Socket: socket, Image: "alpine:3.20", DataRoot: t.TempDir(), Binaries: tb, Versions: testVersions(t, tb),
+	rt, err := New(Config{Socket: socket, Image: "alpine:3.20", DataRoot: dataDir(t), Binaries: tb, Versions: testVersions(t, tb),
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
 	if err != nil {
 		t.Fatal(err)
@@ -173,7 +173,7 @@ func TestMaintenance(t *testing.T) {
 func TestHooksChangeRestartsContainer(t *testing.T) {
 	socket := dockerSocket(t)
 	tb := testBinaries(t)
-	data := t.TempDir()
+	data := dataDir(t)
 	rt, err := New(Config{Socket: socket, Image: "alpine:3.20", DataRoot: data, Binaries: tb, Versions: testVersions(t, tb),
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
 	if err != nil {

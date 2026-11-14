@@ -1,0 +1,64 @@
+# PocketOne's plugin modules (ext/*, examples/pocketone): every module follows the plugin rules (a pluginkit plugin
+# runs the conformance test), and each module a change affects builds, vets and passes its tests with -race.
+# Modules are affected by their own files or by any module they reach through a `replace`; a core change affects
+# all of them. See .github/plugins/main.go and docs/plugins.md.
+name: plugins
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  plugins:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: "**/go.sum"
+
+      - name: Plugin rules
+        run: go run ./.github/plugins check
+
+      - name: Affected modules
+        id: affected
+        env:
+          BEFORE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          AFTER: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          if [ -z "$BEFORE" ] || [ "$BEFORE" = 0000000000000000000000000000000000000000 ]; then
+            mods=$(find ext examples -name go.mod -not -path '*/node_modules/*' -not -path '*/testdata/*' -exec dirname {} \; | sort)
+          else
+            base=$(git merge-base "$BEFORE" "$AFTER")
+            mods=$(go run ./.github/plugins affected "$base" "$AFTER")
+          fi
+          echo "$mods" | sed '/^$/d;s/^/  /'
+          { echo 'modules<<EOF'; echo "$mods"; echo EOF; } >> "$GITHUB_OUTPUT"
+
+      - name: Build, vet and test
+        if: steps.affected.outputs.modules != ''
+        env:
+          MODULES: ${{ steps.affected.outputs.modules }}
+        run: |
+          set -uo pipefail
+          failed=()
+          for m in $MODULES; do
+            echo "::group::$m"
+            ok=1
+            (cd "$m" && go build -o /dev/null ./... && go vet ./... && go test -race -count=1 -timeout 10m ./...) || ok=0
+            echo "::endgroup::"
+            if [ $ok = 0 ]; then
+              echo "::error::$m failed"
+              failed+=("$m")
+            fi
+          done
+          if [ ${#failed[@]} -gt 0 ]; then
+            echo "failed: ${failed[*]}"
+            exit 1
+          fi

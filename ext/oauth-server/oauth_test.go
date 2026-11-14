@@ -297,8 +297,9 @@ func TestUsersCantSignInByDefault(t *testing.T) {
 // The CLI half (ext/remotes) against the server: browser login with the scripted browser standing in.
 func TestCLIBrowserLogin(t *testing.T) {
 	e := newEnv(t, Config{})
-	old := remotes.OpenBrowser
-	defer func() { remotes.OpenBrowser = old }()
+	old, oldCan := remotes.OpenBrowser, remotes.CanOpenBrowser
+	defer func() { remotes.OpenBrowser, remotes.CanOpenBrowser = old, oldCan }()
+	remotes.CanOpenBrowser = func() bool { return true } // a CI runner has no display
 	remotes.OpenBrowser = func(u string) error {
 		go func() {
 			b := newBrowser(t)

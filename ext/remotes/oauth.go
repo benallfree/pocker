@@ -56,7 +56,10 @@ func FetchOAuthMetadata(ctx context.Context, c *Client, path string) (*OAuthMeta
 	return &m, nil
 }
 
-// canOpenBrowser: false over SSH or on a Linux box without a display.
+// CanOpenBrowser reports whether a browser can be opened here: false over SSH or on a Linux box without a display, so
+// the login uses a device code instead (overridable for tests, with [OpenBrowser]).
+var CanOpenBrowser = canOpenBrowser
+
 func canOpenBrowser() bool {
 	if os.Getenv("SSH_CONNECTION") != "" || os.Getenv("SSH_TTY") != "" {
 		return false
@@ -91,7 +94,7 @@ func OAuthLogin(ctx context.Context, c *Client, w *Whoami, opts BrowserLoginOpti
 		return nil, err
 	}
 	var tr *tokenResponse
-	if opts.Device || (!opts.NoBrowser && !canOpenBrowser()) {
+	if opts.Device || (!opts.NoBrowser && !CanOpenBrowser()) {
 		if md.DeviceAuthorizationEndpoint == "" {
 			return nil, errors.New("the remote doesn't offer device sign-in; use --token")
 		}

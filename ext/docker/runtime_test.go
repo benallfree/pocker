@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -35,6 +36,32 @@ func dockerSocket(t *testing.T) string {
 	}
 	t.Skip("no Docker daemon reachable")
 	return ""
+}
+
+// dataDir is a t.TempDir for instance data. On Linux the containers run as root and leave root-owned files in it,
+// which the test user can't delete; cleanup removes them through a container, then the dir.
+func dataDir(t *testing.T) string {
+	t.Helper()
+	dir, err := os.MkdirTemp("", "pocketone-docker-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if os.RemoveAll(dir) == nil {
+			return
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		defer cancel()
+		out, err := exec.CommandContext(ctx, "docker", "run", "--rm", "-v", dir+":/d", "alpine:3.20",
+			"find", "/d", "-mindepth", "1", "-delete").CombinedOutput()
+		if err != nil {
+			t.Logf("cleanup of %s through docker: %v %s", dir, err, out)
+		}
+		if err := os.RemoveAll(dir); err != nil {
+			t.Logf("cleanup: %v", err)
+		}
+	})
+	return dir
 }
 
 // testBinaries is a cache of real PocketBase releases for the daemon's platform, kept between test runs.
@@ -86,7 +113,7 @@ func get(t *testing.T, rt *Runtime, inst host.Instance, path string) (int, strin
 func TestRuntime(t *testing.T) {
 	socket := dockerSocket(t)
 	tb := testBinaries(t)
-	data := t.TempDir()
+	data := dataDir(t)
 	quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
 	if os.Getenv("POCKETONE_DOCKER_DEBUG") != "" {
 		quiet = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug}))
@@ -229,7 +256,7 @@ func TestRuntime(t *testing.T) {
 func TestRuntimeBadVersion(t *testing.T) {
 	socket := dockerSocket(t)
 	tb := testBinaries(t)
-	rt, _ := New(Config{Socket: socket, Image: "alpine:3.20", DataRoot: t.TempDir(), Binaries: tb, Versions: testVersions(t, tb),
+	rt, _ := New(Config{Socket: socket, Image: "alpine:3.20", DataRoot: dataDir(t), Binaries: tb, Versions: testVersions(t, tb),
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
 	if err := rt.Start(context.Background()); err != nil {
 		t.Fatal(err)
