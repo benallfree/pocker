@@ -51,16 +51,13 @@ type Sandbox struct {
 	MaxSleep time.Duration
 
 	// MaxAllocation caps single large allocations JS can request in one step (String repeat/pad, Array join,
-	// Buffer/ArrayBuffer/typed arrays, file reads, readerToString/toBytes). Default 64 MiB. Gradual growth is the
-	// host's memory watchdog's job (see InterruptActive).
+	// Buffer/ArrayBuffer/typed arrays, file reads, readerToString/toBytes). Default 64 MiB. Gradual growth isn't
+	// limited (goja has no per-VM memory accounting).
 	MaxAllocation int64
 
 	// MaxCallStackSize caps JS recursion depth (default 2000). Without it deep recursion overflows the Go stack,
 	// which is fatal for the whole process.
 	MaxCallStackSize int
-
-	// Owner identifies the app in InterruptActive results (e.g. the instance id).
-	Owner string
 
 	// MaxConcurrent caps how many hook/route/cron calls the app runs at once (0 = no cap). A call waits up to
 	// MaxExecution for a slot, then fails.
@@ -588,43 +585,8 @@ func (s *Sandbox) capAllocations(vm *goja.Runtime) {
 	}
 }
 
-// activeRun is one JS call in progress, for the host's memory watchdog.
-type activeRun struct {
-	owner   string
-	started time.Time
-	vm      *goja.Runtime
-}
-
-var activeRuns sync.Map // *activeRun -> struct{}
-
-// InterruptActive interrupts every sandboxed JS call that has been running for at least minAge and returns the
-// owners (Sandbox.Owner) it interrupted, once each. The host's memory watchdog calls it when the heap climbs past
-// its soft limit.
-func InterruptActive(minAge time.Duration, reason string) []string {
-	now := time.Now()
-	seen := map[string]bool{}
-	var owners []string
-	activeRuns.Range(func(k, _ any) bool {
-		r := k.(*activeRun)
-		if now.Sub(r.started) < minAge {
-			return true
-		}
-		r.vm.Interrupt(reason)
-		if !seen[r.owner] {
-			seen[r.owner] = true
-			owners = append(owners, r.owner)
-		}
-		return true
-	})
-	return owners
-}
-
-// interruptAfter arms vm.Interrupt for one JS call, registers it for InterruptActive, and returns the function that
-// ends both.
+// interruptAfter arms vm.Interrupt for one JS call (the execution time limit) and returns the function that ends it.
 func (s *Sandbox) interruptAfter(vm *goja.Runtime) func() {
-	run := &activeRun{owner: s.Owner, started: time.Now(), vm: vm}
-	activeRuns.Store(run, struct{}{})
-
 	var t *time.Timer
 	if limit := s.maxExecution(); limit > 0 {
 		t = time.AfterFunc(limit, func() {
@@ -635,7 +597,6 @@ func (s *Sandbox) interruptAfter(vm *goja.Runtime) func() {
 		if t != nil {
 			t.Stop()
 		}
-		activeRuns.Delete(run)
 		vm.ClearInterrupt()
 	}
 }

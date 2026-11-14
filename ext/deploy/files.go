@@ -194,7 +194,7 @@ func (a *API) readFile(w http.ResponseWriter, r *http.Request) error {
 	h.Set("Content-Type", "application/octet-stream")
 	h.Set("Content-Length", strconv.FormatInt(st.Size(), 10))
 	h.Set("Cache-Control", "no-store")
-	h.Set("X-PH-Mtime", strconv.FormatInt(mtimeMs(st), 10))
+	h.Set("X-File-Mtime", strconv.FormatInt(mtimeMs(st), 10))
 	w.WriteHeader(200)
 	if r.Method != http.MethodHead {
 		_, _ = io.Copy(w, f)

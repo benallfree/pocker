@@ -7,7 +7,7 @@ The JS sandbox for untrusted instances: file access confined to the instance fol
 > **Status.** Working: Go module `github.com/pockethost/pocketone/ext/sandbox`. It plugs into PocketBase's JS plugin
 > as a jsvm extension, `jsvm.Config{Extensions: []jsvm.Extension{sb}}` (its `OnInit`, `OnCall` and `HTTPClient`); [`example/main.go`](example/main.go) runs
 > one sandboxed app. [pocker](../pocker/README.md) uses it for every instance; its attack tests live there. The SQL
-> guard, outbound network rules and memory watch are still in pocker and move here next.
+> guard and outbound network rules live here too.
 
 ## How is this safe?
 
@@ -114,7 +114,7 @@ response sizes are capped.
 | CPU | Every JS call (hook, route, cron, migration) is interrupted after `max_js_execution`. `sleep()` is capped. |
 | Concurrency | At most `max_concurrent_js` JS calls per instance at once; more wait, then fail. Per-IP and per-instance rate and concurrency limits sit in front of every request. |
 | One-shot memory | Built-ins that allocate a big result in one step refuse results over `max_js_allocation`: `repeat`, `padStart`, `join`, typed arrays, `ArrayBuffer`, `Buffer`, file reads and others. Recursion depth is capped, so a JS stack overflow can't crash Go. |
-| Gradual memory | goja can't account memory per VM, so a watcher samples the process heap every 50 ms. Above the soft limit it interrupts long JS calls and gives their instance a strike. Repeated strikes pause the instance (503 with `Retry-After`), with backoff. |
+| Gradual memory | Not limited: goja can't account memory per VM. Gradual growth counts against the whole process (and its swap). |
 
 Every limit has a process default and a per-instance override.
 
@@ -128,9 +128,8 @@ Every limit has a process default and a per-instance override.
 
 Be clear about these before you host strangers:
 
-- **Memory attribution is best-effort.** The watcher blames whoever is running JS when the heap grows. That's usually
-  right, but not guaranteed. A hook that allocates faster than the 50 ms sample, through a path the one-shot caps
-  don't cover, can still push the process over its limit.
+- **Gradual memory isn't per instance.** goja can't account memory per VM, so a hook that grows memory slowly uses
+  the whole process's memory (and swap). Only one-shot allocations are capped.
 - **It's one address space.** A bug in Go, goja, SQLite or PocketOne's own checks would cross tenants in a way a
   container boundary wouldn't. The sandbox tests cover the known paths, but they don't prove nothing else exists.
 - **No OS-level layer yet.** Seccomp, Landlock and a second, OS-level egress filter aren't built in.
@@ -139,7 +138,7 @@ Be clear about these before you host strangers:
 
 For untrusted tenants, add the OS layers yourself:
 - run PocketOne as a non-root user that owns only the instances folder;
-- set `memory_limit` and run it under a cgroup memory limit, so the worst case is a restart, not a host OOM;
+- run it under a cgroup memory limit (with swap), so the worst case is a restart, not a host OOM;
 - add an OS firewall rule that lets that user reach public addresses only, an egress layer independent of the
   process;
 - keep secrets for host code out of the process environment; use `private:` values instead;

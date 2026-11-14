@@ -18,92 +18,18 @@ import (
 //	  max_query_duration: 60s
 //	  http_send_max_timeout: 30s
 //	  http_send_max_body: 20MiB
-//	  quarantine: { strikes: 5, first_pause: 30s, max_pause: 15m }   # or: quarantine: off
 type Limits struct {
-	MaxJSExecution     time.Duration     `yaml:"max_js_execution,omitempty"`
-	MaxJSAllocation    ByteSize          `yaml:"max_js_allocation,omitempty"`
-	MaxCallStackSize   int               `yaml:"max_call_stack_size,omitempty"`
-	MaxSleep           time.Duration     `yaml:"max_sleep,omitempty"`
-	MaxQueryDuration   time.Duration     `yaml:"max_query_duration,omitempty"`
-	HTTPSendMaxTimeout time.Duration     `yaml:"http_send_max_timeout,omitempty"`
-	HTTPSendMaxBody    ByteSize          `yaml:"http_send_max_body,omitempty"`
-	Quarantine         *QuarantinePolicy `yaml:"quarantine,omitempty"`
+	MaxJSExecution     time.Duration `yaml:"max_js_execution,omitempty"`
+	MaxJSAllocation    ByteSize      `yaml:"max_js_allocation,omitempty"`
+	MaxCallStackSize   int           `yaml:"max_call_stack_size,omitempty"`
+	MaxSleep           time.Duration `yaml:"max_sleep,omitempty"`
+	MaxQueryDuration   time.Duration `yaml:"max_query_duration,omitempty"`
+	HTTPSendMaxTimeout time.Duration `yaml:"http_send_max_timeout,omitempty"`
+	HTTPSendMaxBody    ByteSize      `yaml:"http_send_max_body,omitempty"`
 
 	// MaxConcurrentJS caps how many JS calls (hooks, routes, cron jobs) the instance runs at once; further calls
 	// wait up to max_js_execution for a slot, then fail.
 	MaxConcurrentJS int `yaml:"max_concurrent_js,omitempty"`
-}
-
-// QuarantinePolicy decides when repeated memory strikes pause an instance. Pauses back off: FirstPause, doubling on
-// each further quarantine up to MaxPause, and the backoff resets after ResetAfter without strikes.
-type QuarantinePolicy struct {
-	Off        bool          `yaml:"off,omitempty"` // never pause; only interrupt
-	Strikes    int           `yaml:"strikes,omitempty"`
-	Window     time.Duration `yaml:"window,omitempty"`
-	FirstPause time.Duration `yaml:"first_pause,omitempty"`
-	MaxPause   time.Duration `yaml:"max_pause,omitempty"`
-	ResetAfter time.Duration `yaml:"reset_after,omitempty"`
-}
-
-// UnmarshalYAML also accepts `quarantine: off` (or false).
-func (q *QuarantinePolicy) UnmarshalYAML(n *yaml.Node) error {
-	if n.Kind == yaml.ScalarNode {
-		switch strings.ToLower(n.Value) {
-		case "off", "false", "no":
-			*q = QuarantinePolicy{Off: true}
-			return nil
-		case "on", "true", "yes", "":
-			*q = QuarantinePolicy{}
-			return nil
-		}
-		return fmt.Errorf("quarantine: expected off or a mapping, got %q", n.Value)
-	}
-	type plain QuarantinePolicy
-	return n.Decode((*plain)(q))
-}
-
-// DefaultQuarantine is used where neither the instance nor the process sets a field.
-var DefaultQuarantine = QuarantinePolicy{
-	Strikes:    3,
-	Window:     10 * time.Minute,
-	FirstPause: 30 * time.Second,
-	MaxPause:   15 * time.Minute,
-	ResetAfter: time.Hour,
-}
-
-// merged returns q with zero fields taken from def.
-func (q QuarantinePolicy) Merged(def QuarantinePolicy) QuarantinePolicy {
-	if q.Off || def.Off && q == (QuarantinePolicy{}) {
-		return QuarantinePolicy{Off: true}
-	}
-	if q.Strikes <= 0 {
-		q.Strikes = def.Strikes
-	}
-	if q.Window <= 0 {
-		q.Window = def.Window
-	}
-	if q.FirstPause <= 0 {
-		q.FirstPause = def.FirstPause
-	}
-	if q.MaxPause <= 0 {
-		q.MaxPause = def.MaxPause
-	}
-	if q.ResetAfter <= 0 {
-		q.ResetAfter = def.ResetAfter
-	}
-	return q
-}
-
-// pauseFor returns the pause for the n-th quarantine (0-based): FirstPause doubling up to MaxPause.
-func (q QuarantinePolicy) PauseFor(n int) time.Duration {
-	d := q.FirstPause
-	for i := 0; i < n && d < q.MaxPause; i++ {
-		d *= 2
-	}
-	if d > q.MaxPause {
-		d = q.MaxPause
-	}
-	return d
 }
 
 // over returns l with zero fields taken from def.
@@ -132,16 +58,6 @@ func (l Limits) Over(def Limits) Limits {
 	if l.MaxConcurrentJS == 0 {
 		l.MaxConcurrentJS = def.MaxConcurrentJS
 	}
-	defQ := DefaultQuarantine
-	if def.Quarantine != nil {
-		defQ = def.Quarantine.Merged(DefaultQuarantine)
-	}
-	q := QuarantinePolicy{}
-	if l.Quarantine != nil {
-		q = *l.Quarantine
-	}
-	q = q.Merged(defQ)
-	l.Quarantine = &q
 	return l
 }
 

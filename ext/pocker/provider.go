@@ -13,23 +13,20 @@ import (
 //
 //	pocker:
 //	  root: /var/lib/instances    # one folder per instance: <root>/<id>
-//	  memory_limit: 1.2GB         # Go memory limit; the memory watch strikes instances at 70% of it
 //	  egress_allow: []            # private networks apps may still reach
 //	  max_js_execution: 30s       # instance limit defaults (an instance's own limits override them)
 type SectionConfig struct {
-	Root            string `yaml:"root"`
-	HooksPoolSize   *int   `yaml:"hooks_pool_size"`
-	Limits          `yaml:",inline"`
-	EgressAllow     []string      `yaml:"egress_allow"`
-	MemoryLimit     host.ByteSize `yaml:"memory_limit"`
-	MemorySoftLimit host.ByteSize `yaml:"memory_soft_limit"`
+	Root          string `yaml:"root"`
+	HooksPoolSize *int   `yaml:"hooks_pool_size"`
+	Limits        `yaml:",inline"`
+	EgressAllow   []string `yaml:"egress_allow"`
 }
 
 // Section is the key of the `pocker` section.
 var Section = ceplugin.NewSectionFunc("pocker", func() SectionConfig {
 	d := DefaultConfig()
 	return SectionConfig{Root: d.PBRoot, HooksPoolSize: d.HooksPoolSize, Limits: d.Limits}
-}, "Runtime provider pocker: instances run in-process (root folder, hooks pool, memory limit, egress allow list, instance limit defaults).")
+}, "Runtime provider pocker: instances run in-process (root folder, hooks pool, egress allow list, instance limit defaults).")
 
 // Provider is pocker as a runtime provider for ext/host (`provider: pocker`). The fields are the host application's
 // extensions, as on [Server].
@@ -60,7 +57,6 @@ func (p *Provider) Prepare(h *host.Host) error {
 	if sc.HooksPoolSize != nil {
 		cfg.HooksPoolSize = sc.HooksPoolSize
 	}
-	cfg.MemoryLimit, cfg.MemorySoftLimit = int64(sc.MemoryLimit), int64(sc.MemorySoftLimit)
 	if h.Logger == nil {
 		h.Logger = slog.Default()
 	}

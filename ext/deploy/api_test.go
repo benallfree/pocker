@@ -460,7 +460,7 @@ func TestAPIFiles(t *testing.T) {
 		t.Fatalf("list: %v", paths)
 	}
 	r = f.do("GET", Prefix+"/files/raw?path=pb_hooks/main.pb.js", nil)
-	if r.status != 200 || string(r.raw) != "hook" || r.header.Get("X-PH-Mtime") == "" {
+	if r.status != 200 || string(r.raw) != "hook" || r.header.Get("X-File-Mtime") == "" {
 		t.Fatalf("raw: %d %s", r.status, r.raw)
 	}
 	if r = f.do("GET", Prefix+"/files/raw?path=pb_data/data.db", nil); r.status != 409 {

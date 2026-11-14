@@ -90,7 +90,6 @@ instances:
 	addr := freeAddr(t)
 	cfg := DefaultConfig()
 	cfg.Listen, cfg.PBRoot, cfg.InstancesFile = addr, root, instances
-	cfg.MemorySoftLimit = -1
 	srv := &Server{
 		Config: cfg,
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
@@ -228,7 +227,6 @@ func TestTLSRedirectAndReload(t *testing.T) {
 	cfg.Listen, cfg.PBRoot, cfg.Dev = addr, filepath.Join(dir, "pb"), true
 	cfg.PlainListen = []string{plainAddr}
 	cfg.InstancesFile = filepath.Join(dir, "none.yaml")
-	cfg.MemorySoftLimit = -1
 	cfg.TLS = TLSConfig{Cert: certPath, Key: keyPath, HTTPListen: httpAddr}
 	srv := &Server{Config: cfg, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -306,7 +304,6 @@ func TestServerAppIniterPlugin(t *testing.T) {
 	addr := freeAddr(t)
 	cfg := DefaultConfig()
 	cfg.Listen, cfg.PBRoot, cfg.InstancesFile = addr, root, instances
-	cfg.MemorySoftLimit = -1
 	p := initPlugin{calls: make(chan string, 4)}
 	srv := &Server{Config: cfg, Logger: slog.New(slog.NewTextHandler(io.Discard, nil)), Plugins: []Plugin{p}}
 	ctx, cancel := context.WithCancel(context.Background())
@@ -349,7 +346,7 @@ func (c *countingSource) Snapshot(ctx context.Context) ([]Instance, error) {
 func TestServerSnapshotsOnce(t *testing.T) {
 	addr := freeAddr(t)
 	cfg := DefaultConfig()
-	cfg.Listen, cfg.PBRoot, cfg.MemorySoftLimit = addr, t.TempDir(), -1
+	cfg.Listen, cfg.PBRoot = addr, t.TempDir()
 	src := &countingSource{staticSource: staticSource{{ID: "one", Hosts: []string{"one.test"}}}}
 	srv := &Server{Config: cfg, Source: src, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))}
 	ctx, cancel := context.WithCancel(context.Background())

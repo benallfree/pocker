@@ -44,7 +44,7 @@ type Config struct {
 
 	// Limits are the defaults for every instance; an instance's own limits (from the instance source) override
 	// them field by field. Keys: max_js_execution, max_js_allocation, max_call_stack_size, max_sleep,
-	// max_query_duration, http_send_max_timeout, http_send_max_body, quarantine.
+	// max_query_duration, http_send_max_timeout, http_send_max_body.
 	Limits `yaml:",inline"`
 
 	// EgressAllow lists private networks apps may still connect to (default none: public addresses only).
@@ -53,13 +53,6 @@ type Config struct {
 	// TLS: certificate files for HTTPS, and an optional HTTP redirect listener. (Automatic certificates are the
 	// autotls plugin, which reads its own keys under `tls:`.)
 	TLS TLSConfig `yaml:"tls"`
-
-	// MemoryLimit sets the Go runtime's soft memory limit (GOMEMLIMIT) in bytes (default 0 = leave as is).
-	MemoryLimit int64 `yaml:"memory_limit"`
-
-	// MemorySoftLimit is the live-heap level at which the memory watch starts interrupting long JS calls and
-	// striking their instances (default 70% of memory_limit, or 1 GiB without one; negative disables the watch).
-	MemorySoftLimit int64 `yaml:"memory_soft_limit"`
 
 	// doc is the whole config file, for plugins that own their own keys (see [Configurer]).
 	doc *yaml.Node
@@ -122,12 +115,6 @@ func LoadConfig(path string) (Config, error) {
 	if fromFile.EgressAllow != nil {
 		cfg.EgressAllow = fromFile.EgressAllow
 	}
-	if fromFile.MemoryLimit > 0 {
-		cfg.MemoryLimit = fromFile.MemoryLimit
-	}
-	if fromFile.MemorySoftLimit != 0 {
-		cfg.MemorySoftLimit = fromFile.MemorySoftLimit
-	}
 	var doc yaml.Node
 	if err := yaml.Unmarshal(raw, &doc); err == nil && len(doc.Content) > 0 {
 		cfg.doc = &doc
@@ -137,7 +124,6 @@ func LoadConfig(path string) (Config, error) {
 
 // DefaultLimits are the built-in per-instance limits.
 func DefaultLimits() Limits {
-	q := DefaultQuarantine
 	return Limits{
 		MaxJSExecution:     30 * time.Second,
 		MaxJSAllocation:    64 << 20,
@@ -146,7 +132,6 @@ func DefaultLimits() Limits {
 		MaxQueryDuration:   30 * time.Second,
 		HTTPSendMaxTimeout: 60 * time.Second,
 		HTTPSendMaxBody:    10 << 20,
-		Quarantine:         &q,
 		MaxConcurrentJS:    16,
 	}
 }

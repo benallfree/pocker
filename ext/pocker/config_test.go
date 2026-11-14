@@ -22,7 +22,7 @@ max_js_execution: 5s
 egress_allow: [10.0.0.0/8]
 firewall: { allow_cidrs: [10.0.0.0/8], rate_limit_header_prefix: X-Test } # a plugin's key: kept in Doc()
 tls: { cert: /c.pem, key: /k.pem, http_listen: ":9081" }
-memory_limit: 1000
+memory_limit: 1000 # removed keys: ignored, as old configs still carry them
 memory_soft_limit: 500
 `
 	if err := os.WriteFile(p, []byte(yaml), 0o644); err != nil {

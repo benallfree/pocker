@@ -28,10 +28,7 @@ instances:
       max_js_execution: 60s
       max_js_allocation: 128MiB
       http_send_max_body: 1.5MB
-      quarantine: { strikes: 5, max_pause: 1h }
-  - id: mine
-    limits:
-      quarantine: off
+      quarantine: { strikes: 5, max_pause: 1h } # removed key: ignored, as old configs still carry it
 `), &f)
 	if err != nil {
 		t.Fatal(err)
@@ -43,25 +40,19 @@ instances:
 	if shop.MaxQueryDuration != 30*time.Second || shop.MaxSleep != 10*time.Second {
 		t.Fatalf("shop defaults: %+v", shop)
 	}
-	if q := shop.Quarantine; q.Off || q.Strikes != 5 || q.MaxPause != time.Hour || q.FirstPause != 30*time.Second {
-		t.Fatalf("shop quarantine: %+v", *q)
-	}
-	if q := f.Instances[1].Limits.Over(DefaultLimits()).Quarantine; !q.Off {
-		t.Fatalf("quarantine: off not applied: %+v", *q)
-	}
 
 	// process-wide config overrides the built-in defaults; instances override the process
 	dir := t.TempDir()
 	cfgPath := filepath.Join(dir, "pocker.yaml")
-	if err := os.WriteFile(cfgPath, []byte("max_js_execution: 5s\nquarantine: { first_pause: 1m }\n"), 0o644); err != nil {
+	if err := os.WriteFile(cfgPath, []byte("max_js_execution: 5s\nmemory_limit: 1200000000\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	cfg, err := LoadConfig(cfgPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.MaxJSExecution != 5*time.Second || cfg.Quarantine.FirstPause != time.Minute || cfg.Quarantine.Strikes != 3 {
-		t.Fatalf("config limits: %+v / %+v", cfg.Limits, *cfg.Quarantine)
+	if cfg.MaxJSExecution != 5*time.Second { // memory_limit (removed) is ignored
+		t.Fatalf("config limits: %+v", cfg.Limits)
 	}
 	if got := shop.Over(cfg.Limits).MaxJSExecution; got != time.Minute {
 		t.Fatalf("instance must win over config, got %s", got)

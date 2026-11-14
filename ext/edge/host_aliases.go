@@ -14,29 +14,28 @@ import (
 )
 
 type (
-	Instance         = host.Instance
-	Access           = host.Access
-	Superuser        = host.Superuser
-	Blocked          = host.Blocked
-	ChangeKind       = host.ChangeKind
-	Change           = host.Change
-	InstanceSource   = host.InstanceSource
-	Limits           = host.Limits
-	QuarantinePolicy = host.QuarantinePolicy
-	ByteSize         = host.ByteSize
-	Gate             = host.Gate
-	TLSProvider      = host.TLSProvider
-	Wrapper          = host.Wrapper
-	Directory        = host.Directory
-	Runtime          = host.Runtime
-	Prechecker       = host.Prechecker
-	Syncer           = host.Syncer
-	Shutdowner       = host.Shutdowner
-	Statser          = host.Statser
-	Handler          = host.Handler
-	TLSConfig        = host.TLSConfig
-	TimingEntry      = host.TimingEntry
-	Listeners        = host.Listeners
+	Instance       = host.Instance
+	Access         = host.Access
+	Superuser      = host.Superuser
+	Blocked        = host.Blocked
+	ChangeKind     = host.ChangeKind
+	Change         = host.Change
+	InstanceSource = host.InstanceSource
+	Limits         = host.Limits
+	ByteSize       = host.ByteSize
+	Gate           = host.Gate
+	TLSProvider    = host.TLSProvider
+	Wrapper        = host.Wrapper
+	Directory      = host.Directory
+	Runtime        = host.Runtime
+	Prechecker     = host.Prechecker
+	Syncer         = host.Syncer
+	Shutdowner     = host.Shutdowner
+	Statser        = host.Statser
+	Handler        = host.Handler
+	TLSConfig      = host.TLSConfig
+	TimingEntry    = host.TimingEntry
+	Listeners      = host.Listeners
 )
 
 const (
@@ -44,8 +43,6 @@ const (
 	Delete            = host.Delete
 	DefaultHealthPath = host.DefaultHealthPath
 )
-
-var DefaultQuarantine = host.DefaultQuarantine
 
 func ParseByteSize(s string) (ByteSize, error)       { return host.ParseByteSize(s) }
 func ChainGates(gates ...Gate) Gate                  { return host.ChainGates(gates...) }

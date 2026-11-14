@@ -119,7 +119,6 @@ func TestServerAutoTLSRefusesUnmappedSNI(t *testing.T) {
 	addr, httpAddr := freeAddr(t), freeAddr(t)
 	cfg := pocker.DefaultConfig()
 	cfg.Listen, cfg.PBRoot, cfg.InstancesFile = addr, root, instances
-	cfg.MemorySoftLimit = -1
 	cfg.TLS.HTTPListen = httpAddr
 	auto := New()
 	auto.Config = Config{Auto: true, Email: "ops@example.com", CA: "letsencrypt-staging"}

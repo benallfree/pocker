@@ -36,7 +36,7 @@ PocketBase (or PocketOne) binary of the version it asks for, so one host serves 
   version, mounts; a routing-only change doesn't restart it), stops when the instance is deleted or moves to another
   edge. Containers keep running across an edge restart: the next process adopts them by label (`adopt_image` also
   adopts unlabeled containers of an image, for taking over from another manager).
-- **Limits and hardening** (optional): memory, CPUs, pids, nofile, dropped capabilities, no-new-privileges.
+- **Limits and hardening** (optional): CPUs, pids, nofile, dropped capabilities, no-new-privileges.
 - **Logs:** container output goes to `OnLog` (default: the edge's debug log).
 
 A host that runs docker sends every instance to it (one provider per process): `provider: docker` with a `docker`

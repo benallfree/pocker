@@ -171,7 +171,6 @@ type hostConfig struct {
 	Init           bool                     `json:"Init"`
 	AutoRemove     bool                     `json:"AutoRemove"`
 	Ulimits        []ulimit                 `json:"Ulimits,omitempty"`
-	Memory         int64                    `json:"Memory,omitempty"`
 	NanoCPUs       int64                    `json:"NanoCpus,omitempty"`
 	PidsLimit      int64                    `json:"PidsLimit,omitempty"`
 	CapDrop        []string                 `json:"CapDrop,omitempty"`

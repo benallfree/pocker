@@ -46,10 +46,8 @@ type Manager struct {
 
 	held map[string]chan struct{} // by ID: instances under maintenance; requests wait for the channel to close
 
-	mu     sync.RWMutex
-	qstate map[string]*quarantineState // by ID
-	paused map[string]time.Time        // by ID: quarantined until
-	apps   map[string]*appSlot         // by ID
+	mu   sync.RWMutex
+	apps map[string]*appSlot // by ID
 }
 
 var (
@@ -78,7 +76,7 @@ type ManagerOptions struct {
 	HooksPoolSize int
 	// Defaults are the per-instance limits used where an instance doesn't set its own (zero = DefaultLimits).
 	Defaults Limits
-	// OnEvent receives instance events (memory strikes, pauses, restarts), e.g. to log them or notify the owner.
+	// OnEvent receives instance events (started, stopped, restarts), e.g. to log them or notify the owner.
 	OnEvent func(Event)
 	// Gate, if set, admits requests: a peer check before routing, and per-instance admission (e.g. rate limits)
 	// before an instance is served here or forwarded (see [Gate]).
@@ -111,8 +109,6 @@ func NewManager(source InstanceSource, opts ManagerOptions) *Manager {
 		defaults: defaults,
 		onEvent:  opts.OnEvent,
 		gate:     opts.Gate,
-		qstate:   map[string]*quarantineState{},
-		paused:   map[string]time.Time{},
 		held:     map[string]chan struct{}{},
 		log:      opts.Logger,
 		apps:     map[string]*appSlot{},
@@ -230,16 +226,11 @@ func (m *Manager) app(inst Instance) (*runningApp, error) {
 // ServeHTTP serves the edge pipeline (resolve by Host, gates, forwarding) with the Manager as the only runtime.
 func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) { m.handler.ServeHTTP(w, r) }
 
-// Precheck implements [host.Prechecker]: instances under maintenance or paused answer 503 before the gates.
+// Precheck implements [host.Prechecker]: instances under maintenance answer 503 before the gates.
 func (m *Manager) Precheck(w http.ResponseWriter, r *http.Request, inst Instance) bool {
 	if err := m.waitHeld(r.Context(), inst.ID); err != nil {
 		w.Header().Set("Retry-After", "5")
 		http.Error(w, "this instance is being updated; retry shortly", http.StatusServiceUnavailable)
-		return false
-	}
-	if until, paused := m.pausedUntil(inst.ID); paused {
-		w.Header().Set("Retry-After", fmt.Sprint(int(time.Until(until).Seconds())+1))
-		http.Error(w, "this instance is paused for using too much memory; retry later", http.StatusServiceUnavailable)
 		return false
 	}
 	return true
@@ -363,32 +354,22 @@ type Event struct {
 	Kind       EventKind
 	InstanceID string
 	Reason     string
-	Until      time.Time // EventPaused: when requests are served again
-	Strikes    int       // EventStrike: strikes within the window so far
 }
 
 // EventKind names an [Event].
 type EventKind string
 
 const (
-	EventStrike    EventKind = "memory_strike" // a JS call was interrupted by the memory watch
-	EventPaused    EventKind = "paused"        // too many strikes: app stopped, requests get 503 until Until
-	EventRestarted EventKind = "restarted"     // settings changed: the app restarts on its next request
-	EventStarted   EventKind = "started"       // the app started and serves requests
-	EventFailed    EventKind = "failed"        // the app failed to start (Reason has the error)
-	EventStopped   EventKind = "stopped"       // the instance became blocked (e.g. powered off): its app was stopped
+	EventRestarted EventKind = "restarted" // settings changed: the app restarts on its next request
+	EventStarted   EventKind = "started"   // the app started and serves requests
+	EventFailed    EventKind = "failed"    // the app failed to start (Reason has the error)
+	EventStopped   EventKind = "stopped"   // the instance became blocked (e.g. powered off): its app was stopped
 )
 
 func (m *Manager) emit(e Event) {
 	if m.onEvent != nil {
 		m.onEvent(e)
 	}
-}
-
-type quarantineState struct {
-	strikes    []time.Time
-	level      int // quarantines so far (pause backoff)
-	lastStrike time.Time
 }
 
 // sameRuntime reports whether two versions of an instance can share a running app.
@@ -406,76 +387,6 @@ func retire(slot *appSlot) {
 	}
 	time.Sleep(10 * time.Second)
 	stopApp(slot.app)
-}
-
-// Strike records a memory strike against an instance (from the [MemoryWatch]). With the instance's quarantine
-// policy, enough strikes within the window pause it: its app is stopped to free memory and requests get 503 until
-// the pause ends. Pauses back off on repeat quarantines and the backoff resets after a quiet period.
-func (m *Manager) Strike(id string) {
-	now := time.Now()
-	m.mu.Lock()
-	inst, _ := m.dir.Get(id)
-	policy := *inst.Limits.Over(m.defaults).Quarantine
-	st := m.qstate[id]
-	if st == nil {
-		st = &quarantineState{}
-		m.qstate[id] = st
-	}
-	if !st.lastStrike.IsZero() && now.Sub(st.lastStrike) > policy.ResetAfter {
-		st.level = 0
-	}
-	st.lastStrike = now
-	recent := st.strikes[:0]
-	for _, t := range st.strikes {
-		if now.Sub(t) < policy.Window {
-			recent = append(recent, t)
-		}
-	}
-	st.strikes = append(recent, now)
-	count := len(st.strikes)
-
-	var slot *appSlot
-	var until time.Time
-	if !policy.Off && count >= policy.Strikes {
-		until = now.Add(policy.PauseFor(st.level))
-		st.level++
-		st.strikes = nil
-		m.paused[id] = until
-		slot = m.apps[id]
-		delete(m.apps, id)
-	}
-	m.mu.Unlock()
-
-	m.log.Warn("pocker: memory strike", "id", id, "strikes", count)
-	m.emit(Event{Kind: EventStrike, InstanceID: id, Strikes: count, Reason: "memory"})
-	if !until.IsZero() {
-		m.log.Warn("pocker: instance paused for memory", "id", id, "until", until)
-		m.emit(Event{Kind: EventPaused, InstanceID: id, Until: until, Reason: "memory"})
-		if slot != nil {
-			go func() {
-				<-slot.done
-				if slot.app != nil {
-					stopApp(slot.app)
-				}
-			}()
-		}
-	}
-}
-
-func (m *Manager) pausedUntil(id string) (time.Time, bool) {
-	m.mu.RLock()
-	until, ok := m.paused[id]
-	m.mu.RUnlock()
-	if !ok {
-		return time.Time{}, false
-	}
-	if time.Now().After(until) {
-		m.mu.Lock()
-		delete(m.paused, id)
-		m.mu.Unlock()
-		return time.Time{}, false
-	}
-	return until, true
 }
 
 // InstanceDir returns the folder of a known instance (<pbRoot>/<id> unless the instance sets Dir).

@@ -200,7 +200,7 @@ func TestSandboxHoldsInPages(t *testing.T) {
 	runaway := map[string]string{
 		"/loop":    "execution timeout",        // MaxJSExecution
 		"/alloc":   "not allowed on this host", // MaxJSAllocation: one huge allocation is refused
-		"/grow":    "execution timeout",        // steady growth: bounded by the time limit (and pocker's memory watch)
+		"/grow":    "execution timeout",        // steady growth: bounded by the time limit
 		"/recurse": "recurse.ejs",              // MaxCallStackSize
 		"/self":    "nested more than 64 deep", // pages' own include guard
 	}

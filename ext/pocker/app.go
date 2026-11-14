@@ -120,7 +120,6 @@ func startApp(opts appOptions, inst Instance) (r *runningApp, err error) {
 		HTTPSendMaxTimeout: int(lim.HTTPSendMaxTimeout / time.Second),
 		HTTPSendMaxBody:    int64(lim.HTTPSendMaxBody),
 		MaxConcurrent:      lim.MaxConcurrentJS,
-		Owner:              inst.ID,
 		Console:            openInstanceLog(dir).Write,
 	}
 	err = jsvm.Register(app, jsvm.Config{

@@ -64,7 +64,6 @@ type Config struct {
 	StopGrace           time.Duration // SIGINT, then kill after this (default 10s)
 
 	// Per-container limits (0 = unlimited / Docker's default).
-	Memory     int64 // bytes
 	NanoCPUs   int64
 	PidsLimit  int64
 	NofileSoft int64
@@ -547,7 +546,6 @@ func (rt *Runtime) containerConfig(ctx context.Context, inst host.Instance) (con
 		PortBindings: map[string][]portBinding{"8090/tcp": {{HostIP: rt.cfg.HostIP, HostPort: ""}}},
 		Init:         true,
 		AutoRemove:   true,
-		Memory:       rt.cfg.Memory,
 		NanoCPUs:     rt.cfg.NanoCPUs,
 		PidsLimit:    rt.cfg.PidsLimit,
 		CapDrop:      rt.cfg.CapDrop,

@@ -62,8 +62,6 @@ instances_file: "./instances.yaml"
 hooks_pool_size: 2
 shutdown_timeout: 10s
 egress_allow: []          # private networks apps may still reach (default none)
-memory_limit: 0           # Go soft memory limit (GOMEMLIMIT) in bytes; 0 = leave as is
-memory_soft_limit: 0      # live heap where the memory watch steps in; 0 = 70% of memory_limit or 1 GiB
 
 # default limits for every instance (each instance can override them, see below)
 max_js_execution: 30s     # any single JS call (hook, route, cron, migration)
@@ -73,7 +71,6 @@ max_sleep: 10s
 max_query_duration: 30s   # any SQL statement without its own deadline
 http_send_max_timeout: 60s
 http_send_max_body: 10MiB
-quarantine: { strikes: 3, window: 10m, first_pause: 30s, max_pause: 15m, reset_after: 1h }   # or: quarantine: off
 max_concurrent_js: 16     # JS calls an instance runs at once; more wait up to max_js_execution, then fail
 # the keys below are read by plugins: rate_limits/firewall by ext/firewall, edges by ext/edge, tls.auto... by ext/autotls
 rate_limits:              # per client IP and per instance; trusted clients get the trusted set
@@ -127,10 +124,6 @@ instances:
     limits:
       max_js_execution: 60s
       max_js_allocation: 128MiB
-      quarantine: { strikes: 5 }
-  - id: my-own-app
-    hosts: [mine.example.com]
-    limits: { quarantine: off }   # only interrupt, never pause
   - id: api
     hosts: [api.example.com]
     access: { cors_origins: [https://app.example.com] }
@@ -199,8 +192,7 @@ private network, and `Manager.Firewall()` lets host routes in front of the Manag
 
 Every instance's JS hooks and migrations run in a sandbox (the [sandbox](../sandbox/README.md) plugin), and its SQL runs behind
 SQLite's authorizer ([`sandbox/sqlguard.go`](../sandbox/sqlguard.go)). The sandbox plugin also owns the egress policy
-([`sandbox/egress.go`](../sandbox/egress.go)) and the memory watch ([`sandbox/memwatch.go`](../sandbox/memwatch.go)); pocker turns
-them on for its instances. [`sandbox_test.go`](sandbox_test.go) runs one attack per
+([`sandbox/egress.go`](../sandbox/egress.go)); pocker turns it on for its instances. [`sandbox_test.go`](sandbox_test.go) runs one attack per
 route from one instance against another instance and the host; all of these are refused:
 
 | Area | What the sandbox does |
@@ -212,13 +204,12 @@ route from one instance against another instance and the host; all of these are 
 | Raw SQL (`$app.db().newQuery`) | Allowed. SQLite's authorizer refuses `ATTACH` (and `VACUUM INTO`) outside the instance's `pb_data`, `PRAGMA temp_store_directory/data_store_directory` and `load_extension`; the CLI-only `readfile`/`writefile`/`fsdir` don't exist in the library. Statements without a deadline get `max_query_duration`. |
 | CPU | Every JS call is interrupted after `max_js_execution`; `sleep()` is capped at 10 s. |
 | Memory, one shot | Built-ins that allocate a large result in one step refuse results over `max_js_allocation`: `String.repeat/padStart/padEnd`, `Array.join/toString`, `ArrayBuffer`, typed arrays (incl. array-likes, `.from`, and reaching the constructor through an instance), `Buffer.alloc*` / `new Buffer`, `$os.readFile`, `fileFromPath`, `readerToString`/`toBytes` limits. Recursion depth is capped (a JS stack overflow would otherwise crash the Go process). |
-| Memory, gradual | goja has no per-VM heap accounting, so `sandbox/memwatch.go` watches the process heap every 50 ms. Above `memory_soft_limit` and still growing, it interrupts JS calls running longer than 100 ms and strikes their instances (above 1.4x, every JS call). With the instance's quarantine policy (default 3 strikes in 10 minutes) it is paused: its app is stopped and requests get 503 with `Retry-After`. Pauses back off (30 s, 1 m, 2 m, ... up to 15 m) and reset after an hour without strikes; `quarantine: off` only interrupts. Strikes, pauses and restarts are reported as events (`Server.OnEvent`, or an instance source implementing `EventSink`). |
+| Memory, gradual | Not limited. goja has no per-VM memory accounting, so a hook's gradual growth counts against the whole process; the process can use the host's swap, and the OS is the last line. (A memory watch with strikes and quarantine was removed on 2026-11-14: it could fail requests where swap would have absorbed them, and it never fired in production.) |
 | Outbound network: `$http.send`, `$filesystem.fileFromURL`, S3 storage and backups, OAuth2/JWK fetches, SMTP | Public addresses only, checked on the address actually connected to (after DNS, so rebinding doesn't help): loopback, private ranges, link-local and cloud metadata, CGNAT, multicast, reserved and documentation ranges, and IPv6 equivalents/IPv4-in-IPv6 are refused unless listed in `egress_allow`. Installed process-wide on Go's default HTTP transport and PocketBase's SMTP client (`pocker/egress.go`). Host code that must reach private addresses (e.g. a control plane over a private network) uses its own `http.Client` with its own transport. `$http.send` timeouts and response bodies are capped. |
 
-**Limits of the memory controls:** the watch attributes growth to whoever is running JS at the time (usually right,
-not guaranteed), and a hook that allocates faster than the 50 ms sample through a path not covered by the one-shot caps
-could still push the process over its limit. Set `memory_limit` and run Pocker under a cgroup memory limit so the worst
-case is a restart, not a host OOM.
+**Limits of the memory controls:** only one-shot allocations are capped. A hook that grows memory gradually slows or,
+past swap, restarts the whole process (every instance in it) rather than failing alone; per-instance memory accounting
+needs a goja with a memory API, or one process per instance (the docker provider).
 
 **Not covered yet:** per-instance concurrency limits, and OS-level defence in depth: run Pocker as a non-root user with an
 OS firewall that only lets that user reach public addresses (a second, independent egress layer), plus seccomp and

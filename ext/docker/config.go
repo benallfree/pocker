@@ -21,7 +21,6 @@ import (
 //	  default_version: "p1:0.0.*"           # for instances without one (pb: upstream, p1: PocketOne)
 //	  idle_ttl: 10m
 //	  max_concurrent_starts: 4
-//	  memory: 512MiB
 //	  pids_limit: 256
 //	  nofile: [4096, 8192]
 //	  cap_drop: [ALL]
@@ -38,7 +37,6 @@ type SectionConfig struct {
 	IdleTTL             time.Duration `yaml:"idle_ttl"`
 	MaxConcurrentStarts int           `yaml:"max_concurrent_starts"`
 	StartTimeout        time.Duration `yaml:"start_timeout"`
-	Memory              host.ByteSize `yaml:"memory"`
 	NanoCPUs            int64         `yaml:"nano_cpus"`
 	PidsLimit           int64         `yaml:"pids_limit"`
 	Nofile              []int64       `yaml:"nofile"`
@@ -65,7 +63,7 @@ func ConfigFromSection(sc SectionConfig, resolve func(string) string, log *slog.
 		Socket: sc.Socket, Image: sc.Image, DataRoot: resolve(sc.Root), Home: sc.Home, Binaries: b,
 		Versions:       YAMLVersions{Tracked: sc.Versions, Root: b.Root},
 		DefaultVersion: sc.DefaultVersion, IdleTTL: sc.IdleTTL, MaxConcurrentStarts: sc.MaxConcurrentStarts,
-		StartTimeout: sc.StartTimeout, Memory: int64(sc.Memory), NanoCPUs: sc.NanoCPUs, PidsLimit: sc.PidsLimit,
+		StartTimeout: sc.StartTimeout, NanoCPUs: sc.NanoCPUs, PidsLimit: sc.PidsLimit,
 		CapDrop: sc.CapDrop, NoNewPrivileges: sc.NoNewPrivileges, Network: sc.Network, AdoptImage: sc.AdoptImage,
 		Logger: log,
 	}

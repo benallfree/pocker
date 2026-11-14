@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/netip"
-	"runtime/debug"
 
 	"github.com/pockethost/pocketone/ext/host"
 	"github.com/pockethost/pocketone/ext/sandbox"
@@ -22,7 +21,7 @@ type Server struct {
 	Logger  *slog.Logger
 	Manager *Manager // set by Run
 
-	// OnEvent, if set, receives instance events (memory strikes, pauses, restarts). An instance source that
+	// OnEvent, if set, receives instance events (started, stopped, restarts). An instance source that
 	// implements [EventSink] receives them too.
 	OnEvent func(Event)
 
@@ -90,7 +89,7 @@ func (s *Server) Run(ctx context.Context) error {
 }
 
 // prepare makes h run its instances in-process: plugins, the egress policy, the Manager as h's runtime, wrappers,
-// background work (plugin starters, the memory watch). h's Source, Gates, Forward, Dev, Listeners and Logger are
+// background work (plugin starters). h's Source, Gates, Forward, Dev, Listeners and Logger are
 // already set; plugin gates are added after h's.
 func (s *Server) prepare(h *host.Host) error {
 	log := h.Logger
@@ -198,20 +197,6 @@ func (s *Server) prepare(h *host.Host) error {
 	for _, st := range starters {
 		h.Background = append(h.Background, func(ctx context.Context) { st.Start(ctx, s.Manager) })
 	}
-	if s.Config.MemoryLimit > 0 {
-		debug.SetMemoryLimit(s.Config.MemoryLimit)
-	}
-	soft := s.Config.MemorySoftLimit
-	if soft == 0 {
-		soft = 1 << 30
-		if s.Config.MemoryLimit > 0 {
-			soft = s.Config.MemoryLimit * 7 / 10
-		}
-	}
-	if soft > 0 {
-		watch := &sandbox.MemoryWatch{SoftLimit: uint64(soft), OnStrike: s.Manager.Strike, Logger: log}
-		h.Background = append(h.Background, func(ctx context.Context) { watch.Run(ctx) })
-	}
 	h.OnListen = func(addr string) {
 		log.Info("pocker: listening", "addr", addr, "pb_root", s.Config.PBRoot, "dev", s.Config.Dev)
 	}
@@ -226,7 +211,7 @@ type EventSink interface {
 func (s *Server) onEvent(source InstanceSource, log *slog.Logger) func(Event) {
 	sink, _ := source.(EventSink)
 	return func(e Event) {
-		log.Info("pocker: event", "kind", e.Kind, "id", e.InstanceID, "reason", e.Reason, "until", e.Until, "strikes", e.Strikes)
+		log.Info("pocker: event", "kind", e.Kind, "id", e.InstanceID, "reason", e.Reason)
 		if s.OnEvent != nil {
 			s.OnEvent(e)
 		}
