@@ -182,6 +182,17 @@ func (d *Directory) Get(id string) (Instance, bool) {
 	return inst, ok
 }
 
+// List returns every instance (in no particular order).
+func (d *Directory) List() []Instance {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+	out := make([]Instance, 0, len(d.instances))
+	for _, inst := range d.instances {
+		out = append(out, inst)
+	}
+	return out
+}
+
 // Len is the number of instances.
 func (d *Directory) Len() int {
 	d.mu.RLock()

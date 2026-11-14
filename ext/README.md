@@ -26,6 +26,7 @@ Each folder here will be one plugin, with its own Go module (`github.com/pocketh
 | [`config`](config/README.md) | `pocketone.yaml` with sections owned by plugins (typed keys; read only through the owner's key) and a private `.env` for secrets; `pocketbase config`. | Every binary (stock in `pocketbase`) |
 | [`docker`](docker/README.md) | Runtime provider for a host: each instance in its own container with an official PocketBase or PocketOne binary of its version (`pb:`/`ce:`), idle stop, adoption across restarts. | Host (one provider per process), Docker |
 | [`host`](host/README.md) | The multi-instance host: instances by hostname, the request front, listeners/TLS, gates, and the runtime contract; exactly one provider (pocker or docker). | Many-instance binaries |
+| [`lifecycle`](lifecycle/README.md) | Instance data on a host: facts (disk used, last request served) reported to a sink, and decisions from a policy provider (local YAML rules, or a control plane's). First step: measuring. | Any host |
 | [`firewall`](firewall/README.md) | Peer allow-lists, trusted proxies and per-IP and per-instance rate limits for a host; turns on with `firewall:` / `rate_limits:`. | Any host, with or without edge |
 | [`edge`](edge/README.md) | The fleet layer: forwarding to the owner edge, edges from YAML or a mothership. | On a host (pocker or docker) |
 | [`autotls`](autotls/README.md) | Automatic certificates through ACME: on demand for every served hostname, wildcards through DNS-01, more CAs. | Single app, or many under pocker |
