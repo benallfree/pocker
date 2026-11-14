@@ -103,6 +103,7 @@ type Runtime struct {
 
 	mu    sync.Mutex
 	ctrs  map[string]*ctr
+	held  map[string]chan struct{} // instances under maintenance (WithInstanceStopped)
 	ready atomic.Bool
 
 	bg     context.Context

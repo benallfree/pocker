@@ -2,10 +2,12 @@ package docker
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -113,5 +115,54 @@ instances:
 	// the instances' data lives in their folders under the data root
 	if _, err := os.Stat(filepath.Join(data, "cehostce", "pb_data", "data.db")); err != nil {
 		t.Fatalf("data folder: %v", err)
+	}
+}
+
+// Maintenance: WithInstanceStopped stops the container and holds requests; StartInstance starts it again.
+func TestMaintenance(t *testing.T) {
+	socket := dockerSocket(t)
+	rt, err := New(Config{Socket: socket, Image: "alpine:3.20", DataRoot: t.TempDir(), Binaries: testBinaries(t),
+		Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	t.Cleanup(func() { _ = rt.e.remove(context.Background(), "p4maint") })
+	if err := rt.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer rt.Shutdown()
+	inst := host.Instance{ID: "p4maint", Version: "p1:0.0.*"}
+	if err := rt.StartInstance(ctx, inst); err != nil || !rt.Running(inst.ID) {
+		t.Fatalf("start: %v running=%v", err, rt.Running(inst.ID))
+	}
+	inFn := make(chan struct{})
+	done := make(chan error, 1)
+	go func() {
+		done <- rt.WithInstanceStopped(ctx, inst.ID, func(dir string) error {
+			if dir != rt.InstanceDir(inst.ID) || rt.Running(inst.ID) {
+				return fmt.Errorf("fn ran with dir %s, running %v", dir, rt.Running(inst.ID))
+			}
+			close(inFn)
+			time.Sleep(300 * time.Millisecond)
+			return nil
+		})
+	}()
+	<-inFn
+	// a request while held waits for the release, then the instance serves again
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "http://p4maint.test/api/health", nil)
+	start := time.Now()
+	if !rt.Precheck(w, r, inst) || time.Since(start) < 100*time.Millisecond {
+		t.Fatalf("precheck didn't hold: %v after %s", w.Code, time.Since(start))
+	}
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	if err := rt.WithInstanceStopped(ctx, inst.ID, func(string) error { return nil }); err != nil {
+		t.Fatal(err)
+	}
+	if code, _ := get(t, rt, inst, "/api/health"); code != 200 {
+		t.Fatalf("after maintenance: %d", code)
 	}
 }
