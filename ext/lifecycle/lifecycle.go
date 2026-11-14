@@ -156,24 +156,22 @@ func (l *Lifecycle) Run(ctx context.Context) {
 			l.seed(facts)
 		}
 	}
-	tick := time.NewTicker(time.Minute)
-	defer tick.Stop()
 	lastReport := l.now()
 	for {
-		if ctx.Err() != nil {
-			return
-		}
+		wait := time.Minute
 		if l.Directory.Ready() {
 			l.Step(ctx)
 			if l.now().Sub(lastReport) >= l.Policy.ReportEvery() {
 				l.reportActive(ctx)
 				lastReport = l.now()
 			}
+		} else {
+			wait = time.Second // the instance list is still loading
 		}
 		select {
 		case <-ctx.Done():
 			return
-		case <-tick.C:
+		case <-time.After(wait):
 		}
 	}
 }

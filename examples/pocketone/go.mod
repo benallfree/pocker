@@ -14,6 +14,7 @@ require (
 	github.com/pockethost/pocketone/ext/firewall v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketone/ext/host v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketone/ext/jserrors v0.0.0-00010101000000-000000000000
+	github.com/pockethost/pocketone/ext/lifecycle v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketone/ext/mailtrap v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketone/ext/mcp v0.0.0-00010101000000-000000000000
 	github.com/pockethost/pocketone/ext/mothership v0.0.0-00010101000000-000000000000
@@ -155,3 +156,5 @@ replace github.com/pockethost/pocketone/ext/mothership => ../../ext/mothership
 replace github.com/pockethost/pocketone/ext/servertiming => ../../ext/servertiming
 
 replace github.com/pockethost/pocketone/ext/upgrade => ../../ext/upgrade
+
+replace github.com/pockethost/pocketone/ext/lifecycle => ../../ext/lifecycle

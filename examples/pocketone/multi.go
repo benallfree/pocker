@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 
 	"github.com/pockethost/pocketone/ext/autotls"
@@ -15,6 +16,7 @@ import (
 	"github.com/pockethost/pocketone/ext/edge"
 	_ "github.com/pockethost/pocketone/ext/firewall" // turns on with a firewall / rate_limits section
 	"github.com/pockethost/pocketone/ext/host"
+	"github.com/pockethost/pocketone/ext/lifecycle"
 	"github.com/pockethost/pocketone/ext/mailtrap"
 	"github.com/pockethost/pocketone/ext/mothership/mirror"
 	"github.com/pockethost/pocketone/ext/pocker"
@@ -76,7 +78,32 @@ func serveMany(cfg *config.Config) (handled bool, err error) {
 		return true, err
 	}
 	h.Background = append(h.Background, background...)
+
+	// instance data: disk used and last request, measured and logged on the `lifecycle` section's schedule
+	if root := instanceRoot(cfg); root != "" {
+		lc := &lifecycle.Lifecycle{Directory: h.Directory, Folder: func(i host.Instance) string {
+			if i.Dir != "" {
+				return cfg.ResolvePath(i.Dir)
+			}
+			return filepath.Join(root, i.ID)
+		}, Logger: log}
+		h.Gates = append(h.Gates, lc)
+		h.Background = append(h.Background, lc.Run)
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	return true, h.Run(ctx)
+}
+
+// instanceRoot is the folder holding one folder per instance for the configured provider ("" for none).
+func instanceRoot(cfg *config.Config) string {
+	switch p, _ := config.Provider.Get(); p {
+	case "pocker":
+		sc, _ := pocker.Section.Get()
+		return cfg.ResolvePath(sc.Root)
+	case "docker":
+		sc, _ := docker.Section.Get()
+		return cfg.ResolvePath(sc.Root)
+	}
+	return ""
 }
