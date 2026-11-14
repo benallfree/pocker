@@ -21,27 +21,6 @@ import (
 	"github.com/Masterminds/semver/v3"
 )
 
-// Manifest lists the releases an edge may download: where each is hosted and the sha256 of its zips. Two release
-// lines: "versions" are upstream PocketBase (PocketHost's versions.json is a valid manifest as is), "pocketone" are PocketOne
-// releases, which have their own version numbers and note the upstream version they are based on.
-//
-//	{"hosts": {"github": "https://github.com/pocketbase/pocketbase/releases/download/v{version}/{file}",
-//	           "pocketone": "https://github.com/pockethost/pocketone/releases/download/v{version}/{file}"},
-//	 "versions": {"0.36.9": {"host": "github", "sha256": {"linux_amd64": "…", "linux_arm64": "…"}}},
-//	 "pocketone": {"0.0.1": {"host": "pocketone", "base": "0.41.1", "sha256": {"linux_amd64": "…"}}}}
-type Manifest struct {
-	Hosts    map[string]string        `json:"hosts"`
-	Versions map[string]ManifestEntry `json:"versions"`
-	PocketOne map[string]ManifestEntry `json:"pocketone"`
-}
-
-// ManifestEntry is one release in a [Manifest].
-type ManifestEntry struct {
-	Host   string            `json:"host"`
-	Base   string            `json:"base,omitempty"` // PocketOne: the upstream PocketBase version it is based on
-	SHA256 map[string]string `json:"sha256"`         // by platform, e.g. "linux_amd64"
-}
-
 // Release lines, the prefix of an instance's version: "pb:0.36.*" (upstream PocketBase) or "p1:0.0.*" (PocketOne).
 // A version without a prefix is upstream.
 const (
@@ -51,6 +30,31 @@ const (
 
 // MinUpstream is the oldest upstream PocketBase version served: 0.22 and older are sunset.
 const MinUpstream = "0.23.0"
+
+// Release is one PocketBase or PocketOne release a docker host may run, pinned to its downloads and checksums.
+type Release struct {
+	Line    string           `json:"line"`           // LinePB or LineP1
+	Version string           `json:"version"`        // e.g. "0.36.9"
+	Base    string           `json:"base,omitempty"` // PocketOne: the upstream PocketBase version it's based on
+	Assets  map[string]Asset `json:"assets"`         // by platform, e.g. "linux_amd64"
+}
+
+// Asset is a release's zip for one platform.
+type Asset struct {
+	URL    string `json:"url"`
+	SHA256 string `json:"sha256"`
+}
+
+// Key is "pb:0.36.9" / "p1:0.0.1".
+func (r Release) Key() string { return r.Line + ":" + r.Version }
+
+// binaryName is the release's binary inside its zip, and the zip's prefix (pocketbase_<v>_<platform>.zip).
+func binaryName(line string) string {
+	if line == LineP1 {
+		return "pocketone"
+	}
+	return "pocketbase"
+}
 
 // ParseVersion splits "p1:0.0.*" into its line and version (range); no prefix = upstream.
 func ParseVersion(v string) (line, want string, err error) {
@@ -65,26 +69,88 @@ func ParseVersion(v string) (line, want string, err error) {
 	return line, strings.TrimPrefix(strings.TrimSpace(want), "v"), nil
 }
 
-// LoadManifest reads a manifest file.
-func LoadManifest(path string) (*Manifest, error) {
-	b, err := os.ReadFile(path)
+// Pick returns the newest release in rs that satisfies want: "pb:0.36.*", "p1:0.0.1", or an upstream version without
+// a prefix; exact versions and ranges ("0.36.*", "~0.36", "^0.30") both work. It is the one place that decides which
+// release an instance runs.
+func Pick(rs []Release, want string) (Release, error) {
+	line, rng, err := ParseVersion(want)
 	if err != nil {
-		return nil, err
+		return Release{}, err
 	}
-	var m Manifest
-	if err := json.Unmarshal(b, &m); err != nil {
-		return nil, fmt.Errorf("%s: %w", path, err)
+	c, err := semver.NewConstraint(rng)
+	if err != nil {
+		return Release{}, fmt.Errorf("pocketbase version %q: %w", want, err)
 	}
-	return &m, nil
+	var best *semver.Version
+	var pick Release
+	for _, r := range rs {
+		if r.Line != line {
+			continue
+		}
+		v, err := semver.StrictNewVersion(r.Version)
+		if err != nil || !c.Check(v) || (line == LinePB && v.LessThan(semver.MustParse(MinUpstream))) {
+			continue
+		}
+		if best == nil || v.GreaterThan(best) {
+			best, pick = v, r
+		}
+	}
+	if best != nil {
+		return pick, nil
+	}
+	if line == LinePB {
+		if sv, err := semver.NewVersion(strings.TrimSuffix(strings.TrimSuffix(rng, ".*"), ".x")); err == nil && sv.LessThan(semver.MustParse(MinUpstream)) {
+			return Release{}, fmt.Errorf("PocketBase %s is no longer supported (0.22 and older are sunset; use 0.23 or newer)", rng)
+		}
+	}
+	return Release{}, fmt.Errorf("PocketBase %q is not offered on this host", want)
 }
 
-// Binaries is a cache of official PocketBase binaries, one per version, laid out as PocketHost's edges keep them
-// (<Root>/<version>/<platform>/pocketbase), so an existing cache works as is. Versions missing from the cache are
-// downloaded on first use from the manifest and checked against its sha256.
+// LatestPatches keeps, per line, the newest patch of each minor (upstream from MinUpstream on). It is the one place
+// that culls a release list: discovery, `docker update` and a mothership's versions list all go through it.
+func LatestPatches(rs []Release) []Release {
+	min := semver.MustParse(MinUpstream)
+	best := map[string]Release{}
+	bestV := map[string]*semver.Version{}
+	for _, r := range rs {
+		v, err := semver.StrictNewVersion(r.Version)
+		if err != nil || v.Prerelease() != "" || (r.Line == LinePB && v.LessThan(min)) {
+			continue
+		}
+		k := fmt.Sprintf("%s:%d.%d", r.Line, v.Major(), v.Minor())
+		if cur, ok := bestV[k]; !ok || v.GreaterThan(cur) {
+			best[k], bestV[k] = r, v
+		}
+	}
+	out := make([]Release, 0, len(best))
+	for _, r := range best {
+		out = append(out, r)
+	}
+	SortReleases(out)
+	return out
+}
+
+// SortReleases orders releases by line, then version (oldest first).
+func SortReleases(rs []Release) {
+	sort.Slice(rs, func(i, j int) bool {
+		if rs[i].Line != rs[j].Line {
+			return rs[i].Line < rs[j].Line
+		}
+		a, ea := semver.NewVersion(rs[i].Version)
+		b, eb := semver.NewVersion(rs[j].Version)
+		if ea != nil || eb != nil {
+			return rs[i].Version < rs[j].Version
+		}
+		return a.LessThan(b)
+	})
+}
+
+// Binaries is a cache of release binaries, one per release, laid out as PocketHost's edges keep them: upstream at
+// <Root>/<version>/<platform>/pocketbase (so an existing cache works as is), PocketOne at
+// <Root>/p1/<version>/<platform>/pocketone. Fetch downloads a release and checks it against its sha256.
 type Binaries struct {
 	Root     string
-	Manifest *Manifest // nil = cached versions only
-	Platform string    // e.g. "linux_amd64"; default linux_<GOARCH>
+	Platform string // e.g. "linux_amd64"; default linux_<GOARCH>
 	Client   *http.Client
 
 	mu   sync.Mutex
@@ -98,8 +164,7 @@ func (b *Binaries) platform() string {
 	return "linux_" + runtime.GOARCH
 }
 
-// Path is where a release's binary lives in the cache (whether or not it is there): upstream at
-// <Root>/<version>/<platform>/pocketbase (PocketHost's existing layout), PocketOne at <Root>/ce/<version>/<platform>/….
+// Path is where a release's binary lives in the cache (whether or not it is there).
 func (b *Binaries) Path(line, version string) string {
 	if line == LineP1 {
 		return filepath.Join(b.Root, "p1", version, b.platform(), "pocketone")
@@ -107,137 +172,58 @@ func (b *Binaries) Path(line, version string) string {
 	return filepath.Join(b.Root, version, b.platform(), "pocketbase")
 }
 
-func (b *Binaries) entries(line string) map[string]ManifestEntry {
-	if b.Manifest == nil {
-		return nil
-	}
-	if line == LineP1 {
-		return b.Manifest.PocketOne
-	}
-	return b.Manifest.Versions
+// Has reports whether a release's binary is in the cache.
+func (b *Binaries) Has(r Release) bool {
+	_, err := os.Stat(b.Path(r.Line, r.Version))
+	return err == nil
 }
 
-// Versions lists a line's available versions (cached, or downloadable for this platform), newest first. Upstream
-// versions older than [MinUpstream] are left out.
-func (b *Binaries) Versions(line string) []string {
-	min := semver.MustParse(MinUpstream)
-	seen := map[string]bool{}
-	var list []*semver.Version
-	add := func(v string) {
-		sv, err := semver.StrictNewVersion(v)
-		if err != nil || sv.Prerelease() != "" || seen[v] || (line == LinePB && sv.LessThan(min)) {
-			return
+// Seed fetches every release in rs that isn't cached yet, one at a time, and returns the keys it added. It stops at
+// the first failure (what it added so far stays cached).
+func (b *Binaries) Seed(ctx context.Context, rs []Release) (added []string, err error) {
+	for _, r := range rs {
+		if b.Has(r) {
+			continue
 		}
-		seen[v] = true
-		list = append(list, sv)
-	}
-	dir := b.Root
-	if line == LineP1 {
-		dir = filepath.Join(b.Root, "p1")
-	}
-	if entries, err := os.ReadDir(dir); err == nil {
-		for _, e := range entries {
-			if e.IsDir() {
-				if _, err := os.Stat(b.Path(line, e.Name())); err == nil {
-					add(e.Name())
-				}
-			}
+		if err := b.Fetch(ctx, r); err != nil {
+			return added, err
 		}
+		added = append(added, r.Key())
 	}
-	for v, e := range b.entries(line) {
-		if e.SHA256[b.platform()] != "" {
-			add(v)
-		}
-	}
-	sort.Sort(sort.Reverse(semver.Collection(list)))
-	out := make([]string, len(list))
-	for i, v := range list {
-		out[i] = v.Original()
-	}
-	return out
+	return added, nil
 }
 
-// Match returns the line and newest available version satisfying want: "pb:0.36.*", "p1:0.0.1", or an upstream
-// version without a prefix; exact versions and ranges ("0.36.*", "~0.36", "^0.30", ">=0.30 <0.40") both work.
-func (b *Binaries) Match(want string) (line, version string, err error) {
-	line, rng, err := ParseVersion(want)
-	if err != nil {
-		return "", "", err
-	}
-	c, err := semver.NewConstraint(rng)
-	if err != nil {
-		return "", "", fmt.Errorf("pocketbase version %q: %w", want, err)
-	}
-	for _, v := range b.Versions(line) {
-		if c.Check(semver.MustParse(v)) {
-			return line, v, nil
-		}
-	}
-	if line == LinePB {
-		if sv, err := semver.NewVersion(strings.TrimSuffix(strings.TrimSuffix(rng, ".*"), ".x")); err == nil && sv.LessThan(semver.MustParse(MinUpstream)) {
-			return "", "", fmt.Errorf("PocketBase %s is no longer supported (0.22 and older are sunset; use 0.23 or newer)", rng)
-		}
-	}
-	return "", "", fmt.Errorf("no PocketBase version satisfying %q", want)
-}
-
-// Resolve matches want and returns its line, version and the path of its binary, downloading it when needed.
-func (b *Binaries) Resolve(ctx context.Context, want string) (line, version, path string, err error) {
-	line, version, err = b.Match(want)
-	if err != nil {
-		return "", "", "", err
-	}
-	path = b.Path(line, version)
-	if _, err := os.Stat(path); err == nil {
-		return line, version, path, nil
-	}
-	return line, version, path, b.download(ctx, line, version)
-}
-
-func (b *Binaries) lock(version string) *sync.Mutex {
+func (b *Binaries) lock(key string) *sync.Mutex {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if b.busy == nil {
 		b.busy = map[string]*sync.Mutex{}
 	}
-	m, ok := b.busy[version]
+	m, ok := b.busy[key]
 	if !ok {
 		m = &sync.Mutex{}
-		b.busy[version] = m
+		b.busy[key] = m
 	}
 	return m
 }
 
-func (b *Binaries) download(ctx context.Context, line, version string) error {
-	l := b.lock(line + ":" + version)
+// Fetch downloads a release for this platform, checks its sha256 and puts its binary in the cache. A release
+// already cached is left alone.
+func (b *Binaries) Fetch(ctx context.Context, r Release) error {
+	l := b.lock(r.Key())
 	l.Lock()
 	defer l.Unlock()
-	path := b.Path(line, version)
+	path := b.Path(r.Line, r.Version)
 	if _, err := os.Stat(path); err == nil {
-		return nil // another request downloaded it meanwhile
+		return nil
 	}
-	if b.Manifest == nil {
-		return fmt.Errorf("pocketbase %s is not cached and there is no manifest to download it from", version)
+	a, ok := r.Assets[b.platform()]
+	if !ok || a.URL == "" || a.SHA256 == "" {
+		return fmt.Errorf("%s has no %s build", r.Key(), b.platform())
 	}
-	e, ok := b.entries(line)[version]
-	if !ok {
-		return fmt.Errorf("pocketbase %s:%s is not in the manifest", line, version)
-	}
-	sum := e.SHA256[b.platform()]
-	tmpl := b.Manifest.Hosts[e.Host]
-	if sum == "" || tmpl == "" {
-		return fmt.Errorf("pocketbase %s has no %s build (or no host) in the manifest", version, b.platform())
-	}
-	name := "pocketbase" // the release's binary, and its zip's prefix: pocketbase_<v>_<platform>.zip / pocketone_…
-	if line == LineP1 {
-		name = "pocketone"
-	}
-	file := fmt.Sprintf("%s_%s_%s.zip", name, version, b.platform())
-	u := strings.NewReplacer("{version}", version, "{file}", file).Replace(tmpl)
-
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, a.URL, nil)
 	if err != nil {
 		return err
 	}
@@ -247,24 +233,25 @@ func (b *Binaries) download(ctx context.Context, line, version string) error {
 	}
 	res, err := c.Do(req)
 	if err != nil {
-		return fmt.Errorf("download pocketbase %s: %w", version, err)
+		return fmt.Errorf("download %s: %w", r.Key(), err)
 	}
 	defer res.Body.Close()
 	if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("download pocketbase %s: %s %d", version, u, res.StatusCode)
+		return fmt.Errorf("download %s: %s %d", r.Key(), a.URL, res.StatusCode)
 	}
 	data, err := io.ReadAll(io.LimitReader(res.Body, 256<<20))
 	if err != nil {
-		return fmt.Errorf("download pocketbase %s: %w", version, err)
+		return fmt.Errorf("download %s: %w", r.Key(), err)
 	}
 	got := sha256.Sum256(data)
-	if hex.EncodeToString(got[:]) != strings.ToLower(sum) {
-		return fmt.Errorf("pocketbase %s: checksum mismatch (got %x, manifest %s)", version, got, sum)
+	if hex.EncodeToString(got[:]) != strings.ToLower(a.SHA256) {
+		return fmt.Errorf("%s: checksum mismatch (got %x, expected %s)", r.Key(), got, a.SHA256)
 	}
 	zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
 	if err != nil {
-		return fmt.Errorf("pocketbase %s: %w", version, err)
+		return fmt.Errorf("%s: %w", r.Key(), err)
 	}
+	name := binaryName(r.Line)
 	for _, f := range zr.File {
 		if f.Name != name {
 			continue
@@ -277,7 +264,7 @@ func (b *Binaries) download(ctx context.Context, line, version string) error {
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			return err
 		}
-		tmp, err := os.CreateTemp(filepath.Dir(path), ".pocketbase-*")
+		tmp, err := os.CreateTemp(filepath.Dir(path), ".binary-*")
 		if err != nil {
 			return err
 		}
@@ -293,5 +280,47 @@ func (b *Binaries) download(ctx context.Context, line, version string) error {
 		}
 		return os.Rename(tmp.Name(), path)
 	}
-	return fmt.Errorf("pocketbase %s: no %s binary in %s", version, name, file)
+	return fmt.Errorf("%s: no %s binary in %s", r.Key(), name, a.URL)
+}
+
+// IndexFile is where `docker update` records the releases a host tracks, inside the binary cache.
+const IndexFile = "releases.json"
+
+// ReadIndex reads the releases recorded in a cache's index (none when there is no index yet).
+func ReadIndex(root string) ([]Release, error) {
+	b, err := os.ReadFile(filepath.Join(root, IndexFile))
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var rs []Release
+	if err := json.Unmarshal(b, &rs); err != nil {
+		return nil, fmt.Errorf("%s: %w", IndexFile, err)
+	}
+	return rs, nil
+}
+
+// WriteIndex records releases in a cache's index (written to a temp file and renamed, so readers never see half).
+func WriteIndex(root string, rs []Release) error {
+	SortReleases(rs)
+	b, err := json.MarshalIndent(rs, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		return err
+	}
+	tmp, err := os.CreateTemp(root, ".releases-*")
+	if err != nil {
+		return err
+	}
+	if _, err := tmp.Write(append(b, '\n')); err != nil {
+		tmp.Close()
+		os.Remove(tmp.Name())
+		return err
+	}
+	tmp.Close()
+	return os.Rename(tmp.Name(), filepath.Join(root, IndexFile))
 }

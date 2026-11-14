@@ -1,6 +1,7 @@
 package docker
 
 import (
+	"encoding/json"
 	"context"
 	"io"
 	"log/slog"
@@ -39,12 +40,31 @@ func dockerSocket(t *testing.T) string {
 // testBinaries is a cache of real PocketBase releases for the daemon's platform, kept between test runs.
 func testBinaries(t *testing.T) *Binaries {
 	t.Helper()
-	m, err := LoadManifest("testdata/versions.json")
+	dir, _ := os.UserCacheDir()
+	return &Binaries{Root: filepath.Join(dir, "ce-docker-test", "pocketbase")}
+}
+
+// staticVersions serves a fixed release list.
+type staticVersions []Release
+
+func (s staticVersions) Releases(context.Context) ([]Release, error) { return s, nil }
+
+// testVersions is upstream 0.23.12, 0.36.9 and PocketOne 0.0.1 (testdata/releases.json), seeded into the test cache
+// once so containers don't wait on downloads.
+func testVersions(t *testing.T, b *Binaries) staticVersions {
+	t.Helper()
+	raw, err := os.ReadFile("testdata/releases.json")
 	if err != nil {
 		t.Fatal(err)
 	}
-	dir, _ := os.UserCacheDir()
-	return &Binaries{Root: filepath.Join(dir, "ce-docker-test", "pocketbase"), Manifest: m}
+	var rs []Release
+	if err := json.Unmarshal(raw, &rs); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := b.Seed(context.Background(), rs); err != nil {
+		t.Fatal(err)
+	}
+	return rs
 }
 
 func get(t *testing.T, rt *Runtime, inst host.Instance, path string) (int, string) {
@@ -57,12 +77,13 @@ func get(t *testing.T, rt *Runtime, inst host.Instance, path string) (int, strin
 
 func TestRuntime(t *testing.T) {
 	socket := dockerSocket(t)
+	tb := testBinaries(t)
 	data := t.TempDir()
 	quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
 	if os.Getenv("CE_DOCKER_DEBUG") != "" {
 		quiet = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	}
-	cfg := Config{Socket: socket, Image: "alpine:3.20", DataRoot: data, Binaries: testBinaries(t),
+	cfg := Config{Socket: socket, Image: "alpine:3.20", DataRoot: data, Binaries: tb, Versions: testVersions(t, tb),
 		MaxConcurrentStarts: 1, NofileSoft: 4096, NofileHard: 8192, PidsLimit: 256, Logger: quiet,
 		Prepare: func(_ context.Context, inst host.Instance, version string, spec *Spec) error {
 			spec.Env["PH_APP_NAME"] = inst.ID
@@ -193,13 +214,14 @@ func TestRuntime(t *testing.T) {
 // A container that can't start (no such version) answers 503 with the reason.
 func TestRuntimeBadVersion(t *testing.T) {
 	socket := dockerSocket(t)
-	rt, _ := New(Config{Socket: socket, Image: "alpine:3.20", DataRoot: t.TempDir(), Binaries: testBinaries(t),
+	tb := testBinaries(t)
+	rt, _ := New(Config{Socket: socket, Image: "alpine:3.20", DataRoot: t.TempDir(), Binaries: tb, Versions: testVersions(t, tb),
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
 	if err := rt.Start(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	defer rt.Shutdown()
-	if code, body := get(t, rt, host.Instance{ID: "cedockerx", Version: "0.99.*"}, "/"); code != 503 || !strings.Contains(body, "no PocketBase version") {
+	if code, body := get(t, rt, host.Instance{ID: "cedockerx", Version: "0.99.*"}, "/"); code != 503 || !strings.Contains(body, "not offered on this host") {
 		t.Fatalf("%d %q", code, body)
 	}
 	if code, body := get(t, rt, host.Instance{ID: "cedockery", Version: "0.22.*"}, "/"); code != 503 || !strings.Contains(body, "no longer supported") {

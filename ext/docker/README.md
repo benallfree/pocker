@@ -12,18 +12,25 @@ PocketBase (or PocketOne) binary of the version it asks for, so one host serves 
 
 ## How it runs an instance
 
-- **Binary:** two release lines, picked by a prefix in the instance's `version`: `pb:` = upstream PocketBase
-  (0.23 and newer; 0.22 and older are sunset and refused), `p1:` = PocketOne releases (their own version numbers);
-  no prefix = `pb:`. Exact versions (`pb:0.36.9`) or ranges (`pb:0.36.*`, `p1:~0.0.1`, `^0.30`); the newest match
-  wins. The cache is laid out as `<binaries>/<version>/<platform>/pocketbase` for upstream (PocketHost's existing
-  layout) and `<binaries>/p1/<version>/<platform>/pocketone` for PocketOne; missing releases are downloaded from a
-  manifest (`versions.json`: hosts, `versions` for upstream, `pocketone` for PocketOne with each release's upstream base, sha256
-  per platform) and checked.
+- **Releases:** a host serves an explicit list of releases, each pinned to its download and sha256, from a
+  `VersionsSource`. Built in: `docker.versions` in pocketbase.yaml, the minors to serve (`["pb:0.36", "p1:0.0"]`).
+  `docker update` finds the latest patch of each (upstream PocketBase from ganigeorgiev.com, then the archived GitHub;
+  PocketOne from GitHub; checksums from each release's checksums.txt), records them in the cache's `releases.json`
+  and downloads them; `docker seed` downloads whatever is listed but not cached. One function (`LatestPatches`) culls
+  to the latest patch per minor and one (`Pick`) matches an instance's version, for every caller. A fleet's list can
+  come from a mothership instead (a bridge implements `VersionsSource`).
+- **Binary:** two release lines, picked by a prefix in the instance's `version`: `pb:` = upstream PocketBase (0.23
+  and newer; 0.22 and older are sunset and refused), `p1:` = PocketOne; no prefix = `pb:`. The newest listed release
+  that matches wins; anything not listed gets a clear 503. Cache: `<binaries>/<version>/<platform>/pocketbase`
+  (PocketHost's existing layout) and `<binaries>/p1/<version>/<platform>/pocketone`. Listed releases missing from the
+  cache are seeded in the background; there are no downloads at request time.
 - **Container:** the instance folder at `/home/pockethost`, the binary read-only at `/home/pockethost/pocketbase`,
   `./pocketbase serve --http 0.0.0.0:8090` (plus `--dev`, and `--encryptionEnv=PB_ENCRYPTION_KEY` when the instance
   has an encryption key), the instance's secrets as environment, published on a loopback port the edge proxies to.
   Same layout as PocketHost's Node edge, so its instance folders move as they are. A host adds its own mounts,
   environment and labels with `Prepare`.
+- **pb_hooks:** a change restarts just that container (PocketBase's HooksWatch, from the host, one watcher for all).
+  Migrations run when a container boots.
 - **Lifecycle:** starts on the first request (ready when `/api/health` answers), at most `max_concurrent_starts` at
   once, stops after `idle_ttl` without requests, restarts on its next request when what it runs changed (secrets,
   version, mounts; a routing-only change doesn't restart it), stops when the instance is deleted or moves to another
@@ -40,7 +47,7 @@ instance's version before the binary is picked).
 docker:
   image: alpine:3.20
   binaries: /var/lib/pocketbase
-  manifest: /etc/pocketbase/versions.json
+  versions: ["pb:0.23", "pb:0.36", "p1:0.0"]
   default_version: "pb:0.36.*"
   idle_ttl: 10m
   max_concurrent_starts: 4

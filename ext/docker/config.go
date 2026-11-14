@@ -3,7 +3,6 @@ package docker
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"time"
 
@@ -17,7 +16,7 @@ import (
 //	docker:
 //	  image: alpine:3.20                    # base image the binaries run in
 //	  binaries: /var/lib/pocketbase         # cache: <binaries>/<version>/linux_amd64/pocketbase; PocketOne under p1/
-//	  manifest: /etc/pocketbase/versions.json  # releases it may download (optional)
+//	  versions: ["pb:0.36", "p1:0.0"]       # minors this host serves (latest patch each, via docker update)
 //	  root: /var/lib/instances              # one folder per instance: <root>/<id>
 //	  default_version: "p1:0.0.*"           # for instances without one (pb: upstream, p1: PocketOne)
 //	  idle_ttl: 10m
@@ -32,7 +31,7 @@ type SectionConfig struct {
 	Socket              string        `yaml:"socket"`
 	Image               string        `yaml:"image"`
 	Binaries            string        `yaml:"binaries"`
-	Manifest            string        `yaml:"manifest"`
+	Versions            []string      `yaml:"versions"`
 	Root                string        `yaml:"root"`
 	Home                string        `yaml:"home"`
 	DefaultVersion      string        `yaml:"default_version"`
@@ -62,15 +61,9 @@ func ConfigFromSection(sc SectionConfig, resolve func(string) string, log *slog.
 		return Config{}, errors.New("docker: image, binaries and root are required")
 	}
 	b := &Binaries{Root: resolve(sc.Binaries)}
-	if sc.Manifest != "" {
-		m, err := LoadManifest(resolve(sc.Manifest))
-		if err != nil {
-			return Config{}, fmt.Errorf("docker: %w", err)
-		}
-		b.Manifest = m
-	}
 	cfg := Config{
 		Socket: sc.Socket, Image: sc.Image, DataRoot: resolve(sc.Root), Home: sc.Home, Binaries: b,
+		Versions:       YAMLVersions{Tracked: sc.Versions, Root: b.Root},
 		DefaultVersion: sc.DefaultVersion, IdleTTL: sc.IdleTTL, MaxConcurrentStarts: sc.MaxConcurrentStarts,
 		StartTimeout: sc.StartTimeout, Memory: int64(sc.Memory), NanoCPUs: sc.NanoCPUs, PidsLimit: sc.PidsLimit,
 		CapDrop: sc.CapDrop, NoNewPrivileges: sc.NoNewPrivileges, Network: sc.Network, AdoptImage: sc.AdoptImage,
@@ -94,6 +87,8 @@ type Provider struct {
 	OnLog func(instanceID string, stderr bool, line string)
 	// Resolve makes relative paths in the section absolute (e.g. ext/config's Config.ResolvePath).
 	Resolve func(string) string
+	// Versions, if set, replaces the section's `versions` list (e.g. a fleet's list from a mothership).
+	Versions VersionsSource
 }
 
 var _ host.Provider = (*Provider)(nil)
@@ -109,6 +104,9 @@ func (p *Provider) Prepare(h *host.Host) error {
 		return err
 	}
 	cfg.Prepare, cfg.OnLog, cfg.Version = p.Container, p.OnLog, p.Version
+	if p.Versions != nil {
+		cfg.Versions = p.Versions
+	}
 	rt, err := New(cfg)
 	if err != nil {
 		return err

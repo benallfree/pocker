@@ -49,11 +49,12 @@ type Spec struct {
 
 // Config configures a [Runtime].
 type Config struct {
-	Socket   string    // Docker socket (default [DefaultSocket])
-	Image    string    // base image the binary runs in (required); pulled when missing
-	DataRoot string    // host folder with one folder per instance (<DataRoot>/<id>; Instance.Dir overrides)
-	Home     string    // the instance folder inside the container (default /home/pockethost)
-	Binaries *Binaries // PocketBase binaries by version (required)
+	Socket   string         // Docker socket (default [DefaultSocket])
+	Image    string         // base image the binary runs in (required); pulled when missing
+	DataRoot string         // host folder with one folder per instance (<DataRoot>/<id>; Instance.Dir overrides)
+	Home     string         // the instance folder inside the container (default /home/pockethost)
+	Binaries *Binaries      // the release binary cache (required)
+	Versions VersionsSource // the releases this host serves (required); missing ones are seeded in the background
 
 	DefaultVersion string // for instances without a Version (e.g. "pb:0.36.*" or "p1:0.0.*"); empty = such instances fail
 
@@ -101,11 +102,14 @@ type Runtime struct {
 	http *http.Client
 	tr   *http.Transport
 
-	mu    sync.Mutex
-	ctrs  map[string]*ctr
-	held  map[string]chan struct{} // instances under maintenance (WithInstanceStopped)
-	ready atomic.Bool
-	watch *host.ScriptWatcher // restarts a container when its pb_hooks change
+	mu     sync.Mutex
+	ctrs   map[string]*ctr
+	held   map[string]chan struct{} // instances under maintenance (WithInstanceStopped)
+	seedMu sync.Mutex               // one seeding run at a time
+	ready  atomic.Bool
+	watch  *host.ScriptWatcher // restarts a container when its pb_hooks change
+
+	releases atomic.Pointer[[]Release] // the current list from Versions
 
 	bg     context.Context
 	cancel context.CancelFunc
@@ -136,8 +140,8 @@ var (
 
 // New returns a runtime for cfg. Call Start before serving.
 func New(cfg Config) (*Runtime, error) {
-	if cfg.Image == "" || cfg.Binaries == nil || cfg.DataRoot == "" {
-		return nil, errors.New("docker: Image, Binaries and DataRoot are required")
+	if cfg.Image == "" || cfg.Binaries == nil || cfg.DataRoot == "" || cfg.Versions == nil {
+		return nil, errors.New("docker: Image, Binaries, Versions and DataRoot are required")
 	}
 	if cfg.Socket == "" {
 		cfg.Socket = DefaultSocket()
@@ -207,8 +211,82 @@ func (rt *Runtime) Start(ctx context.Context) error {
 	if err := rt.adopt(ctx); err != nil {
 		return err
 	}
+	if err := rt.loadReleases(ctx); err != nil {
+		return err
+	}
 	go rt.reap()
+	go rt.followReleases()
 	rt.ready.Store(true)
+	return nil
+}
+
+// loadReleases reads the list from Versions, logs what isn't cached yet, and seeds it in the background.
+func (rt *Runtime) loadReleases(ctx context.Context) error {
+	rs, err := rt.cfg.Versions.Releases(ctx)
+	if err != nil {
+		return fmt.Errorf("docker: versions: %w", err)
+	}
+	prev := rt.releases.Swap(&rs)
+	var missing []Release
+	for _, r := range rs {
+		if !rt.cfg.Binaries.Has(r) {
+			missing = append(missing, r)
+		}
+	}
+	if prev == nil || len(missing) > 0 {
+		keys := make([]string, 0, len(rs))
+		for _, r := range rs {
+			keys = append(keys, r.Key())
+		}
+		rt.log.Info("docker: serving releases", "releases", keys, "not_cached", len(missing))
+	}
+	if len(rs) == 0 {
+		rt.log.Warn("docker: no releases listed; instances can't start (docker.versions, then docker update)")
+	}
+	if len(missing) > 0 {
+		go rt.seed(missing)
+	}
+	return nil
+}
+
+// seed downloads releases in the background, one at a time (a failure is logged and retried on the next refresh).
+func (rt *Runtime) seed(rs []Release) {
+	rt.seedMu.Lock()
+	defer rt.seedMu.Unlock()
+	for _, r := range rs {
+		if rt.cfg.Binaries.Has(r) {
+			continue
+		}
+		t0 := time.Now()
+		if err := rt.cfg.Binaries.Fetch(rt.bg, r); err != nil {
+			rt.log.Warn("docker: seeding a release failed", "release", r.Key(), "error", err)
+			continue
+		}
+		rt.log.Info("docker: release seeded", "release", r.Key(), "ms", time.Since(t0).Milliseconds())
+	}
+}
+
+// followReleases re-reads the list every 30 s (a `docker update`, or a fleet's change) until shutdown.
+func (rt *Runtime) followReleases() {
+	t := time.NewTicker(30 * time.Second)
+	defer t.Stop()
+	for {
+		select {
+		case <-rt.bg.Done():
+			return
+		case <-t.C:
+			if err := rt.loadReleases(rt.bg); err != nil {
+				rt.log.Warn("docker: refreshing versions", "error", err)
+			}
+		}
+	}
+}
+
+// Releases returns the releases this host currently serves.
+func (rt *Runtime) Releases() []Release {
+	if p := rt.releases.Load(); p != nil {
+		return *p
+	}
 	return nil
 }
 
@@ -393,11 +471,16 @@ func (rt *Runtime) containerConfig(ctx context.Context, inst host.Instance) (con
 	if want == "" {
 		return containerConfig{}, "", errors.New("no PocketBase version")
 	}
-	line, ver, bin, err := rt.cfg.Binaries.Resolve(ctx, want)
+	rel, err := Pick(rt.Releases(), want)
 	if err != nil {
 		return containerConfig{}, "", err
 	}
-	version := line + ":" + ver // e.g. "pb:0.36.9", "p1:0.0.1"
+	if !rt.cfg.Binaries.Has(rel) {
+		go rt.seed([]Release{rel})
+		return containerConfig{}, "", fmt.Errorf("%s is still downloading on this host; retry shortly", rel.Key())
+	}
+	bin := rt.cfg.Binaries.Path(rel.Line, rel.Version)
+	version := rel.Key() // e.g. "pb:0.36.9", "p1:0.0.1"
 	dir := rt.folder(inst)
 	// create the instance folder here: otherwise the daemon creates a missing bind source itself (root-owned on
 	// Linux; inside the VM with Docker Desktop, where the host never sees it)

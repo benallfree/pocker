@@ -31,6 +31,7 @@ func (tagGate) Admit(w http.ResponseWriter, _ *http.Request, inst host.Instance)
 // front, a blocked instance answered by the host, an unknown host 404.
 func TestHostWithDocker(t *testing.T) {
 	socket := dockerSocket(t)
+	tb := testBinaries(t)
 	root := t.TempDir()
 	data := filepath.Join(root, "instances")
 	instances := filepath.Join(root, "instances.yaml")
@@ -50,7 +51,7 @@ instances:
 		t.Fatal(err)
 	}
 	quiet := slog.New(slog.NewTextHandler(io.Discard, nil))
-	rt, err := New(Config{Socket: socket, Image: "alpine:3.20", DataRoot: data, Binaries: testBinaries(t), Logger: quiet})
+	rt, err := New(Config{Socket: socket, Image: "alpine:3.20", DataRoot: data, Binaries: tb, Versions: testVersions(t, tb), Logger: quiet})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -121,7 +122,8 @@ instances:
 // Maintenance: WithInstanceStopped stops the container and holds requests; StartInstance starts it again.
 func TestMaintenance(t *testing.T) {
 	socket := dockerSocket(t)
-	rt, err := New(Config{Socket: socket, Image: "alpine:3.20", DataRoot: t.TempDir(), Binaries: testBinaries(t),
+	tb := testBinaries(t)
+	rt, err := New(Config{Socket: socket, Image: "alpine:3.20", DataRoot: t.TempDir(), Binaries: tb, Versions: testVersions(t, tb),
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
 	if err != nil {
 		t.Fatal(err)
@@ -170,8 +172,9 @@ func TestMaintenance(t *testing.T) {
 // Changing a running instance's pb_hooks restarts its container, which then serves the new code.
 func TestHooksChangeRestartsContainer(t *testing.T) {
 	socket := dockerSocket(t)
+	tb := testBinaries(t)
 	data := t.TempDir()
-	rt, err := New(Config{Socket: socket, Image: "alpine:3.20", DataRoot: data, Binaries: testBinaries(t),
+	rt, err := New(Config{Socket: socket, Image: "alpine:3.20", DataRoot: data, Binaries: tb, Versions: testVersions(t, tb),
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
 	if err != nil {
 		t.Fatal(err)

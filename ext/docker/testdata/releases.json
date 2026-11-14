@@ -1,0 +1,45 @@
+[
+ {
+  "line": "pb",
+  "version": "0.23.12",
+  "assets": {
+   "linux_amd64": {
+    "url": "https://github.com/pocketbase/pocketbase/releases/download/v0.23.12/pocketbase_0.23.12_linux_amd64.zip",
+    "sha256": "af00ee3cb6c3575075bee4e2adb86ab6878598fda30e79b15f89f948c602aacc"
+   },
+   "linux_arm64": {
+    "url": "https://github.com/pocketbase/pocketbase/releases/download/v0.23.12/pocketbase_0.23.12_linux_arm64.zip",
+    "sha256": "f5a77bd6ec046bd374f8cac77586af899212796bab96d3ed7f9df4d67a741a44"
+   }
+  }
+ },
+ {
+  "line": "pb",
+  "version": "0.36.9",
+  "assets": {
+   "linux_amd64": {
+    "url": "https://github.com/pocketbase/pocketbase/releases/download/v0.36.9/pocketbase_0.36.9_linux_amd64.zip",
+    "sha256": "514441ad69eeba4e5da6e4728dae7483c6e5328b109fed9c67f66909a006fb5a"
+   },
+   "linux_arm64": {
+    "url": "https://github.com/pocketbase/pocketbase/releases/download/v0.36.9/pocketbase_0.36.9_linux_arm64.zip",
+    "sha256": "97f8f2337a1041b54153d63c4eea02df1bca4b4e68907052c0ab9ce89a0df855"
+   }
+  }
+ },
+ {
+  "line": "p1",
+  "version": "0.0.1",
+  "base": "0.41.1",
+  "assets": {
+   "linux_amd64": {
+    "url": "https://github.com/pockethost/pocketone/releases/download/v0.0.1/pocketone_0.0.1_linux_amd64.zip",
+    "sha256": "0392fd2cc98930b7e58a7aceba68aa6b8c557549c35af06c37fc44516a54b422"
+   },
+   "linux_arm64": {
+    "url": "https://github.com/pockethost/pocketone/releases/download/v0.0.1/pocketone_0.0.1_linux_arm64.zip",
+    "sha256": "2a92d288e74db19109a2383142fa47c35824382f83297448629181b628090d04"
+   }
+  }
+ }
+]

@@ -192,10 +192,10 @@ type ulimit struct {
 }
 
 type inspect struct {
-	ID     string `json:"Id"`
-	Name   string `json:"Name"`
-	Image  string `json:"Image"`
-	State  struct {
+	ID    string `json:"Id"`
+	Name  string `json:"Name"`
+	Image string `json:"Image"`
+	State struct {
 		Running   bool   `json:"Running"`
 		StartedAt string `json:"StartedAt"`
 	} `json:"State"`

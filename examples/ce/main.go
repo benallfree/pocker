@@ -26,6 +26,7 @@ import (
 	"github.com/pockethost/pocketone/ext/bulkmail"
 	"github.com/pockethost/pocketone/ext/ceplugin"
 	"github.com/pockethost/pocketone/ext/config"
+	"github.com/pockethost/pocketone/ext/docker"
 	"github.com/pockethost/pocketone/ext/deploy"
 	"github.com/pockethost/pocketone/ext/jserrors"
 	"github.com/pockethost/pocketone/ext/mailtrap"
@@ -69,6 +70,10 @@ func main() {
 	app.RootCmd.PersistentFlags().StringVar(&cfgPath, "config", "", "the config file (default ./pocketbase.yaml, else next to the executable)")
 	app.RootCmd.PersistentFlags().StringVar(&envPath, "env-file", "", "secrets for $VAR references in the config file (default .env beside it); never passed to the app")
 	app.RootCmd.AddCommand(config.NewCommand(func() config.Options { return cfgOpts }))
+	app.RootCmd.AddCommand(docker.NewCommand(func() (docker.SectionConfig, func(string) string) {
+		sc, _ := docker.Section.Get()
+		return sc, cfg.ResolvePath
+	}))
 
 	// PocketOne plugins that ship in the standard binary and follow the plugin contract (ceplugin): Register
 	// here, and BindJS in the jsvm below. Bulk mail: campaigns to the app's own users (Mail in the dashboard, Bulk
