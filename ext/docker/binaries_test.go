@@ -198,3 +198,27 @@ func TestLiveDiscovery(t *testing.T) {
 		t.Fatalf("too few releases: %s", keys(latest))
 	}
 }
+
+// An update of PocketOne minors only never asks the upstream host (it may be down); a failing host fails the update
+// instead of shrinking the list.
+func TestDiscoveryOnlyAsksTrackedLines(t *testing.T) {
+	zipP1, sumP1 := fakeRelease(t, "p1 0.0.2", "pocketone")
+	upstreamHits := 0
+	mux := http.NewServeMux()
+	mux.HandleFunc("/upstream/refs", func(w http.ResponseWriter, r *http.Request) { upstreamHits++; http.Error(w, "down", 503) })
+	mux.HandleFunc("/p1/refs", func(w http.ResponseWriter, r *http.Request) { fmt.Fprint(w, "refs/tags/v0.0.2\n") })
+	mux.HandleFunc("/p1rel/v0.0.2/checksums.txt", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, "%s  pocketone_0.0.2_linux_amd64.zip\n", sumP1)
+	})
+	mux.HandleFunc("/p1rel/v0.0.2/pocketone_0.0.2_linux_amd64.zip", func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write(zipP1) })
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+	d := &Discovery{Platforms: []string{"linux_amd64"}, UpstreamRefs: srv.URL + "/upstream/refs", PocketOneRefs: srv.URL + "/p1/refs",
+		UpstreamHosts: []string{srv.URL + "/none/{version}/{file}"}, PocketOneHost: srv.URL + "/p1rel/v{version}/{file}"}
+	if rs, err := d.Latest(context.Background(), []string{"p1:0.0"}); err != nil || keys(rs) != "p1:0.0.2" || upstreamHits != 0 {
+		t.Fatalf("p1 only: %s %v (upstream hits %d)", keys(rs), err, upstreamHits)
+	}
+	if _, err := d.Latest(context.Background(), nil); err == nil || upstreamHits != 3 {
+		t.Fatalf("all lines with upstream down: %v (hits %d, want 3 tries)", err, upstreamHits)
+	}
+}

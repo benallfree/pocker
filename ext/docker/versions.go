@@ -127,6 +127,9 @@ func (d *Discovery) Tags(ctx context.Context, line string) ([]string, error) {
 func (d *Discovery) Latest(ctx context.Context, tracked []string) ([]Release, error) {
 	var candidates []Release
 	for _, line := range []string{LinePB, LineP1} {
+		if !tracksLine(tracked, line) {
+			continue // e.g. `update p1:0.0` doesn't depend on the upstream host
+		}
 		tags, err := d.Tags(ctx, line)
 		if err != nil {
 			return nil, fmt.Errorf("%s tags: %w", line, err)
@@ -155,6 +158,19 @@ func (d *Discovery) Latest(ctx context.Context, tracked []string) ([]Release, er
 		out = append(out, pinned)
 	}
 	return out, nil
+}
+
+// tracksLine reports whether tracked (empty = everything) includes a minor of line.
+func tracksLine(tracked []string, line string) bool {
+	if len(tracked) == 0 {
+		return true
+	}
+	for _, t := range tracked {
+		if l, _, err := trackedMinor(t); err == nil && l == line {
+			return true
+		}
+	}
+	return false
 }
 
 // Pin finds where a release is hosted and records its zips' sha256 for every platform from its checksums.txt.
@@ -198,12 +214,33 @@ func (d *Discovery) Pin(ctx context.Context, line, version string) (Release, err
 	return Release{}, fmt.Errorf("%s:%s: no host has its checksums.txt", line, version)
 }
 
+// get fetches a small document, trying up to three times (release hosts can be briefly slow); a 404 isn't retried.
 func (d *Discovery) get(ctx context.Context, u string, max int64) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	var last error
+	for attempt := 1; attempt <= 3; attempt++ {
+		b, status, err := d.getOnce(ctx, u, max)
+		if err == nil {
+			return b, nil
+		}
+		last = err
+		if status == http.StatusNotFound || ctx.Err() != nil {
+			break
+		}
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(time.Duration(attempt) * time.Second):
+		}
+	}
+	return nil, last
+}
+
+func (d *Discovery) getOnce(ctx context.Context, u string, max int64) ([]byte, int, error) {
+	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	c := d.Client
 	if c == nil {
@@ -211,13 +248,14 @@ func (d *Discovery) get(ctx context.Context, u string, max int64) ([]byte, error
 	}
 	res, err := c.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer res.Body.Close()
 	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("GET %s: %d", u, res.StatusCode)
+		return nil, res.StatusCode, fmt.Errorf("GET %s: %d", u, res.StatusCode)
 	}
-	return io.ReadAll(io.LimitReader(res.Body, max))
+	b, err := io.ReadAll(io.LimitReader(res.Body, max))
+	return b, res.StatusCode, err
 }
 
 // Update is `docker update` for a host without a control plane: it finds the latest patch of each tracked minor,
