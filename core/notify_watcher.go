@@ -73,10 +73,13 @@ func (app *BaseApp) registerNotifyWatcherHooks() {
 		}
 
 		if notifyWatcher != nil {
+			// remove the previous notify file first and leave the new one in place: writing and removing it at
+			// once loses the event on macOS (kqueue only reports a directory change and fsnotify rescans, so a
+			// file that is already gone is never seen)
+			_ = os.Remove(settingsFile)
 			if err := os.WriteFile(settingsFile, nil, 0644); err != nil {
 				e.App.Logger().Warn("Failed to write watcher file", "error", err, "file", settingsFile)
 			}
-			_ = os.Remove(settingsFile)
 		}
 
 		return nil
@@ -100,10 +103,13 @@ func (app *BaseApp) registerNotifyWatcherHooks() {
 		}
 
 		if notifyWatcher != nil {
+			// remove the previous notify file first and leave the new one in place: writing and removing it at
+			// once loses the event on macOS (kqueue only reports a directory change and fsnotify rescans, so a
+			// file that is already gone is never seen)
+			_ = os.Remove(collectionsFile)
 			if err := os.WriteFile(collectionsFile, nil, 0644); err != nil {
 				e.App.Logger().Warn("Failed to write watcher file", "error", err, "file", collectionsFile)
 			}
-			_ = os.Remove(collectionsFile)
 		}
 
 		return nil
