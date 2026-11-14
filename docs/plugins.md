@@ -200,6 +200,7 @@ ext/<name>/
   README.md         what it does, runs on (single app, pocker or both), config
   <name>.go         the plugin
   <name>_test.go
+  conformance_test.go  the shared plugin test (below)
   example/main.go   a minimal program that builds cleanly and shows the feature
   ui/               optional: admin screens (embedded main.js)
 ```
@@ -212,6 +213,20 @@ ext/<name>/
   `devusers.Register(app)` right after `pocketbase.New()` (under pocker, `devusers.Ensure(app)` in
   `SetupApp`), from [`ext/devusers`](../ext/devusers/devusers.go). A fresh data dir is then ready to log
   in to, with no installer page and no CLI step. Never register it in a production build.
+- **`conformance_test.go` is required.** It runs the shared plugin test from
+  [`ext/pluginkit/conformance`](../ext/pluginkit/conformance/conformance.go) once:
+
+  ```go
+  func TestConformance(t *testing.T) {
+  	conformance.Run(t, func() pluginkit.Plugin { return myplugin.New(myplugin.Config{}) })
+  }
+  ```
+
+  It checks that the plugin registers, migrates, serves and shuts down on a fresh app with no goroutines left
+  behind; that PocketBase's own collections are unchanged and every collection it adds is named `_<name>_…`; and
+  that one plugin value serves several apps at once (as under pocker) without registering on one app touching
+  another's hooks. Run it with `go test -race`. It's the minimum every plugin passes; your own tests cover the
+  feature.
 - **Dependencies stay in your module.** Heavy libraries go in your plugin's `go.mod`, never in core's.
 - **Single app first.** Where it makes sense, a plugin should work on one PocketBase app, and add more under the
   pocker (multitenant) host.
