@@ -97,11 +97,11 @@ every level: on a single app and on every instance under pocker. Keep changes to
 
 *Bugs tracked here were found and fixed through production incidents and have not yet been fixed in upstream.*
 
-| Bug | Fix |
-|---|---|
-| A request that fails with a plain (non-`ApiError`) error is logged with status 0 instead of the status the client got. | [diff](https://github.com/pockethost/pocketone/compare/7b9ab7ccce7a0e5c9d96796a6bf804f3dd5e4c77...core-bugfix/request-log-status) |
-| A superuser's realtime subscription filter can't use hidden fields or superuser-only relations, though the same filter works in the list API, so matching events are silently dropped. | [diff](https://github.com/pockethost/pocketone/compare/7b9ab7ccce7a0e5c9d96796a6bf804f3dd5e4c77...core-bugfix/realtime-superuser-filter) |
-| On macOS, settings and collection changes made by another process aren't picked up: the notify file is written and removed at once, so kqueue never reports it. | [diff](https://github.com/pockethost/pocketone/compare/7b9ab7ccce7a0e5c9d96796a6bf804f3dd5e4c77...core-bugfix/notify-watcher-macos) |
+| Bug | Description | Fix |
+|---|---|---|
+| Request log shows status 0 | A request that fails with a plain (non-`ApiError`) error is logged with status 0 instead of the status the client got. | [diff](https://github.com/pockethost/pocketone/compare/7b9ab7ccce7a0e5c9d96796a6bf804f3dd5e4c77...core-bugfix/request-log-status) |
+| Superuser realtime filter drops events | A superuser's realtime subscription filter can't use hidden fields or superuser-only relations, though the same filter works in the list API, so matching events are silently dropped. | [diff](https://github.com/pockethost/pocketone/compare/7b9ab7ccce7a0e5c9d96796a6bf804f3dd5e4c77...core-bugfix/realtime-superuser-filter) |
+| macOS misses changes from other processes | On macOS, settings and collection changes made by another process aren't picked up: the notify file is written and removed at once, so kqueue never reports it. | [diff](https://github.com/pockethost/pocketone/compare/7b9ab7ccce7a0e5c9d96796a6bf804f3dd5e4c77...core-bugfix/notify-watcher-macos) |
 
 MIT, like PocketBase.
 
