@@ -11,7 +11,7 @@ import (
 	"github.com/pockethost/pocketone/ext/tokens"
 )
 
-// What Claude's connector flow needs (pockethost-support plans/ce-mcp-plan.md, Auth).
+// What Claude's connector flow needs (private maintainer plan for ext/mcp, Auth).
 func TestClaudeConnectorFlow(t *testing.T) {
 	var docURL string
 	doc := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

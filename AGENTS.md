@@ -44,4 +44,4 @@ Bug fixes to upstream behavior, each tested and meant for upstream; drop each on
   (`docs/plugins.md`). Modules that reach another `ext/` module add a `replace` for it.
 - Build checks: `go build -o /dev/null ./...` (a plain `go build` in a single-main module writes a binary into the
   tree). Stage files by name; never commit built binaries.
-- Plans and internal notes go in the private `pockethost-support` repo, never here.
+- Plans and internal notes go in a private maintainer repo, never here.
