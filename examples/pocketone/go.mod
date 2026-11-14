@@ -1,4 +1,4 @@
-module github.com/pockethost/pocketone/examples/ce
+module github.com/pockethost/pocketone/examples/pocketone
 
 go 1.27
 

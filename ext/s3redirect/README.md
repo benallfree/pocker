@@ -36,7 +36,7 @@ bucket allowing `GET` from your origin. Plain `<img>`, `<video>` and links need 
 
 ## In the standard PocketOne binary
 
-`examples/ce` (the PocketOne release binary) registers it **on by default**: turn on S3 in Settings → Files
+`examples/pocketone` (the PocketOne release binary) registers it **on by default**: turn on S3 in Settings → Files
 storage and downloads redirect. Flags: `--s3Redirect=false` streams as before, `--s3RedirectTTL 2m` changes how long
 each URL is valid.
 

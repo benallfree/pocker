@@ -1,7 +1,7 @@
 # PocketOne's release config (the repo root's .goreleaser.yaml is upstream's, for plain examples/base).
 # Run from the repo root:
 #
-#   goreleaser release --config examples/ce/.goreleaser.yaml --release-notes <file>
+#   goreleaser release --config examples/pocketone/.goreleaser.yaml --release-notes <file>
 #
 version: 2
 
@@ -12,12 +12,12 @@ dist: .builds
 before:
   hooks:
     - go mod tidy
-    - go -C examples/ce mod tidy
+    - go -C examples/pocketone mod tidy
 
 builds:
   - id: build_noncgo
     # the standard PocketOne binary: examples/base + the default PocketOne plugins, in its own module
-    dir: examples/ce
+    dir: examples/pocketone
     main: .
     binary: pocketone
     ldflags:
@@ -98,6 +98,6 @@ snapshot:
   version_template: '{{ incpatch .Version }}-next'
 
 # GitHub renders every newline in release notes as a line break: never hard-wrap the header above or the notes file.
-# Release notes are written by hand: always run `goreleaser release --config examples/ce/.goreleaser.yaml --release-notes <file>` (that skips the
+# Release notes are written by hand: always run `goreleaser release --config examples/pocketone/.goreleaser.yaml --release-notes <file>` (that skips the
 # generated changelog, which would list PocketBase's whole upstream history). Don't set changelog.disable: it drops
 # the --release-notes file too. The header above is prepended to the notes.

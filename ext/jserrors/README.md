@@ -4,7 +4,7 @@ JS hook errors that point at the `.pb.js` file they come from: `pb_hooks/main.pb
 `/your/cwd/pb.js:1:40`.
 
 **Runs on:** Single app, or many under [pocker](../pocker/README.md) (each instance's log). Ships in the standard
-`pocketone` binary ([`examples/ce`](../../examples/ce/main.go)).
+`pocketone` binary ([`examples/pocketone`](../../examples/pocketone/main.go)).
 
 ## Use
 

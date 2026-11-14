@@ -68,7 +68,7 @@ cd myapp
 pocketbase serve --dir ./pb_data
 ```
 
-The standard PocketOne binary ([`examples/ce`](../../examples/ce/main.go)) includes pages: put a `pb_pages` folder next
+The standard PocketOne binary ([`examples/pocketone`](../../examples/pocketone/main.go)) includes pages: put a `pb_pages` folder next
 to `pb_data` and run `pocketbase serve`. `--pagesDir` points it somewhere else. In your own Go build:
 
 ```go
