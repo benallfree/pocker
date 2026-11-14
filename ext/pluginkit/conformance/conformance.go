@@ -1,7 +1,8 @@
 // Package conformance is the shared test every PocketOne plugin runs. It checks what any [pluginkit.Plugin] must get
 // right whatever it does: it registers and runs on a fresh app and shuts down cleanly, it leaves PocketBase's own
-// collections alone and names its own `_<name>` or `_<name>_…`, and one plugin value can serve many apps at once (as under pocker)
-// without one app's registration reaching another.
+// collections alone and names its own `_<name>` or `_<name>_…`, one plugin value can serve many apps at once (as under pocker)
+// without one app's registration reaching another, and any MCP tools it adds are named `<name>_<verb>_<noun>` and
+// described.
 //
 // A plugin's test file calls it once:
 //
@@ -11,6 +12,14 @@
 //
 // Run it with -race: the many-apps check registers the same plugin value on several apps concurrently. Feature tests
 // stay in the plugin's own test files; this is only the minimum.
+//
+// A plugin that adds MCP tools (ext/mcp) puts an MCP server on the test apps with [Options.Setup], so the tool check
+// can see them:
+//
+//	conformance.Run(t, newPlugin, conformance.Options{Setup: func(app core.App) error {
+//		_, err := mcp.Register(app, mcp.Config{NoBuiltins: true})
+//		return err
+//	}})
 package conformance
 
 import (
@@ -18,6 +27,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 	"runtime"
 	"sort"
 	"strings"
@@ -47,6 +57,10 @@ type Options struct {
 	// GoroutineSlack is how many goroutines may outlive the app (default 0). Raise it only with a comment saying
 	// which goroutine stays and why it's harmless.
 	GoroutineSlack int
+
+	// Setup runs on every test app before the plugin registers: what the plugin expects the host to have put there
+	// first, such as an MCP server (ext/mcp) for a plugin that adds tools.
+	Setup func(app core.App) error
 }
 
 // TB is the part of testing.T the checks use, so they can be tested against a recorder.
@@ -71,10 +85,19 @@ func Run(t *testing.T, newPlugin func() pluginkit.Plugin, opts ...Options) {
 	if name == "" || strings.ContainsAny(name, " _/.") || strings.ToLower(name) != name {
 		t.Fatalf("Name() = %q: want a non-empty lowercase key with no spaces, dots, slashes or underscores", name)
 	}
+	if name == "pb" {
+		t.Fatalf(`Name() = "pb": reserved for PocketBase's own MCP tools (pb_*)`)
+	}
 
 	t.Run("Lifecycle", func(t *testing.T) { CheckLifecycle(t, newPlugin(), o) })
 	t.Run("Collections", func(t *testing.T) { CheckCollections(t, newPlugin(), o) })
 	t.Run("ManyApps", func(t *testing.T) { CheckManyApps(t, newPlugin(), withApps(o)) })
+	t.Run("MCPTools", func(t *testing.T) {
+		if o.Setup == nil {
+			t.Skip("no Options.Setup: the plugin adds no MCP tools")
+		}
+		CheckMCPTools(t, newPlugin(), o)
+	})
 }
 
 func withApps(o Options) Options {
@@ -88,7 +111,7 @@ func withApps(o Options) Options {
 // started outlives the app (and, for a [pluginkit.Closer], its Close).
 func CheckLifecycle(t TB, p pluginkit.Plugin, o Options) {
 	before := goroutines()
-	app := newApp(t)
+	app := newApp(t, o)
 	if err := start(app, p, o.Layers); err != nil {
 		t.Fatal(err)
 	}
@@ -112,14 +135,14 @@ func CheckLifecycle(t TB, p pluginkit.Plugin, o Options) {
 // CheckCollections: PocketBase's own collections are unchanged, and every collection the plugin adds is named
 // `_<name>` or `_<name>_…` (or allowed with a reason).
 func CheckCollections(t TB, p pluginkit.Plugin, o Options) {
-	base := newApp(t)
+	base := newApp(t, o)
 	if err := start(base, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 	want := snapshot(t, base)
 	_ = stop(base)
 
-	app := newApp(t)
+	app := newApp(t, o)
 	if err := start(app, p, o.Layers); err != nil {
 		t.Fatal(err)
 	}
@@ -159,7 +182,7 @@ func CheckManyApps(t TB, p pluginkit.Plugin, o Options) {
 	o = withApps(o)
 	apps := make([]*core.BaseApp, o.Apps)
 	for i := range apps {
-		apps[i] = newApp(t)
+		apps[i] = newApp(t, o)
 	}
 	for i, app := range apps {
 		before := allHookCounts(apps)
@@ -183,7 +206,7 @@ func CheckManyApps(t TB, p pluginkit.Plugin, o Options) {
 	errs := make([]error, len(more))
 	var wg sync.WaitGroup
 	for i := range more {
-		more[i] = newApp(t)
+		more[i] = newApp(t, o)
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
@@ -209,6 +232,47 @@ func CheckManyApps(t TB, p pluginkit.Plugin, o Options) {
 	}
 }
 
+// CheckMCPTools: every MCP tool the plugin adds (to the server [Options.Setup] put on the app) is named
+// `<name>_<verb>_<noun>`: the plugin's name (with "-" as "_"), then at least two lowercase words joined by "_". Each
+// has a description, and an input schema, when it has one, is a JSON Schema object. The `pb_` prefix is
+// PocketBase's own.
+func CheckMCPTools(t TB, p pluginkit.Plugin, o Options) {
+	app := newApp(t, o)
+	before, ok := pluginkit.Tools(app)
+	if !ok {
+		t.Fatalf("Options.Setup put no MCP server on the app (ext/mcp's Register does)")
+	}
+	if err := start(app, p, o.Layers); err != nil {
+		t.Fatal(err)
+	}
+	defer stop(app)
+	after, _ := pluginkit.Tools(app)
+
+	had := map[string]bool{}
+	for _, tool := range before {
+		had[tool.Name] = true
+	}
+	prefix := strings.ReplaceAll(p.Name(), "-", "_") + "_"
+	for _, tool := range after {
+		if had[tool.Name] {
+			continue
+		}
+		rest, found := strings.CutPrefix(tool.Name, prefix)
+		if !found || !toolWords.MatchString(rest) {
+			t.Errorf("MCP tool %q: name it %s<verb>_<noun> (lowercase words joined by _, e.g. %slist_items)", tool.Name, prefix, prefix)
+		}
+		if strings.TrimSpace(tool.Description) == "" {
+			t.Errorf("MCP tool %q has no description; models pick tools by it", tool.Name)
+		}
+		if tool.InputSchema != nil && tool.InputSchema["type"] != "object" {
+			t.Errorf("MCP tool %q: input schema must be a JSON Schema object ({\"type\": \"object\", ...})", tool.Name)
+		}
+	}
+}
+
+// toolWords is the part of a tool name after the plugin prefix: a verb and a noun at least.
+var toolWords = regexp.MustCompile(`^[a-z][a-z0-9]*(_[a-z0-9]+)+$`)
+
 func allHookCounts(apps []*core.BaseApp) []map[string]int {
 	out := make([]map[string]int, len(apps))
 	for i, a := range apps {
@@ -220,10 +284,15 @@ func allHookCounts(apps []*core.BaseApp) []map[string]int {
 var appSeq atomic.Int64
 
 // newApp is a fresh app with its own host id ([pluginkit.AppID]), as pocker gives each instance.
-func newApp(t TB) *core.BaseApp {
+func newApp(t TB, o Options) *core.BaseApp {
 	t.Helper()
 	app := core.NewBaseApp(core.BaseAppConfig{DataDir: t.TempDir(), EncryptionEnv: "", QueryTimeout: 10 * time.Second})
 	pluginkit.SetAppID(app, fmt.Sprintf("app%d", appSeq.Add(1)))
+	if o.Setup != nil {
+		if err := o.Setup(app); err != nil {
+			t.Fatalf("Options.Setup: %v", err)
+		}
+	}
 	return app
 }
 

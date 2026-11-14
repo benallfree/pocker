@@ -25,6 +25,7 @@ import (
 	"sync"
 
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
+	"github.com/pockethost/pocketone/ext/pluginkit"
 )
 
 const (
@@ -200,6 +201,7 @@ func Register(app core.App, cfg Config) (*Server, error) {
 		}
 	}
 	app.Store().Set(storeKey, s)
+	pluginkit.SetToolLister(app, s) // lets checks such as the plugin conformance test see the tools
 
 	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
 		s.setupOAuth()
@@ -264,6 +266,16 @@ func (s *Server) Tools() []*Tool {
 		out = append(out, t)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out
+}
+
+// ToolInfos implements [pluginkit.ToolLister].
+func (s *Server) ToolInfos() []pluginkit.ToolInfo {
+	tools := s.Tools()
+	out := make([]pluginkit.ToolInfo, len(tools))
+	for i, t := range tools {
+		out[i] = pluginkit.ToolInfo{Name: t.Name, Description: t.Description, InputSchema: t.InputSchema}
+	}
 	return out
 }
 

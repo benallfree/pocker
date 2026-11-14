@@ -152,3 +152,81 @@ func TestCrossAppHooksFail(t *testing.T) {
 		t.Fatalf("hooks bound on another app not reported: %v", r.errors)
 	}
 }
+
+// fakeMCP stands in for ext/mcp's server: Setup puts one on each app, and toolPlugin adds its tools to it on serve.
+type fakeMCP struct {
+	mu    sync.Mutex
+	tools []pluginkit.ToolInfo
+}
+
+func (f *fakeMCP) ToolInfos() []pluginkit.ToolInfo {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]pluginkit.ToolInfo(nil), f.tools...)
+}
+
+func withMCP(app core.App) error {
+	f := &fakeMCP{tools: []pluginkit.ToolInfo{{Name: "pb_list_collections", Description: "built in"}}}
+	app.Store().Set("fakemcp", f)
+	pluginkit.SetToolLister(app, f)
+	return nil
+}
+
+type toolPlugin struct {
+	name  string
+	tools []pluginkit.ToolInfo
+}
+
+func (p *toolPlugin) Name() string { return p.name }
+func (p *toolPlugin) Register(app core.App, _ pluginkit.Config) error {
+	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
+		f := e.App.Store().Get("fakemcp").(*fakeMCP)
+		f.mu.Lock()
+		f.tools = append(f.tools, p.tools...)
+		f.mu.Unlock()
+		return e.Next()
+	})
+	return nil
+}
+
+var objectSchema = map[string]any{"type": "object", "properties": map[string]any{}}
+
+func TestGoodToolsPass(t *testing.T) {
+	conformance.Run(t, func() pluginkit.Plugin {
+		return &toolPlugin{name: "oauth-server", tools: []pluginkit.ToolInfo{
+			{Name: "oauth_server_list_clients", Description: "Lists OAuth clients.", InputSchema: objectSchema},
+			{Name: "oauth_server_revoke_client_tokens", Description: "Revokes a client's tokens."},
+		}}
+	}, conformance.Options{Setup: withMCP})
+}
+
+func TestBadToolsFail(t *testing.T) {
+	r := check(t, func(tb conformance.TB) {
+		conformance.CheckMCPTools(tb, &toolPlugin{name: "shop", tools: []pluginkit.ToolInfo{
+			{Name: "list_orders", Description: "no prefix"},
+			{Name: "pb_shop_orders", Description: "PocketBase's prefix"},
+			{Name: "shop_orders", Description: "one word after the prefix"},
+			{Name: "shop_ListOrders", Description: "not lowercase"},
+			{Name: "shop_list_orders"},
+			{Name: "shop_get_order", Description: "Gets an order.", InputSchema: map[string]any{"type": "string"}},
+		}}, conformance.Options{Setup: withMCP})
+	})
+	for _, want := range []string{`"list_orders": name it shop_`, `"pb_shop_orders": name it`, `"shop_orders": name it`,
+		`"shop_ListOrders": name it`, `"shop_list_orders" has no description`, `"shop_get_order": input schema`} {
+		if !r.has(want) {
+			t.Errorf("not reported: %s\ngot: %v", want, r.errors)
+		}
+	}
+	if len(r.errors) != 6 {
+		t.Errorf("want 6 problems, got %d: %v", len(r.errors), r.errors)
+	}
+}
+
+func TestToolCheckNeedsAnMCPServer(t *testing.T) {
+	r := check(t, func(tb conformance.TB) {
+		conformance.CheckMCPTools(tb, &toolPlugin{name: "shop"}, conformance.Options{Setup: func(core.App) error { return nil }})
+	})
+	if !r.has("put no MCP server") {
+		t.Fatalf("missing MCP server not reported: %v", r.errors)
+	}
+}

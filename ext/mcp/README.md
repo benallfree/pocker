@@ -72,6 +72,20 @@ mcp.Tool{
 - Arguments are not validated against `InputSchema`, so check the ones you rely on.
 - `server.AddInstructions(text)` adds a paragraph to the `instructions` sent in `initialize`.
 
+### Tools from a plugin
+
+A PocketOne plugin that adds tools names them `<plugin>_<verb>_<noun>`: its name (with `-` as `_`), then at least
+two lowercase words, such as `notes_list_notes` or `oauth_server_revoke_client`. Each has a description, and an input
+schema, when it has one, is a JSON Schema object. `pb_` is reserved for the built-in tools. The conformance test
+checks all of this when the plugin's test puts an MCP server on the test apps:
+
+```go
+conformance.Run(t, newPlugin, conformance.Options{Setup: func(app core.App) error {
+    _, err := mcp.Register(app, mcp.Config{})
+    return err
+}})
+```
+
 ## From JS (pb_hooks)
 
 ```go
