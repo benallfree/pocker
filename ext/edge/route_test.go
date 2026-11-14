@@ -23,7 +23,9 @@ func owner(t *testing.T) *httptest.Server {
 			_, _ = io.WriteString(w, `{"status":"ok"}`)
 			return
 		}
-		w.Header().Set("X-Powered-By", "owner")
+		if r.URL.Path != "/plain" {
+			w.Header().Set("X-Powered-By", "owner")
+		}
 		w.Header().Set("Access-Control-Allow-Origin", "https://owner-says.example")
 		_, _ = io.WriteString(w, "owner "+r.Host+r.URL.Path+" from "+r.Header.Get("X-Edge-Forwarded-By"))
 	}))
@@ -55,6 +57,10 @@ func TestForwardViaYAMLProvider(t *testing.T) {
 		}
 		if got := w.Header().Values("X-Powered-By"); len(got) != 1 || got[0] != "owner" {
 			t.Fatalf("X-Powered-By: %v", got)
+		}
+		// an owner that sends none (upstream PocketBase): the entry edge doesn't claim it
+		if got := serveRT(rt, inst, http.MethodGet, "/plain", nil).Header().Values("X-Powered-By"); len(got) != 0 {
+			t.Fatalf("X-Powered-By from a silent owner: %v", got)
 		}
 	}
 }

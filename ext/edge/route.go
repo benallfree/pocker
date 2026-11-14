@@ -289,9 +289,8 @@ func (rt *Router) Forward(w http.ResponseWriter, r *http.Request, inst Instance)
 			},
 			Transport: rt.transport,
 			ModifyResponse: func(res *http.Response) error {
-				if res.Header.Get("X-Powered-By") != "" {
-					w.Header().Del("X-Powered-By") // the owner fulfilled it: its value replaces ours (the proxy would add both)
-				}
+				// the owner fulfilled it: its X-Powered-By (or none, e.g. upstream PocketBase) replaces ours
+				w.Header().Del("X-Powered-By")
 				if policy != nil {
 					policy.rewriteUpstream(res.Header)
 				}

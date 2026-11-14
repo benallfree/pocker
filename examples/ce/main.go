@@ -39,6 +39,9 @@ import (
 	"github.com/pockethost/pocketone/ext/tokens"
 )
 
+// PoweredBy is the X-Powered-By this binary sends on every response.
+const PoweredBy = "PocketOne"
+
 func main() {
 	// pocketbase.yaml (and the .env beside it): each plugin's section, defaults for the flags below (flags win)
 	cfgOpts := config.FromArgs(os.Args[1:])
@@ -299,6 +302,11 @@ func main() {
 	// (if publicDir exists and the route path is not already defined)
 	app.OnServe().Bind(&hook.Handler[*core.ServeEvent]{
 		Func: func(e *core.ServeEvent) error {
+			// name the server that answers (a host or proxy in front passes it through)
+			e.Router.BindFunc(func(re *core.RequestEvent) error {
+				re.Response.Header().Set("X-Powered-By", PoweredBy)
+				return re.Next()
+			})
 			if !e.Router.HasRoute(http.MethodGet, "/{path...}") {
 				e.Router.GET("/{path...}", apis.Static(os.DirFS(publicDir), indexFallback))
 			}
